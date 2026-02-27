@@ -1,27 +1,45 @@
 # 岗位相关路由（列表、画像、图谱)
 # routes/job.py
 from flask import Blueprint, request, jsonify
+from db import get_db
+import json
 
 job_bp = Blueprint('job', __name__, url_prefix='/api')
 
 @job_bp.route('/jobs', methods=['GET'])
 def get_jobs():
-    """获取岗位列表（模拟数据）"""
-    mock_jobs = [
-        {"jobName": "数据分析师", "company": "腾讯", "industry": "互联网", "salary": "20-35K"},
-        {"jobName": "前端开发工程师", "company": "字节跳动", "industry": "互联网", "salary": "18-30K"},
-        {"jobName": "产品经理", "company": "阿里巴巴", "industry": "互联网", "salary": "25-40K"},
-        {"jobName": "Java开发工程师", "company": "美团", "industry": "互联网", "salary": "18-32K"},
-        {"jobName": "UI设计师", "company": "网易", "industry": "互联网", "salary": "15-25K"},
-        {"jobName": "测试开发工程师", "company": "百度", "industry": "互联网", "salary": "16-28K"},
-        {"jobName": "运维工程师", "company": "京东", "industry": "互联网", "salary": "15-26K"},
-        {"jobName": "大数据开发", "company": "快手", "industry": "互联网", "salary": "22-38K"},
-    ]
-    return jsonify({"total": len(mock_jobs), "data": mock_jobs})
+    """从数据库获取岗位列表"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM job")
+    rows = cursor.fetchall()
+    jobs = [dict(row) for row in rows]
+    conn.close()
+    return jsonify({"total": len(jobs), "data": jobs})
 
 @job_bp.route('/job/<name>/profile', methods=['GET'])
 def get_job_profile(name):
-    """获取岗位画像（模拟数据）"""
+    """获取岗位画像，优先从数据库读取，没有则返回默认模拟数据"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT skills, certificates, soft_abilities FROM job_profile WHERE job_name = ?", (name,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        # row contains TEXT columns; assume JSON stored if complex
+        try:
+            skills = json.loads(row['skills']) if row['skills'] else []
+            certificates = json.loads(row['certificates']) if row['certificates'] else []
+        except Exception:
+            skills = row['skills']
+            certificates = row['certificates']
+        return jsonify({
+            "jobName": name,
+            "skills": skills,
+            "certificates": certificates,
+            "soft_abilities": row['soft_abilities'],
+        })
+    # fallback simulacrum
     mock_profiles = {
         "数据分析师": {
             "jobName": "数据分析师",
