@@ -62,3 +62,15 @@ def save_student():
     student_id = cursor.lastrowid
     conn.close()
     return jsonify({"id": student_id})
+
+
+@student_bp.route('/students', methods=['GET'])
+def get_students():
+    """返回所有学生信息"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM student")
+    rows = cursor.fetchall()
+    students = [dict(row) for row in rows]
+    conn.close()
+    return jsonify({"total": len(students), "data": students})
