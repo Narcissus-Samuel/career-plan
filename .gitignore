@@ -1,0 +1,2 @@
+# 前端依赖（核心：忽略 node_modules）
+node_modules/
