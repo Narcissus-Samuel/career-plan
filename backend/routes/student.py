@@ -10,7 +10,7 @@ student_bp = Blueprint('student', __name__, url_prefix='/api')
 
 @student_bp.route('/parse_resume', methods=['POST'])
 def parse_resume():
-    """上传并解析简历（当前模拟解析）"""
+    """上传并解析简历（当前为模拟数据，待集成真实解析函数）"""
     if 'file' not in request.files:
         return jsonify({"error": "没有上传文件"}), 400
     file = request.files['file']
@@ -21,7 +21,11 @@ def parse_resume():
     file_path = os.path.join(UPLOAD_FOLDER, filename)
     file.save(file_path)
 
-    # ========== 模拟解析结果 ==========
+    # TODO: 后续替换为成员3的真实解析函数调用
+    # from services.llm_service import parse_resume as real_parse
+    # result = real_parse(file_path)
+
+    # 模拟解析结果（保持与数据库字段一致）
     mock_result = {
         "name": "张三",
         "major": "计算机科学与技术",
@@ -33,14 +37,13 @@ def parse_resume():
         "completeness": 85,
         "competitiveness": 78
     }
-    # ========== 模拟结束 ==========
 
     os.remove(file_path)
     return jsonify(mock_result)
 
 @student_bp.route('/student', methods=['POST'])
 def save_student():
-    """将学生信息保存到数据库"""
+    """将学生信息保存到 SQLite 数据库"""
     data = request.json
     conn = get_db()
     cursor = conn.cursor()
@@ -62,15 +65,3 @@ def save_student():
     student_id = cursor.lastrowid
     conn.close()
     return jsonify({"id": student_id})
-
-
-@student_bp.route('/students', methods=['GET'])
-def get_students():
-    """返回所有学生信息"""
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM student")
-    rows = cursor.fetchall()
-    students = [dict(row) for row in rows]
-    conn.close()
-    return jsonify({"total": len(students), "data": students})
