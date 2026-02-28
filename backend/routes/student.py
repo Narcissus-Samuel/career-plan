@@ -47,10 +47,12 @@ def save_student():
     data = request.json
     conn = get_db()
     cursor = conn.cursor()
+    # allow optional user_id field
     cursor.execute('''
-        INSERT INTO student (name, major, grade, skills, certificates, internships, interests, completeness, competitiveness)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO student (user_id, name, major, grade, skills, certificates, internships, interests, completeness, competitiveness)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
+        data.get('user_id'),
         data.get('name'),
         data.get('major'),
         data.get('grade'),

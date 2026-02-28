@@ -122,10 +122,11 @@ def init_db():
             )
         ''')
 
-    # 创建学生表
+    # 创建学生表（可关联到 users 表）
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS student (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,      -- 如果用户登录，可保存对应ID
             name TEXT,
             major TEXT,
             grade TEXT,
@@ -138,6 +139,11 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    # 如果表已经存在但旧版本没有 user_id 字段，尝试添加
+    cursor.execute("PRAGMA table_info(student)")
+    cols = [row['name'] for row in cursor.fetchall()]
+    if 'user_id' not in cols:
+        cursor.execute("ALTER TABLE student ADD COLUMN user_id INTEGER")
 
     # 创建岗位画像表（用于存储大模型生成的岗位画像）
     cursor.execute('''
@@ -172,6 +178,30 @@ def init_db():
             content TEXT,
             format_type TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # 新增：创建用户/管理员、验证码等相关表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            phone TEXT UNIQUE,
+            password_hash TEXT NOT NULL,
+            role TEXT DEFAULT 'user',        -- user/admin
+            is_active INTEGER DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # 存储短信验证码或注册验证码，后续可以用于验证
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS verification_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            phone TEXT,
+            code TEXT,
+            expires_at TIMESTAMP
         )
     ''')
 

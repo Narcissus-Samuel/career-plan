@@ -120,17 +120,27 @@ const handleLogin = async () => {
 
   try {
     isLoading.value = true
-    // 模拟接口请求（实际项目替换为真实接口）
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
+    // 调用后端登录接口
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: loginForm.value.username, password: loginForm.value.password })
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      throw new Error(data.error || '登录失败')
+    }
+
     // 登录成功逻辑
     alert('登录成功！')
     // 存储token（示例）
-    localStorage.setItem('token', 'mock-token-' + Date.now())
+    localStorage.setItem('token', data.token)
+    // 可以把用户信息放在 localStorage 或者状态管理中
+    localStorage.setItem('currentUser', JSON.stringify(data.user))
     // 跳转到首页
     router.push('/')
   } catch (error) {
-    alert('登录失败：账号或密码错误')
+    alert('登录失败：' + error.message)
   } finally {
     isLoading.value = false
   }
