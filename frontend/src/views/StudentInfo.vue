@@ -307,6 +307,31 @@ const submitForm = () => {
       competitivenessScore.value = Math.min(skillScore + certScore + internScore, 100)
       
       ElMessage.success('信息录入成功！大模型正在生成人岗匹配结果...')
+
+      // 如果登录了用户，可将 student 数据同步到后端
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null')
+      const payload = {
+        user_id: currentUser ? currentUser.id : null,
+        name: studentForm.name,
+        major: studentForm.major,
+        grade: studentForm.grade,
+        skills: studentForm.skills,
+        certificates: studentForm.certificates,
+        internships: studentForm.internships,
+        interests: studentForm.interests,
+        completeness: completenessScore.value,
+        competitiveness: competitivenessScore.value
+      }
+      fetch('/api/student', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(r => r.json()).then(res => {
+        console.log('student saved', res)
+      }).catch(err => {
+        console.warn('failed to save student info', err)
+      })
+
       localStorage.setItem('studentInfo', JSON.stringify(studentForm))
       localStorage.setItem('scoreInfo', JSON.stringify({
         completeness: completenessScore.value,
