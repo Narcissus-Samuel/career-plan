@@ -205,7 +205,7 @@ const validateForm = () => {
 }
 
 // 获取验证码
-const getVerifyCode = () => {
+const getVerifyCode = async () => {
   // 先验证手机号
   if (!registerForm.value.phone.trim()) {
     formError.value.phone = '请输入手机号'
@@ -217,6 +217,22 @@ const getVerifyCode = () => {
     return
   }
 
+  try {
+    // 向后端请求发送验证码
+    const res = await fetch('/api/send_code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: registerForm.value.phone })
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      throw new Error(data.error || '发送验证码失败')
+    }
+    alert(`验证码已发送至手机号 ${registerForm.value.phone}，模拟码：${data.code}`)
+  } catch (err) {
+    alert(err.message)
+  }
+
   // 开始倒计时
   codeCountdown.value = 60
   countdownTimer = setInterval(() => {
@@ -225,9 +241,6 @@ const getVerifyCode = () => {
       clearInterval(countdownTimer)
     }
   }, 1000)
-
-  // 模拟发送验证码接口
-  alert(`验证码已发送至手机号 ${registerForm.value.phone}，验证码：123456`)
 }
 
 // 处理注册逻辑
@@ -237,15 +250,28 @@ const handleRegister = async () => {
 
   try {
     isLoading.value = true
-    // 模拟接口请求（实际项目替换为真实接口）
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
+    // 调用后端注册接口
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: registerForm.value.username,
+        phone: registerForm.value.phone,
+        password: registerForm.value.password,
+        code: registerForm.value.code
+      })
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      throw new Error(data.error || '注册失败')
+    }
+
     // 注册成功逻辑
     alert('注册成功！即将跳转到登录页')
     // 跳转到登录页
     router.push('/login')
   } catch (error) {
-    alert('注册失败：该手机号已被注册')
+    alert('注册失败：' + error.message)
   } finally {
     isLoading.value = false
   }
