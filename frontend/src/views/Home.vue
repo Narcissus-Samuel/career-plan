@@ -329,7 +329,7 @@ const handleImageUpload = (e) => {
 const goToFeature = (type) => {
   switch(type) {
     case '测评':
-      router.push('/interest-assessment')
+      router.push('/interest-test')
       break
     case '分析':
       router.push('/ability-analysis')
