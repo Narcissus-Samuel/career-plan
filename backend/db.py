@@ -204,6 +204,19 @@ def init_db():
             expires_at TIMESTAMP
         )
     ''')
+    #让前端首页的 contentList 从数据库动态加载。
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS content (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        img_url TEXT,
+        stage TEXT,
+        type TEXT,
+        category TEXT,               -- 分类：direction/template/case
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+''')
 
     conn.commit()
     conn.close()

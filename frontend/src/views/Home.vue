@@ -1,6 +1,6 @@
 <template>
   <div class="career-home">
-    <!-- 1. 顶部导航（默认选中首页，新增核心功能下拉菜单） -->
+    <!-- 1. 顶部导航 -->
     <header class="top-nav">
       <div class="nav-wrap">
         <div class="nav-left">
@@ -9,19 +9,12 @@
             <span class="logo-text">大学生职业规划系统</span>
           </div>
           <ul class="nav-menu">
-            <!-- 首页 - 激活状态 + 跳转事件 -->
             <li class="menu-item active" @click="$router.push('/')">首页</li>
-            <!-- 职业规划 - 跳转事件 -->
             <li class="menu-item" @click="$router.push('/career-planning')">职业规划</li>
-            <!-- 能力测评 - 跳转事件 -->
             <li class="menu-item" @click="$router.push('/ability-assessment')">能力测评</li>
-            <!-- 报告生成 - 跳转事件 -->
             <li class="menu-item" @click="$router.push('/report-generate')">报告生成</li>
-            <!-- 资源库 - 跳转事件 -->
             <li class="menu-item" @click="$router.push('/resource-library')">资源库</li>
-            <!-- 关于我们 - 跳转事件 -->
             <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
-            <!-- 核心功能下拉菜单（原Banner区四个按钮迁移至此） -->
             <li class="menu-item dropdown">
               核心功能 ▼
               <ul class="dropdown-menu">
@@ -42,14 +35,13 @@
           </ul>
         </div>
         <div class="nav-right">
-          <!-- 登录/注册按钮 - 跳转事件 -->
           <button class="btn-login" @click="$router.push('/login')">登录</button>
           <button class="btn-register" @click="$router.push('/register')">注册</button>
         </div>
       </div>
     </header>
 
-    <!-- 2. Banner区（替换为可上传的滚动轮播图） -->
+    <!-- 2. Banner区（轮播图） -->
     <section class="banner-carousel">
       <div class="carousel-container" ref="carouselRef">
         <div 
@@ -62,7 +54,6 @@
               alt="轮播图" 
               class="carousel-img"
             >
-            <!-- 轮播图上保留核心文案（无按钮，按钮已迁移到导航） -->
             <div class="carousel-overlay">
               <div class="overlay-left">
                 <h1 class="overlay-title">大学生智能职业规划系统</h1>
@@ -77,10 +68,8 @@
             </div>
           </div>
         </div>
-        <!-- 轮播控制按钮 -->
         <button class="carousel-btn prev-btn" @click="prevSlide">◀</button>
         <button class="carousel-btn next-btn" @click="nextSlide">▶</button>
-        <!-- 轮播指示器 -->
         <div class="carousel-indicators">
           <span 
             class="indicator" 
@@ -90,7 +79,6 @@
             @click="goToSlide(index)"
           ></span>
         </div>
-        <!-- 图片上传按钮 -->
         <div class="upload-area">
           <label class="upload-btn">
             <input 
@@ -118,34 +106,29 @@
       </div>
     </section>
 
-    <!-- 4. 核心分类入口（取消找工作/考研卡片颜色加深） -->
+    <!-- 4. 核心分类入口 -->
     <section class="category-section">
       <div class="category-wrap">
-        <!-- 找工作规划 - 跳转事件 -->
         <div class="category-card" @click="$router.push('/job-planning')">
           <div class="card-icon">👨💼</div>
           <div class="card-title">找工作规划</div>
           <div class="card-desc">校招、实习、应届生求职</div>
         </div>
-        <!-- 考研规划 - 跳转事件 -->
         <div class="category-card" @click="$router.push('/postgraduate-planning')">
           <div class="card-icon">🎓</div>
           <div class="card-title">考研规划</div>
           <div class="card-desc">择校、择专业、备考计划</div>
         </div>
-        <!-- 留学规划 - 跳转事件 -->
         <div class="category-card" @click="$router.push('/study-abroad-planning')">
           <div class="card-icon">🌏</div>
           <div class="card-title">留学规划</div>
           <div class="card-desc">选校、文书、语言备考</div>
         </div>
-        <!-- 考公规划 - 跳转事件 -->
         <div class="category-card" @click="$router.push('/civil-service-planning')">
           <div class="card-icon">💼</div>
           <div class="card-title">考公规划</div>
           <div class="card-desc">岗位筛选、备考指导</div>
         </div>
-        <!-- 创业规划 - 跳转事件 -->
         <div class="category-card" @click="$router.push('/entrepreneurship-planning')">
           <div class="card-icon">📈</div>
           <div class="card-title">创业规划</div>
@@ -154,15 +137,12 @@
       </div>
     </section>
 
-    <!-- 5. 内容筛选区 -->
+    <!-- 5. 内容筛选区（含滑动分页） -->
     <section class="content-section">
       <div class="content-wrap">
         <div class="content-tabs">
-          <!-- 职业方向 - 点击切换 + 跳转 -->
           <span class="tab-item active" @click="switchTab('direction')">职业方向(200+)</span>
-          <!-- 规划模板 - 点击切换 + 跳转 -->
           <span class="tab-item" @click="switchTab('template')">规划模板(50+)</span>
-          <!-- 成功案例 - 点击切换 + 跳转 -->
           <span class="tab-item" @click="switchTab('case')">成功案例(1000+) <span class="new-tag">NEW</span></span>
         </div>
         <div class="filter-section">
@@ -200,20 +180,51 @@
             </label>
           </div>
         </div>
-        <div class="content-preview">
-          <!-- 内容卡片 - 跳转事件 -->
-          <div class="content-card" v-for="(item, i) in contentList" :key="i" @click="$router.push(`/detail/${item.id}`)">
-            <div class="card-header">
-              <span class="card-title">{{ item.title }}</span>
-            </div>
-            <div class="card-body">
-              <img :src="item.imgUrl" alt="规划案例" class="card-img">
-            </div>
-            <div class="card-footer">
-              <span class="tag">{{ item.stage }}</span>
-              <span class="tag">{{ item.type }}</span>
+
+        <!-- 滑动内容容器 -->
+        <div class="content-slider-container">
+          <div 
+            class="content-slider" 
+            :style="{ transform: `translateX(-${(currentPage - 1) * 100}%)` }"
+          >
+            <div 
+              class="slider-page" 
+              v-for="page in totalPages" 
+              :key="page"
+            >
+              <div class="content-preview">
+                <div 
+                  class="content-card" 
+                  v-for="item in getPageData(page)" 
+                  :key="item.id" 
+                  @click="$router.push(`/detail/${item.id}`)"
+                >
+                  <div class="card-header">
+                    <span class="card-title">{{ item.title }}</span>
+                  </div>
+                  <div class="card-body">
+                    <img :src="item.imgUrl" alt="规划案例" class="card-img">
+                  </div>
+                  <div class="card-footer">
+                    <span class="tag">{{ item.stage }}</span>
+                    <span class="tag">{{ item.type }}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
+        </div>
+
+        <!-- 分页控件 -->
+        <div class="pagination-wrap" style="margin-top: 30px; text-align: center;">
+          <el-pagination
+            background
+            layout="prev, pager, next"
+            :total="total"
+            :page-size="pageSize"
+            :current-page="currentPage"
+            @current-change="handlePageChange"
+          />
         </div>
       </div>
     </section>
@@ -228,13 +239,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import axios from 'axios'
 
-// 初始化路由实例
 const router = useRouter()
 
-// 轮播相关数据
+// ---------- 轮播相关 ----------
 const carouselRef = ref(null)
 const currentIndex = ref(0)
 const carouselList = ref([
@@ -244,77 +255,33 @@ const carouselList = ref([
 ])
 let carouselTimer = null
 
-// 内容列表数据（替换原硬编码）
-const contentList = ref([
-  { 
-    id: 1, 
-    title: '互联网产品岗规划', 
-    imgUrl: 'https://picsum.photos/seed/career1/300/200', 
-    stage: '适配大三', 
-    type: '免费' 
-  },
-  { 
-    id: 2, 
-    title: '计算机考研规划', 
-    imgUrl: 'https://picsum.photos/seed/career2/300/200', 
-    stage: '适配大三', 
-    type: '免费' 
-  },
-  { 
-    id: 3, 
-    title: '金融行业求职规划', 
-    imgUrl: 'https://picsum.photos/seed/career3/300/200', 
-    stage: '适配大三', 
-    type: '免费' 
-  },
-  { 
-    id: 4, 
-    title: '考公备考规划', 
-    imgUrl: 'https://picsum.photos/seed/career4/300/200', 
-    stage: '适配大三', 
-    type: '免费' 
-  }
-])
-
-// 轮播自动播放
 const startCarousel = () => {
   carouselTimer = setInterval(() => {
     nextSlide()
   }, 3000)
 }
-
-// 上一张轮播图
 const prevSlide = () => {
   currentIndex.value = (currentIndex.value - 1 + carouselList.value.length) % carouselList.value.length
 }
-
-// 下一张轮播图
 const nextSlide = () => {
   currentIndex.value = (currentIndex.value + 1) % carouselList.value.length
 }
-
-// 跳转到指定轮播图
 const goToSlide = (index) => {
   currentIndex.value = index
 }
-
-// 处理轮播图片上传
 const handleImageUpload = (e) => {
   const file = e.target.files[0]
   if (!file) return
-  
   const isImage = file.type.startsWith('image/')
   if (!isImage) {
     alert('请上传图片格式的文件（jpg/png）！')
     return
   }
-
   const isLt5M = file.size / 1024 / 1024 < 5
   if (!isLt5M) {
     alert('图片大小不能超过5MB！')
     return
   }
-
   const reader = new FileReader()
   reader.onload = (event) => {
     carouselList.value.push({ url: event.target.result })
@@ -325,85 +292,87 @@ const handleImageUpload = (e) => {
   e.target.value = ''
 }
 
-// 核心功能按钮跳转逻辑
-const goToFeature = (type) => {
-  switch(type) {
-    case '测评':
-      router.push('/interest-assessment')
-      break
-    case '分析':
-      router.push('/ability-analysis')
-      break
-    case '规划':
-      router.push('/development-path')
-      break
-    case '导出':
-      router.push('/report-export')
-      break
-    default:
-      break
+// ---------- 内容列表（一次性获取全部，前端分页滑动） ----------
+const allData = ref([])
+const loading = ref(false)
+const pageSize = ref(8)
+const currentPage = ref(1)
+
+const total = computed(() => allData.value.length)
+const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
+
+const getPageData = (page) => {
+  const start = (page - 1) * pageSize.value
+  const end = start + pageSize.value
+  return allData.value.slice(start, end)
+}
+
+const fetchAllContents = async () => {
+  loading.value = true
+  try {
+    // 假设后端接口支持 size 参数，这里传一个较大的值获取全部数据
+    const res = await axios.get('/api/contents?size=1000')
+    allData.value = res.data.data || []
+  } catch (error) {
+    console.error('获取内容列表失败', error)
+  } finally {
+    loading.value = false
   }
 }
 
-// 搜索功能
+const handlePageChange = (page) => {
+  currentPage.value = page
+}
+
+// ---------- 其他功能（导航、搜索、筛选等）----------
+const goToFeature = (type) => {
+  switch(type) {
+    case '测评': router.push('/interest-assessment'); break
+    case '分析': router.push('/ability-analysis'); break
+    case '规划': router.push('/development-path'); break
+    case '导出': router.push('/report-export'); break
+    default: break
+  }
+}
+
 const handleSearch = () => {
   const searchInput = document.querySelector('.search-input')
   const keyword = searchInput.value.trim()
   if (keyword) {
-    // 跳转到搜索结果页
     router.push(`/search?keyword=${encodeURIComponent(keyword)}`)
   } else {
     alert('请输入搜索关键词！')
   }
 }
 
-// 切换内容标签
 const switchTab = (tabType) => {
-  // 实际项目中可根据tabType跳转不同页面
-  switch(tabType) {
-    case 'direction':
-      router.push('/career-direction')
-      break
-    case 'template':
-      router.push('/planning-template')
-      break
-    case 'case':
-      router.push('/success-case')
-      break
-    default:
-      break
-  }
+  console.log('切换标签：', tabType)
+  // 可根据实际需求重新获取数据
 }
 
-// 切换筛选标签
 const switchFilter = (filterType) => {
-  // 仅示例：实际可结合筛选条件跳转
   console.log('切换筛选类型：', filterType)
 }
 
-// 选择筛选标签
 const selectTag = (tag) => {
-  // 仅示例：实际可结合标签跳转筛选结果页
   console.log('选择筛选标签：', tag)
 }
 
-// 排序方式变更
 const handleSortChange = (e) => {
   console.log('排序方式：', e.target.value)
 }
 
-// 适用阶段变更
 const handleStageChange = (e) => {
   console.log('适用阶段：', e.target.value)
 }
 
-// 免费内容筛选
 const handleFreeFilter = (e) => {
   console.log('仅看免费内容：', e.target.checked)
 }
 
-// 生命周期
+// ---------- 生命周期 ----------
 onMounted(() => {
+  fetchAllContents()
   startCarousel()
 })
 
@@ -411,6 +380,7 @@ onUnmounted(() => {
   clearInterval(carouselTimer)
 })
 </script>
+
 
 <style scoped>
 /* 全局容器 */
@@ -423,7 +393,27 @@ onUnmounted(() => {
   margin: 0;
   padding: 0;
 }
-
+/* ===== 新增滑动容器样式 ===== */
+.content-slider-container {
+  width: 100%;
+  overflow: hidden;        /* 隐藏溢出的页面 */
+  position: relative;
+}
+.content-slider {
+  display: flex;           /* 横向排列页面 */
+  width: 100%;
+  transition: transform 0.3s ease;  /* 平滑滑动 */
+}
+.slider-page {
+  flex: 0 0 100%;          /* 每个页面占容器宽度的100% */
+  width: 100%;
+}
+.content-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  width: 100%;
+}
 /* 1. 顶部导航样式 */
 .top-nav {
   height: 60px;
