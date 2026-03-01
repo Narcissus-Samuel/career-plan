@@ -7,6 +7,8 @@ from config import UPLOAD_FOLDER
 from routes import register_blueprints
 
 app = Flask(__name__)
+# 设置 secret key（必须，用于 session 存储）
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 CORS(app)
 
 # 初始化数据库

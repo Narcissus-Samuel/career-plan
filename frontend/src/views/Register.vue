@@ -1,6 +1,5 @@
 <template>
   <div class="register-page">
-    <!-- 顶部logo栏 -->
     <header class="register-header">
       <div class="logo">
         <span class="logo-icon">🎯</span>
@@ -8,12 +7,11 @@
       </div>
     </header>
 
-    <!-- 注册表单区 -->
     <main class="register-main">
       <div class="register-card">
         <div class="register-title">用户注册</div>
         <form class="register-form" @submit.prevent="handleRegister">
-          <!-- 用户名输入框 -->
+          <!-- 用户名 -->
           <div class="form-item">
             <label class="form-label">用户名</label>
             <input 
@@ -26,7 +24,7 @@
             <span class="error-tip" v-if="formError.username">{{ formError.username }}</span>
           </div>
 
-          <!-- 手机号输入框 -->
+          <!-- 手机号 -->
           <div class="form-item">
             <label class="form-label">手机号</label>
             <input 
@@ -39,18 +37,21 @@
             <span class="error-tip" v-if="formError.phone">{{ formError.phone }}</span>
           </div>
 
-          <!-- 验证码输入框 -->
+          <!-- 短信验证码 -->
           <div class="form-item code-item">
             <div class="code-input-wrap">
-              <label class="form-label">验证码</label>
+              <label class="form-label">短信验证码</label>
               <input 
                 type="text" 
                 class="form-input" 
                 v-model="registerForm.code" 
-                placeholder="请输入验证码"
+                placeholder="请输入短信验证码"
                 :class="{ error: formError.code }"
               >
               <span class="error-tip" v-if="formError.code">{{ formError.code }}</span>
+              <div v-if="codeSuccessMsg" class="code-success">{{ codeSuccessMsg }}</div>
+              <div v-if="codeErrorMsg" class="code-error">{{ codeErrorMsg }}</div>
+              <div v-if="debugCode" class="debug-code">🔧 调试码：{{ debugCode }}</div>
             </div>
             <button 
               type="button" 
@@ -62,7 +63,24 @@
             </button>
           </div>
 
-          <!-- 密码输入框 -->
+          <!-- 图形验证码 -->
+          <div class="form-item">
+            <label class="form-label">图形验证码</label>
+            <div class="captcha-container">
+              <input 
+                type="text" 
+                class="form-input captcha-input" 
+                v-model="registerForm.captcha" 
+                placeholder="请输入图形验证码"
+                :class="{ error: formError.captcha }"
+              >
+              <img :src="captchaSrc" @click="refreshCaptcha" class="captcha-img" alt="验证码">
+              <span class="refresh-link" @click="refreshCaptcha">换一张</span>
+            </div>
+            <span class="error-tip" v-if="formError.captcha">{{ formError.captcha }}</span>
+          </div>
+
+          <!-- 密码 -->
           <div class="form-item">
             <label class="form-label">设置密码</label>
             <input 
@@ -75,7 +93,7 @@
             <span class="error-tip" v-if="formError.password">{{ formError.password }}</span>
           </div>
 
-          <!-- 确认密码输入框 -->
+          <!-- 确认密码 -->
           <div class="form-item">
             <label class="form-label">确认密码</label>
             <input 
@@ -87,6 +105,10 @@
             >
             <span class="error-tip" v-if="formError.confirmPwd">{{ formError.confirmPwd }}</span>
           </div>
+
+          <!-- 注册错误/成功提示 -->
+          <div v-if="registerError" class="register-error">{{ registerError }}</div>
+          <div v-if="registerSuccessMsg" class="register-success">{{ registerSuccessMsg }}</div>
 
           <!-- 注册协议 -->
           <div class="form-agreement">
@@ -111,7 +133,6 @@
       </div>
     </main>
 
-    <!-- 页脚 -->
     <footer class="register-footer">
       © 2026 大学生职业规划系统 | 助力大学生精准规划职业方向
     </footer>
@@ -119,7 +140,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -131,7 +152,8 @@ const registerForm = ref({
   code: '',
   password: '',
   confirmPwd: '',
-  agreement: false
+  agreement: false,
+  captcha: ''  // 图形验证码
 })
 
 // 表单错误提示
@@ -140,9 +162,30 @@ const formError = ref({})
 // 加载状态
 const isLoading = ref(false)
 
-// 验证码倒计时
+// 短信验证码相关
 const codeCountdown = ref(0)
 let countdownTimer = null
+const codeSuccessMsg = ref('')
+const codeErrorMsg = ref('')
+let successTimer = null
+let errorTimer = null
+const debugCode = ref('')
+let debugTimer = null
+
+// 注册结果提示
+const registerError = ref('')
+const registerSuccessMsg = ref('')
+let registerSuccessTimer = null
+
+// 图形验证码相关
+const captchaTimestamp = ref(Date.now())
+const captchaSrc = computed(() => `/api/captcha?t=${captchaTimestamp.value}`)
+
+const refreshCaptcha = () => {
+  captchaTimestamp.value = Date.now()
+  registerForm.value.captcha = ''
+  if (formError.value.captcha) formError.value.captcha = ''
+}
 
 // 表单验证
 const validateForm = () => {
@@ -150,7 +193,6 @@ const validateForm = () => {
   formError.value = {}
   const regPhone = /^1[3-9]\d{9}$/
 
-  // 验证用户名
   if (!registerForm.value.username.trim()) {
     formError.value.username = '请输入用户名'
     isValid = false
@@ -159,7 +201,6 @@ const validateForm = () => {
     isValid = false
   }
 
-  // 验证手机号
   if (!registerForm.value.phone.trim()) {
     formError.value.phone = '请输入手机号'
     isValid = false
@@ -168,16 +209,20 @@ const validateForm = () => {
     isValid = false
   }
 
-  // 验证验证码
   if (!registerForm.value.code.trim()) {
-    formError.value.code = '请输入验证码'
+    formError.value.code = '请输入短信验证码'
     isValid = false
   } else if (registerForm.value.code.length !== 6) {
-    formError.value.code = '验证码为6位数字'
+    formError.value.code = '短信验证码为6位数字'
     isValid = false
   }
 
-  // 验证密码
+  // 图形验证码
+  if (!registerForm.value.captcha.trim()) {
+    formError.value.captcha = '请输入图形验证码'
+    isValid = false
+  }
+
   if (!registerForm.value.password.trim()) {
     formError.value.password = '请设置密码'
     isValid = false
@@ -186,7 +231,6 @@ const validateForm = () => {
     isValid = false
   }
 
-  // 验证确认密码
   if (!registerForm.value.confirmPwd.trim()) {
     formError.value.confirmPwd = '请再次输入密码'
     isValid = false
@@ -195,7 +239,6 @@ const validateForm = () => {
     isValid = false
   }
 
-  // 验证协议
   if (!registerForm.value.agreement) {
     formError.value.agreement = '请阅读并同意用户注册协议'
     isValid = false
@@ -204,9 +247,17 @@ const validateForm = () => {
   return isValid
 }
 
-// 获取验证码
+// 获取短信验证码
 const getVerifyCode = async () => {
-  // 先验证手机号
+  // 清除之前的提示
+  codeSuccessMsg.value = ''
+  codeErrorMsg.value = ''
+  debugCode.value = ''
+  if (successTimer) clearTimeout(successTimer)
+  if (errorTimer) clearTimeout(errorTimer)
+  if (debugTimer) clearTimeout(debugTimer)
+
+  // 验证手机号
   if (!registerForm.value.phone.trim()) {
     formError.value.phone = '请输入手机号'
     return
@@ -218,7 +269,6 @@ const getVerifyCode = async () => {
   }
 
   try {
-    // 向后端请求发送验证码
     const res = await fetch('/api/send_code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -228,9 +278,24 @@ const getVerifyCode = async () => {
     if (!res.ok) {
       throw new Error(data.error || '发送验证码失败')
     }
-    alert(`验证码已发送至手机号 ${registerForm.value.phone}，模拟码：${data.code}`)
+    codeSuccessMsg.value = '验证码已发送'
+    successTimer = setTimeout(() => {
+      codeSuccessMsg.value = ''
+    }, 3000)
+
+    // 显示模拟码（调试用）
+    if (data.code) {
+      debugCode.value = `模拟码：${data.code}`
+      debugTimer = setTimeout(() => {
+        debugCode.value = ''
+      }, 10000)
+    }
   } catch (err) {
-    alert(err.message)
+    codeErrorMsg.value = err.message
+    errorTimer = setTimeout(() => {
+      codeErrorMsg.value = ''
+    }, 3000)
+    return
   }
 
   // 开始倒计时
@@ -239,18 +304,20 @@ const getVerifyCode = async () => {
     codeCountdown.value--
     if (codeCountdown.value <= 0) {
       clearInterval(countdownTimer)
+      countdownTimer = null
     }
   }, 1000)
 }
 
-// 处理注册逻辑
+// 处理注册
 const handleRegister = async () => {
-  // 表单验证
   if (!validateForm()) return
+
+  registerError.value = ''
+  registerSuccessMsg.value = ''
 
   try {
     isLoading.value = true
-    // 调用后端注册接口
     const res = await fetch('/api/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -258,7 +325,8 @@ const handleRegister = async () => {
         username: registerForm.value.username,
         phone: registerForm.value.phone,
         password: registerForm.value.password,
-        code: registerForm.value.code
+        code: registerForm.value.code,
+        captcha: registerForm.value.captcha
       })
     })
     const data = await res.json()
@@ -266,20 +334,31 @@ const handleRegister = async () => {
       throw new Error(data.error || '注册失败')
     }
 
-    // 注册成功逻辑
-    alert('注册成功！即将跳转到登录页')
-    // 跳转到登录页
-    router.push('/login')
+    // 注册成功
+    registerSuccessMsg.value = '注册成功！即将跳转到登录页'
+    registerSuccessTimer = setTimeout(() => {
+      router.push('/login')
+    }, 2000)
   } catch (error) {
-    alert('注册失败：' + error.message)
+    registerError.value = error.message
+    refreshCaptcha() // 失败后刷新图形验证码
   } finally {
     isLoading.value = false
   }
 }
+
+// 组件卸载时清除所有定时器
+onUnmounted(() => {
+  if (countdownTimer) clearInterval(countdownTimer)
+  if (successTimer) clearTimeout(successTimer)
+  if (errorTimer) clearTimeout(errorTimer)
+  if (debugTimer) clearTimeout(debugTimer)
+  if (registerSuccessTimer) clearTimeout(registerSuccessTimer)
+})
 </script>
 
 <style scoped>
-/* 全局样式 */
+/* 原有样式 + 验证码相关样式 */
 .register-page {
   width: 100%;
   min-height: 100vh;
@@ -288,8 +367,6 @@ const handleRegister = async () => {
   display: flex;
   flex-direction: column;
 }
-
-/* 顶部logo */
 .register-header {
   height: 80px;
   background: #fff;
@@ -309,8 +386,6 @@ const handleRegister = async () => {
   font-size: 28px;
   margin-right: 10px;
 }
-
-/* 注册主体区 */
 .register-main {
   flex: 1;
   display: flex;
@@ -332,8 +407,6 @@ const handleRegister = async () => {
   margin-bottom: 25px;
   color: #333;
 }
-
-/* 表单样式 */
 .register-form {
   width: 100%;
 }
@@ -375,8 +448,6 @@ const handleRegister = async () => {
   font-size: 12px;
   color: #ff4d4f;
 }
-
-/* 验证码按钮 */
 .get-code-btn {
   width: 120px;
   height: 40px;
@@ -392,8 +463,74 @@ const handleRegister = async () => {
   background: #85a5ff;
   cursor: not-allowed;
 }
+.code-success {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #52c41a;
+}
+.code-error {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #ff4d4f;
+}
+.debug-code {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #8c8c8c;
+  background-color: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 2px;
+  display: inline-block;
+}
 
-/* 注册协议 */
+/* 图形验证码样式 */
+.captcha-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.captcha-input {
+  flex: 1;
+}
+.captcha-img {
+  width: 100px;
+  height: 36px;
+  border: 1px solid #e8e8e8;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.refresh-link {
+  color: #2f54eb;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.refresh-link:hover {
+  text-decoration: underline;
+}
+
+/* 注册错误/成功提示 */
+.register-error {
+  color: #ff4d4f;
+  font-size: 14px;
+  margin-bottom: 16px;
+  text-align: center;
+  padding: 8px 0;
+  background-color: #fff2f0;
+  border: 1px solid #ffccc7;
+  border-radius: 4px;
+}
+.register-success {
+  color: #52c41a;
+  font-size: 14px;
+  margin-bottom: 16px;
+  text-align: center;
+  padding: 8px 0;
+  background-color: #f6ffed;
+  border: 1px solid #b7eb8f;
+  border-radius: 4px;
+}
+
 .form-agreement {
   margin-bottom: 25px;
   font-size: 12px;
@@ -415,8 +552,6 @@ const handleRegister = async () => {
 .agreement-link:hover {
   text-decoration: underline;
 }
-
-/* 注册按钮 */
 .register-btn {
   width: 100%;
   height: 44px;
@@ -435,8 +570,6 @@ const handleRegister = async () => {
 .register-btn:hover:not(:disabled) {
   background: #1d39c4;
 }
-
-/* 登录链接 */
 .login-link {
   text-align: center;
   margin-top: 20px;
@@ -450,8 +583,6 @@ const handleRegister = async () => {
 .link-text:hover {
   text-decoration: underline;
 }
-
-/* 页脚 */
 .register-footer {
   height: 60px;
   line-height: 60px;

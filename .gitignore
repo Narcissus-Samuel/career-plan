@@ -1,5 +1,11 @@
 # 忽略前端依赖
 node_modules/
 
-# 忽略 Python 虚拟环境
+# Python 缓存
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+*.egg-info/
 .venv/
+venv/

@@ -1,12 +1,17 @@
-# routes/auth.py
-from flask import Blueprint, request, jsonify
-from werkzeug.security import generate_password_hash, check_password_hash
-from db import get_db
-import datetime
+import io
 import random
+import string
+import datetime
+import time
+from flask import Blueprint, request, jsonify, session, Response
+from werkzeug.security import generate_password_hash, check_password_hash
+from captcha.image import ImageCaptcha  # 需要安装：pip install captcha
+from db import get_db
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api')
 
+# 用于记录短信发送频率（简单内存存储，生产环境应使用Redis）
+last_send_time = {}
 
 def _get_user_by_identifier(identifier):
     """根据用户名或手机号查找用户"""
@@ -19,14 +24,33 @@ def _get_user_by_identifier(identifier):
     conn.close()
     return user
 
+# ---------- 图形验证码 ----------
+@auth_bp.route('/captcha', methods=['GET'])
+def get_captcha():
+    """生成图形验证码图片"""
+    # 生成4位随机字符（大写字母+数字）
+    captcha_text = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    # 存储到session
+    session['captcha'] = captcha_text
+    # 生成图片
+    image = ImageCaptcha(width=120, height=40)
+    data = image.generate(captcha_text)
+    return Response(data.read(), mimetype='image/png')
 
+# ---------- 短信验证码（模拟） ----------
 @auth_bp.route('/send_code', methods=['POST'])
 def send_code():
-    """生成并保存短信验证码（模拟）"""
+    """生成并保存短信验证码（模拟），需先验证图形验证码（可选，建议加）"""
     data = request.json or {}
     phone = data.get('phone')
     if not phone:
         return jsonify({'error': 'phone required'}), 400
+
+    # 检查发送频率（60秒内只能发一次）
+    now = time.time()
+    if phone in last_send_time and now - last_send_time[phone] < 60:
+        return jsonify({'error': '发送过于频繁，请稍后再试'}), 429
+    last_send_time[phone] = now
 
     code = f"{random.randint(0, 999999):06d}"
     expires = datetime.datetime.now() + datetime.timedelta(minutes=5)
@@ -40,51 +64,68 @@ def send_code():
     conn.commit()
     conn.close()
 
-    # 真实环境应当发送短信，此处返回给客户端以便调试
-    print(f"verification code {code} saved for phone {phone}")
-    return jsonify({'code': code})
+    # 真实环境应当发送短信，此处只打印到控制台，并返回模拟码（调试用）
+    print(f"验证码 {code} 已发送至手机 {phone}")
+    return jsonify({'code': code, 'message': '验证码已发送'})  # 保留code便于调试
 
-
+# ---------- 注册 ----------
 @auth_bp.route('/register', methods=['POST'])
 def register():
-    """根据前端传来的用户名/手机号/密码/验证码创建新用户"""
     data = request.json or {}
     username = data.get('username')
     phone = data.get('phone')
     password = data.get('password')
-    code = data.get('code')
+    sms_code = data.get('code')       # 短信验证码
+    captcha_input = data.get('captcha')  # 图形验证码
 
-    # 简单验证
+    # 验证图形验证码
+    if not captcha_input:
+        return jsonify({'error': '请输入图形验证码'}), 400
+    session_captcha = session.pop('captcha', None)  # 使用后立即删除
+    if not session_captcha or session_captcha.lower() != captcha_input.lower():
+        return jsonify({'error': '图形验证码错误'}), 400
+
+    # 基础验证
     if not username or not password:
         return jsonify({'error': 'username and password required'}), 400
+    if phone and not sms_code:
+        return jsonify({'error': '短信验证码不能为空'}), 400
 
-    # 验证码检查（如果有手机号）
-    if phone and code:
-        conn = get_db()
-        cursor = conn.cursor()
+    # 检查用户名或手机号是否已存在
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM users WHERE username = ? OR phone = ?",
+        (username, phone if phone else '')
+    )
+    existing = cursor.fetchone()
+    if existing:
+        conn.close()
+        return jsonify({'error': '用户名或手机号已被注册'}), 400
+
+    # 验证短信验证码（如果提供了手机号）
+    if phone and sms_code:
         cursor.execute(
             "SELECT code, expires_at FROM verification_codes WHERE phone = ? ORDER BY id DESC LIMIT 1",
             (phone,)
         )
         row = cursor.fetchone()
-        conn.close()
-        if not row or row['code'] != code:
-            return jsonify({'error': 'invalid code'}), 400
+        if not row or row['code'] != sms_code:
+            conn.close()
+            return jsonify({'error': '短信验证码错误'}), 400
         try:
             exp = datetime.datetime.fromisoformat(row['expires_at'])
             if datetime.datetime.now() > exp:
-                return jsonify({'error': 'code expired'}), 400
+                conn.close()
+                return jsonify({'error': '短信验证码已过期'}), 400
         except Exception:
             pass
+        # 验证成功后删除该短信验证码（防止重复使用）
+        cursor.execute("DELETE FROM verification_codes WHERE phone = ? AND code = ?", (phone, sms_code))
+        conn.commit()
 
-    # 检查用户名或手机号是否已存在
-    existing = _get_user_by_identifier(username) or (_get_user_by_identifier(phone) if phone else None)
-    if existing:
-        return jsonify({'error': 'user already exists'}), 400
-
+    # 创建用户
     pw_hash = generate_password_hash(password)
-    conn = get_db()
-    cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO users (username, phone, password_hash) VALUES (?, ?, ?)",
         (username, phone, pw_hash)
@@ -95,13 +136,21 @@ def register():
 
     return jsonify({'id': user_id, 'username': username})
 
-
+# ---------- 登录 ----------
 @auth_bp.route('/login', methods=['POST'])
 def login():
-    """验证用户凭据并返回简单token"""
     data = request.json or {}
     identifier = data.get('username') or data.get('phone')
     password = data.get('password')
+    captcha_input = data.get('captcha')  # 图形验证码
+
+    # 验证图形验证码
+    if not captcha_input:
+        return jsonify({'error': '请输入图形验证码'}), 400
+    session_captcha = session.pop('captcha', None)
+    if not session_captcha or session_captcha.lower() != captcha_input.lower():
+        return jsonify({'error': '图形验证码错误'}), 400
+
     if not identifier or not password:
         return jsonify({'error': 'credentials required'}), 400
 
@@ -112,14 +161,13 @@ def login():
     if not check_password_hash(user['password_hash'], password):
         return jsonify({'error': 'invalid credentials'}), 401
 
-    # 生成简单 token（生产应使用 JWT 或 session）
+    # 生成简单 token
     token = f"mock-token-{user['id']}"
     return jsonify({'token': token, 'user': {'id': user['id'], 'username': user['username'], 'role': user['role']}})
 
-
+# ---------- 用户管理接口（原有，未修改）----------
 @auth_bp.route('/users', methods=['GET'])
 def list_users():
-    """列出所有用户（可用于管理员界面）"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT id, username, phone, role, is_active, created_at FROM users")
@@ -128,10 +176,8 @@ def list_users():
     users = [dict(r) for r in rows]
     return jsonify({'total': len(users), 'users': users})
 
-
 @auth_bp.route('/users/<int:user_id>/role', methods=['PUT'])
 def change_role(user_id):
-    """修改用户角色，例如 'user' -> 'admin'"""
     data = request.json or {}
     new_role = data.get('role')
     if new_role not in ('user', 'admin'):
