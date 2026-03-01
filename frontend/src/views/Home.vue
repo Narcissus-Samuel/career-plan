@@ -325,13 +325,23 @@ const handlePageChange = (page) => {
 }
 
 // ---------- 其他功能（导航、搜索、筛选等）----------
+// 核心功能按钮跳转逻辑（修复重复定义问题，保留正确的路由跳转）
 const goToFeature = (type) => {
   switch(type) {
-    case '测评': router.push('/interest-assessment'); break
-    case '分析': router.push('/ability-analysis'); break
-    case '规划': router.push('/development-path'); break
-    case '导出': router.push('/report-export'); break
-    default: break
+    case '测评':
+      router.push('/interest-test')
+      break
+    case '分析':
+      router.push('/ability-analysis')
+      break
+    case '规划':
+      router.push('/development-path')
+      break
+    case '导出':
+      router.push('/report-export')
+      break
+    default:
+      break
   }
 }
 
@@ -380,7 +390,6 @@ onUnmounted(() => {
   clearInterval(carouselTimer)
 })
 </script>
-
 
 <style scoped>
 /* 全局容器 */
