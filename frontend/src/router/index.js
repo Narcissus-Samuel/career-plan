@@ -10,22 +10,23 @@ import Login from '../views/Login.vue'
 import Register from '../views/Register.vue'
 
 // 新增：导入其他功能页面组件（未创建的组件先用Home占位）
-const CareerPlanning = () => import('../views/Home.vue') // 临时占位
-const AbilityAssessment = () => import('../views/Home.vue') // 临时占位
-const ReportGenerate = () => import('../views/Home.vue') // 临时占位
-const ResourceLibrary = () => import('../views/Home.vue') // 临时占位
-const AboutUs = () => import('../views/Home.vue') // 临时占位
-const JobPlanning = () => import('../views/Home.vue') // 临时占位
+import CareerPlanning from '../views/CareerPlanning.vue'
+import AbilityAssessment from '../views/AbilityAssessment.vue'
+import ReportGenerate from '../views/ReportGenerate.vue'
+import ResourceLibrary from '../views/ResourceLibrary.vue'
+import AboutUs from '../views/AboutUs.vue'
+import CareerInterestTest from '../views/CareerInterestTest.vue'
 const PostgraduatePlanning = () => import('../views/Home.vue') // 临时占位
 const StudyAbroadPlanning = () => import('../views/Home.vue') // 临时占位
 const CivilServicePlanning = () => import('../views/Home.vue') // 临时占位
 const EntrepreneurshipPlanning = () => import('../views/Home.vue') // 临时占位
 const InterestAssessment = () => import('../views/Home.vue') // 临时占位
-const AbilityAnalysis = () => import('../views/Home.vue') // 临时占位
-const DevelopmentPath = () => import('../views/Home.vue') // 临时占位
-const ReportExport = () => import('../views/Home.vue') // 临时占位
+import AbilityAnalysis from '../views/AbilityAnalysis.vue'
+import DevelopmentPath from '../views/DevelopmentPath.vue'
+import ReportExport from '../views/ReportExport.vue'
 const Search = () => import('../views/Home.vue') // 临时占位
 const Detail = () => import('../views/Home.vue') // 临时占位
+
 
 const routes = [
   { 
@@ -92,12 +93,17 @@ const routes = [
     name: 'AboutUs',
     component: AboutUs 
   },
-  // 新增：核心分类入口路由
-  { 
-    path: '/job-planning', 
-    name: 'JobPlanning',
-    component: JobPlanning 
+  {
+    path: '/interest-test',
+    name: 'CareerInterestTest',
+    component:CareerInterestTest
   },
+  // 新增：核心分类入口路由
+  // { 
+  //   path: '/job-planning', 
+  //   name: 'JobPlanning',
+  //   component: JobPlanning 
+  // },
   { 
     path: '/postgraduate-planning', 
     name: 'PostgraduatePlanning',
