@@ -1,6 +1,5 @@
 <template>
   <div class="login-page">
-    <!-- 顶部logo栏 -->
     <header class="login-header">
       <div class="logo">
         <span class="logo-icon">🎯</span>
@@ -8,12 +7,11 @@
       </div>
     </header>
 
-    <!-- 登录表单区 -->
     <main class="login-main">
       <div class="login-card">
         <div class="login-title">用户登录</div>
         <form class="login-form" @submit.prevent="handleLogin">
-          <!-- 账号输入框 -->
+          <!-- 账号 -->
           <div class="form-item">
             <label class="form-label">账号</label>
             <input 
@@ -26,7 +24,7 @@
             <span class="error-tip" v-if="formError.username">{{ formError.username }}</span>
           </div>
 
-          <!-- 密码输入框 -->
+          <!-- 密码 -->
           <div class="form-item">
             <label class="form-label">密码</label>
             <input 
@@ -38,6 +36,27 @@
             >
             <span class="error-tip" v-if="formError.password">{{ formError.password }}</span>
           </div>
+
+          <!-- 图形验证码 -->
+          <div class="form-item">
+            <label class="form-label">验证码</label>
+            <div class="captcha-container">
+              <input 
+                type="text" 
+                class="form-input captcha-input" 
+                v-model="loginForm.captcha" 
+                placeholder="请输入验证码"
+                :class="{ error: formError.captcha }"
+              >
+              <img :src="captchaSrc" @click="refreshCaptcha" class="captcha-img" alt="验证码">
+              <span class="refresh-link" @click="refreshCaptcha">换一张</span>
+            </div>
+            <span class="error-tip" v-if="formError.captcha">{{ formError.captcha }}</span>
+          </div>
+
+          <!-- 登录错误/成功提示 -->
+          <div v-if="loginError" class="login-error">{{ loginError }}</div>
+          <div v-if="loginSuccessMsg" class="login-success">{{ loginSuccessMsg }}</div>
 
           <!-- 记住密码 & 忘记密码 -->
           <div class="form-extra">
@@ -61,7 +80,6 @@
       </div>
     </main>
 
-    <!-- 页脚 -->
     <footer class="login-footer">
       © 2026 大学生职业规划系统 | 助力大学生精准规划职业方向
     </footer>
@@ -69,7 +87,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -78,30 +96,44 @@ const router = useRouter()
 const loginForm = ref({
   username: '',
   password: '',
-  remember: false
+  remember: false,
+  captcha: ''  // 图形验证码
 })
 
 // 表单错误提示
 const formError = ref({
   username: '',
-  password: ''
+  password: '',
+  captcha: ''
 })
+
+// 提示信息
+const loginError = ref('')
+const loginSuccessMsg = ref('')
+let successTimer = null
 
 // 加载状态
 const isLoading = ref(false)
+
+// 图形验证码相关
+const captchaTimestamp = ref(Date.now())
+const captchaSrc = computed(() => `/api/captcha?t=${captchaTimestamp.value}`)
+
+const refreshCaptcha = () => {
+  captchaTimestamp.value = Date.now()
+  loginForm.value.captcha = ''
+  formError.value.captcha = ''
+}
 
 // 表单验证
 const validateForm = () => {
   let isValid = true
   formError.value = {}
 
-  // 验证账号
   if (!loginForm.value.username.trim()) {
     formError.value.username = '请输入账号'
     isValid = false
   }
-
-  // 验证密码
   if (!loginForm.value.password.trim()) {
     formError.value.password = '请输入密码'
     isValid = false
@@ -109,46 +141,62 @@ const validateForm = () => {
     formError.value.password = '密码长度不能少于6位'
     isValid = false
   }
+  if (!loginForm.value.captcha.trim()) {
+    formError.value.captcha = '请输入验证码'
+    isValid = false
+  }
 
   return isValid
 }
 
-// 处理登录逻辑
+// 处理登录
 const handleLogin = async () => {
-  // 表单验证
   if (!validateForm()) return
+
+  loginError.value = ''
+  loginSuccessMsg.value = ''
+  if (successTimer) clearTimeout(successTimer)
 
   try {
     isLoading.value = true
-    // 调用后端登录接口
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: loginForm.value.username, password: loginForm.value.password })
+      body: JSON.stringify({
+        username: loginForm.value.username,
+        password: loginForm.value.password,
+        captcha: loginForm.value.captcha
+      })
     })
     const data = await res.json()
     if (!res.ok) {
-      throw new Error(data.error || '登录失败')
+      throw new Error(data.error || '用户名或密码错误')
     }
 
-    // 登录成功逻辑
-    alert('登录成功！')
-    // 存储token（示例）
+    // 登录成功
+    loginSuccessMsg.value = '登录成功！即将跳转至首页'
     localStorage.setItem('token', data.token)
-    // 可以把用户信息放在 localStorage 或者状态管理中
     localStorage.setItem('currentUser', JSON.stringify(data.user))
-    // 跳转到首页
-    router.push('/')
+
+    successTimer = setTimeout(() => {
+      router.push('/')
+    }, 1500)
   } catch (error) {
-    alert('登录失败：' + error.message)
+    loginError.value = error.message
+    refreshCaptcha() // 失败后刷新验证码
   } finally {
     isLoading.value = false
   }
 }
+
+// 组件卸载时清除定时器
+onUnmounted(() => {
+  if (successTimer) clearTimeout(successTimer)
+})
 </script>
 
 <style scoped>
-/* 全局样式 */
+/* 原有样式保持不变，仅添加验证码相关样式 */
 .login-page {
   width: 100%;
   min-height: 100vh;
@@ -157,8 +205,6 @@ const handleLogin = async () => {
   display: flex;
   flex-direction: column;
 }
-
-/* 顶部logo */
 .login-header {
   height: 80px;
   background: #fff;
@@ -178,8 +224,6 @@ const handleLogin = async () => {
   font-size: 28px;
   margin-right: 10px;
 }
-
-/* 登录主体区 */
 .login-main {
   flex: 1;
   display: flex;
@@ -201,8 +245,6 @@ const handleLogin = async () => {
   margin-bottom: 25px;
   color: #333;
 }
-
-/* 表单样式 */
 .login-form {
   width: 100%;
 }
@@ -238,7 +280,54 @@ const handleLogin = async () => {
   color: #ff4d4f;
 }
 
-/* 表单额外选项 */
+/* 验证码容器 */
+.captcha-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.captcha-input {
+  flex: 1;
+}
+.captcha-img {
+  width: 100px;
+  height: 36px;
+  border: 1px solid #e8e8e8;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.refresh-link {
+  color: #2f54eb;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.refresh-link:hover {
+  text-decoration: underline;
+}
+
+/* 登录错误/成功提示 */
+.login-error {
+  color: #ff4d4f;
+  font-size: 14px;
+  margin-bottom: 16px;
+  text-align: center;
+  padding: 8px 0;
+  background-color: #fff2f0;
+  border: 1px solid #ffccc7;
+  border-radius: 4px;
+}
+.login-success {
+  color: #52c41a;
+  font-size: 14px;
+  margin-bottom: 16px;
+  text-align: center;
+  padding: 8px 0;
+  background-color: #f6ffed;
+  border: 1px solid #b7eb8f;
+  border-radius: 4px;
+}
+
 .form-extra {
   display: flex;
   justify-content: space-between;
@@ -262,8 +351,6 @@ const handleLogin = async () => {
 .forgot-pwd:hover {
   text-decoration: underline;
 }
-
-/* 登录按钮 */
 .login-btn {
   width: 100%;
   height: 44px;
@@ -282,8 +369,6 @@ const handleLogin = async () => {
 .login-btn:hover:not(:disabled) {
   background: #1d39c4;
 }
-
-/* 注册链接 */
 .register-link {
   text-align: center;
   margin-top: 20px;
@@ -297,8 +382,6 @@ const handleLogin = async () => {
 .link-text:hover {
   text-decoration: underline;
 }
-
-/* 页脚 */
 .login-footer {
   height: 60px;
   line-height: 60px;
