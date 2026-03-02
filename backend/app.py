@@ -5,6 +5,8 @@ import os
 from db import get_db, init_db
 from config import UPLOAD_FOLDER
 from routes import register_blueprints
+from dotenv import load_dotenv
+load_dotenv()  # 加在最顶部
 
 app = Flask(__name__)
 # 设置 secret key（必须，用于 session 存储）
