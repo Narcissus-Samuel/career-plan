@@ -118,6 +118,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
 
@@ -132,39 +133,32 @@ const studentInfo = ref(JSON.parse(localStorage.getItem('studentInfo')) || {
   interests: ['数据分析']
 })
 
-// 模拟匹配结果数据
-const matchList = reactive([
-  { 
-    rank: 1, 
-    jobName: '数据分析师', 
-    matchScore: 0.85, 
-    details: { base: 0.9, skill: 0.88, quality: 0.8, potential: 0.82 } 
-  },
-  { 
-    rank: 2, 
-    jobName: '前端开发工程师', 
-    matchScore: 0.72,
-    details: { base: 0.8, skill: 0.75, quality: 0.7, potential: 0.68 } 
-  },
-  { 
-    rank: 3, 
-    jobName: '后端开发工程师', 
-    matchScore: 0.65,
-    details: { base: 0.75, skill: 0.6, quality: 0.7, potential: 0.72 } 
-  },
-  { 
-    rank: 4, 
-    jobName: '产品经理', 
-    matchScore: 0.58,
-    details: { base: 0.7, skill: 0.5, quality: 0.65, potential: 0.75 } 
-  },
-  { 
-    rank: 5, 
-    jobName: '测试开发工程师', 
-    matchScore: 0.55,
-    details: { base: 0.68, skill: 0.55, quality: 0.6, potential: 0.6 } 
+// 匹配结果数据（默认空，页面加载时调用后端计算）
+const matchList = reactive([])
+
+async function toPageData() {
+  try {
+    const token = localStorage.getItem('token') || ''
+    const res = await axios.post('/api/llm/recommend', { student: studentInfo.value, top_n: 5 }, { headers: { Authorization: `Bearer ${token}` } })
+    if (res.data && res.data.results) {
+      matchList.splice(0, matchList.length)
+      res.data.results.forEach((item, idx) => {
+        const job = item.job || {}
+        const match = item.match || {}
+        matchList.push({
+          rank: idx + 1,
+          jobName: job.job_name || job.jobName || '',
+          matchScore: match.overall_score || 0,
+          details: match
+        })
+      })
+      initRadarChart() // 更新雷达图
+    }
+  } catch (e) {
+    console.error('获取匹配结果失败', e)
+    // 可以保留默认静态数据作为备用
   }
-])
+}
 
 // 进度条颜色（按匹配度分色）
 const getProgressColor = (score) => {
@@ -198,6 +192,10 @@ const viewDetail = (row) => {
 
 // 初始化雷达图
 let radarChart = null
+
+onMounted(() => {
+  toPageData()
+})
 onMounted(() => {
   const chartDom = document.getElementById('radar-chart')
   radarChart = echarts.init(chartDom)
