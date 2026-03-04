@@ -99,7 +99,7 @@
           <div class="form-content">
             <div class="checkbox-group">
               <label class="checkbox-item" v-for="item in interestList" :key="item.id">
-                <input type="checkbox" v-model="planInfo.interest" :value="item.name"> {{ item.name }}
+                <input type="checkbox" v-model="planInfo.interest" :value="item.id"> {{ item.name }}
               </label>
             </div>
             <div class="form-row">
@@ -121,10 +121,10 @@
               <label class="form-label">{{ item.name }}：</label>
               <div class="rate-group">
                 <span class="rate-item" v-for="star in 5" :key="star" 
-                  :class="{ active: star <= planInfo.ability[item.key] }"
-                  @click="setAbility(item.key, star)"
+                  :class="{ active: star <= planInfo.ability[item.code] }"
+                  @click="setAbility(item.code, star)"
                 >★</span>
-                <span class="rate-text">{{ planInfo.ability[item.key] }}星</span>
+                <span class="rate-text">{{ planInfo.ability[item.code] }}星</span>
               </div>
             </div>
             <div class="form-row">
@@ -153,13 +153,13 @@
               </div>
               <div class="result-item">
                 <div class="result-label">职业兴趣：</div>
-                <div class="result-value">{{ planInfo.interest.join('、') || '未选择' }}</div>
+                <div class="result-value">{{ selectedInterestNames.join('、') || '未选择' }}</div>
               </div>
               <div class="result-item">
                 <div class="result-label">核心能力评估：</div>
                 <div class="result-value">
                   <div v-for="item in abilityList" :key="item.id">
-                    {{ item.name }}：{{ planInfo.ability[item.key] }}星
+                    {{ item.name }}：{{ planInfo.ability[item.code] }}星
                   </div>
                 </div>
               </div>
@@ -202,10 +202,10 @@
       <div class="resource-wrap">
         <div class="resource-title">为你推荐的规划资源</div>
         <div class="resource-list">
-          <div class="resource-card" v-for="(item, i) in resourceList" :key="i" @click="$router.push(`/detail/${i+10}`)">
+          <div class="resource-card" v-for="(item, i) in resourceList" :key="i" @click="$router.push(`/detail/${item.id}`)">
             <div class="resource-icon">{{ item.icon }}</div>
-            <div class="resource-name">{{ item.name }}</div>
-            <div class="resource-desc">{{ item.desc }}</div>
+            <div class="resource-name">{{ item.title }}</div>
+            <div class="resource-desc">{{ item.description }}</div>
           </div>
         </div>
       </div>
@@ -236,7 +236,7 @@ const planInfo = ref({
   grade: '',
   major: '',
   target: '',
-  interest: [],
+  interest: [],          // 存储兴趣ID数组
   interestDesc: '',
   ability: {
     communication: 0,
@@ -248,35 +248,14 @@ const planInfo = ref({
   abilityDesc: ''
 })
 
-// 兴趣列表
-const interestList = ref([
-  { id: 1, name: '技术研发' },
-  { id: 2, name: '产品设计' },
-  { id: 3, name: '市场营销' },
-  { id: 4, name: '运营管理' },
-  { id: 5, name: '教育培训' },
-  { id: 6, name: '金融投资' },
-  { id: 7, name: '行政办公' },
-  { id: 8, name: '创业管理' }
-])
+// 兴趣列表（从后端获取）
+const interestList = ref([])
 
-// 能力列表
-const abilityList = ref([
-  { id: 1, name: '沟通能力', key: 'communication' },
-  { id: 2, name: '学习能力', key: 'learning' },
-  { id: 3, name: '团队协作', key: 'teamwork' },
-  { id: 4, name: '专业技能', key: 'professional' },
-  { id: 5, name: '创新能力', key: 'innovation' }
-])
+// 能力列表（从后端获取）
+const abilityList = ref([])
 
-// 推荐资源列表
-const resourceList = ref([
-  { icon: '📚', name: '《大学生职业规划指南》', desc: '全阶段规划方法论，适合新手入门' },
-  { icon: '🎓', name: '目标专业考研真题集', desc: '近5年真题+解析，针对性备考' },
-  { icon: '👨💼', name: '名企校招面试技巧', desc: 'HR亲授，通过率提升80%' },
-  { icon: '🌏', name: '留学申请文书模板', desc: '适配Top50院校，含推荐信模板' },
-  { icon: '💼', name: '考公岗位筛选工具', desc: '按专业/地区/学历精准匹配岗位' }
-])
+// 推荐资源列表（从后端获取）
+const resourceList = ref([])
 
 // 当前日期
 const currentDate = computed(() => {
@@ -284,27 +263,118 @@ const currentDate = computed(() => {
   return `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`
 })
 
+// 计算选中的兴趣名称（用于显示）
+const selectedInterestNames = computed(() => {
+  if (!planInfo.value.interest.length) return []
+  return interestList.value
+    .filter(item => planInfo.value.interest.includes(item.id))
+    .map(item => item.name)
+})
+
+// 获取请求头（包含 token）
+const getHeaders = () => {
+  const token = localStorage.getItem('token')
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': token ? `Bearer ${token}` : ''
+  }
+}
+
+// 加载所有初始数据
+const loadData = async () => {
+  try {
+    const [
+      interestsRes,
+      dimensionsRes,
+      baseRes,
+      userInterestsRes,
+      abilityRes,
+      resourcesRes
+    ] = await Promise.all([
+      fetch('/api/profile/interests'),
+      fetch('/api/profile/ability-dimensions'),
+      fetch('/api/profile/base', { headers: getHeaders() }),
+      fetch('/api/profile/user-interests', { headers: getHeaders() }),
+      fetch('/api/profile/ability', { headers: getHeaders() }),
+      fetch('/api/path/learning-resources')
+    ])
+
+    if (interestsRes.ok) {
+      interestList.value = await interestsRes.json()
+    }
+
+    if (dimensionsRes.ok) {
+      const dimensions = await dimensionsRes.json()
+      abilityList.value = dimensions.map(d => ({
+        id: d.id,
+        name: d.name,
+        code: d.code
+      }))
+    }
+
+    if (baseRes.ok) {
+      const data = await baseRes.json()
+      if (data && Object.keys(data).length) {
+        planInfo.value.name = data.name || ''
+        planInfo.value.gender = data.gender || ''
+        planInfo.value.grade = data.grade || ''
+        planInfo.value.major = data.major || ''
+        planInfo.value.target = data.target || ''
+      }
+    }
+
+    if (userInterestsRes.ok) {
+      const data = await userInterestsRes.json()
+      if (data && data.length) {
+        planInfo.value.interest = data.map(item => item.id)
+        planInfo.value.interestDesc = data[0]?.description || ''
+      }
+    }
+
+    if (abilityRes.ok) {
+      const data = await abilityRes.json()
+      if (data && data.length) {
+        const abilityMap = {}
+        data.forEach(item => {
+          abilityMap[item.code] = item.score
+        })
+        planInfo.value.ability = { ...planInfo.value.ability, ...abilityMap }
+        planInfo.value.abilityDesc = data[0]?.description || ''
+      }
+    }
+
+    if (resourcesRes.ok) {
+      resourceList.value = await resourcesRes.json()
+    }
+  } catch (error) {
+    console.error('加载数据失败:', error)
+    alert('加载数据失败，请刷新重试')
+  }
+}
+
 // 下一步
-const nextStep = () => {
-  // 步骤1校验
+const nextStep = async () => {
   if (currentStep.value === 1) {
     if (!planInfo.value.name || !planInfo.value.grade || !planInfo.value.major) {
       alert('请填写姓名、年级、专业等必填信息！')
       return
     }
+    await saveBaseInfo(false)
   }
-  // 步骤2校验
-  if (currentStep.value === 2 && planInfo.value.interest.length === 0) {
-    alert('请至少选择一个职业兴趣！')
-    return
+  if (currentStep.value === 2) {
+    if (planInfo.value.interest.length === 0) {
+      alert('请至少选择一个职业兴趣！')
+      return
+    }
+    await saveInterests(false)
   }
-  // 步骤3校验
   if (currentStep.value === 3) {
     const hasAbility = Object.values(planInfo.value.ability).some(v => v > 0)
     if (!hasAbility) {
       alert('请至少评估一项核心能力！')
       return
     }
+    await saveAbility(false)
   }
   
   if (currentStep.value < 4) {
@@ -324,33 +394,112 @@ const setAbility = (key, star) => {
   planInfo.value.ability[key] = star
 }
 
-// 保存规划
-const savePlan = () => {
-  // 模拟保存到本地存储
-  localStorage.setItem('careerPlan', JSON.stringify(planInfo.value))
-  alert('规划保存成功！')
+// 保存基础信息
+const saveBaseInfo = async (showAlert = true) => {
+  try {
+    const res = await fetch('/api/profile/base', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        name: planInfo.value.name,
+        gender: planInfo.value.gender,
+        grade: planInfo.value.grade,
+        major: planInfo.value.major,
+        target: planInfo.value.target
+      })
+    })
+    if (!res.ok) throw new Error('保存基础信息失败')
+    if (showAlert) alert('基础信息保存成功')
+  } catch (error) {
+    alert(error.message)
+  }
 }
 
-// 导出报告
-const exportPlan = () => {
-  alert('报告导出功能已触发，即将生成PDF文件！')
-  // 实际项目中可集成jsPDF等库实现真实导出
+// 保存兴趣
+const saveInterests = async (showAlert = true) => {
+  try {
+    const interests = planInfo.value.interest.map(id => ({ id }))
+    const res = await fetch('/api/profile/user-interests', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        interests,
+        interestDesc: planInfo.value.interestDesc
+      })
+    })
+    if (!res.ok) throw new Error('保存兴趣失败')
+    if (showAlert) alert('兴趣保存成功')
+  } catch (error) {
+    alert(error.message)
+  }
 }
 
-// 完成规划
-const finishPlan = () => {
-  savePlan()
-  alert('职业规划生成完成！可前往“报告生成”页面查看完整版。')
-  router.push('/report')
+// 保存能力评估
+const saveAbility = async (showAlert = true) => {
+  try {
+    const abilities = abilityList.value.map(item => ({
+      code: item.code,
+      score: planInfo.value.ability[item.code] || 0
+    }))
+    const res = await fetch('/api/profile/ability', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        abilities,
+        abilityDesc: planInfo.value.abilityDesc
+      })
+    })
+    if (!res.ok) throw new Error('保存能力评估失败')
+    if (showAlert) alert('能力评估保存成功')
+  } catch (error) {
+    alert(error.message)
+  }
+}
+
+// 保存规划（调用三个保存接口）
+const savePlan = async () => {
+  await saveBaseInfo(true)
+  await saveInterests(true)
+  await saveAbility(true)
+}
+
+// 导出报告 - 生成报告并跳转到报告页面
+const exportPlan = async () => {
+  await finishPlan() // 复用完成规划逻辑
+}
+
+// 完成规划 - 生成报告并跳转
+const finishPlan = async () => {
+  await savePlan()
+
+  try {
+    const res = await fetch('/api/report/generate', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        title: `${planInfo.value.name}的职业规划报告`,
+        type: 1, // 综合职业规划报告
+        format: 'html',
+        modules: [] // 可根据需要传递选中的模块
+      })
+    })
+    if (!res.ok) throw new Error('生成报告失败')
+    const data = await res.json()
+    const reportId = data.id
+    router.push(`/report?id=${reportId}`)
+  } catch (error) {
+    alert('生成报告失败：' + error.message)
+  }
 }
 
 // 初始化
 onMounted(() => {
-  // 读取本地保存的规划信息
-  const savedPlan = localStorage.getItem('careerPlan')
-  if (savedPlan) {
-    planInfo.value = JSON.parse(savedPlan)
+  if (!localStorage.getItem('token')) {
+    alert('请先登录')
+    router.push('/login')
+    return
   }
+  loadData()
 })
 </script>
 

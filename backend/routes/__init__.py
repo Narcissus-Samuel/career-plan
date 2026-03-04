@@ -8,6 +8,8 @@ from .auth import auth_bp
 from .content import content_bp   # 新增
 from .admin import admin_bp
 from .llm import llm_bp
+from .profile import profile_bp   # 新增
+from .path import path_bp         # 新增
 from .assessment import assessment_bp
 
 def register_blueprints(app):
@@ -19,4 +21,6 @@ def register_blueprints(app):
     app.register_blueprint(content_bp)  # 新增
     app.register_blueprint(admin_bp)
     app.register_blueprint(llm_bp)
+    app.register_blueprint(profile_bp)  # 新增
+    app.register_blueprint(path_bp)      # 新增
     app.register_blueprint(assessment_bp)
