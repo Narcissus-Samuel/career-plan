@@ -218,6 +218,235 @@ def init_db():
     )
 ''')
 
+    # ========== 新增：发展路径规划相关表 ==========
+    # 用户扩展信息表（关联 users.id）
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_profiles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL UNIQUE,
+            name TEXT,
+            gender TEXT,
+            grade TEXT,
+            major TEXT,
+            target TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # 兴趣选项表（预定义）
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS interests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            sort_order INTEGER DEFAULT 0
+        )
+    ''')
+
+    # 用户兴趣关联表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_interests (
+            user_id INTEGER NOT NULL,
+            interest_id INTEGER NOT NULL,
+            description TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (user_id, interest_id),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (interest_id) REFERENCES interests(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # 能力维度表（预定义）
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ability_dimensions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            code TEXT NOT NULL UNIQUE,
+            sort_order INTEGER DEFAULT 0
+        )
+    ''')
+
+    # 用户能力评估记录表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ability_assessments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            dimension_id INTEGER NOT NULL,
+            score INTEGER NOT NULL CHECK(score BETWEEN 1 AND 5),
+            description TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (dimension_id) REFERENCES ability_dimensions(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # 用户规划主表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_plans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title TEXT,
+            target TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # 规划阶段表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS plan_stages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            plan_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            period TEXT,
+            status TEXT DEFAULT 'pending',
+            sort_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (plan_id) REFERENCES user_plans(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # 阶段目标表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS plan_goals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            stage_id INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            completed BOOLEAN DEFAULT 0,
+            sort_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (stage_id) REFERENCES plan_stages(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # 阶段里程碑表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS plan_milestones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            stage_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            date TEXT,
+            sort_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (stage_id) REFERENCES plan_stages(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # 发展路径类型表（预定义模板）
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS path_types (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            icon TEXT,
+            name TEXT NOT NULL,
+            description TEXT,
+            color TEXT,
+            progress INTEGER DEFAULT 0,
+            create_time TEXT,
+            target_time TEXT,
+            core_goal TEXT,
+            ability_base TEXT,
+            challenges TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # 路径阶段模板表（关联 path_types）
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS path_stage_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            path_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            period TEXT,
+            status TEXT DEFAULT 'pending',
+            sort_order INTEGER DEFAULT 0,
+            goals TEXT,       -- JSON数组，存储目标内容列表
+            milestones TEXT,  -- JSON数组，存储里程碑对象 {name, date}
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (path_id) REFERENCES path_types(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # 学习资源表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS learning_resources (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            icon TEXT,
+            color TEXT,
+            title TEXT NOT NULL,
+            description TEXT,
+            duration TEXT,
+            priority TEXT,
+            link TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # 导师表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS mentors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            avatar TEXT,
+            name TEXT NOT NULL,
+            title TEXT,
+            field TEXT,
+            introduction TEXT,
+            services TEXT,   -- JSON数组
+            contact TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # 实践机会表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS practices (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            type TEXT,
+            color TEXT,
+            title TEXT NOT NULL,
+            description TEXT,
+            requirements TEXT, -- JSON数组
+            link TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # 报告记录表（区别于 report_history，用于存储生成的报告内容）
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            type TEXT,
+            format TEXT,
+            content TEXT,      -- 报告内容（JSON或文本）
+            file_path TEXT,    -- 生成的文件路径（可选）
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # ---------- 插入预定义数据 ----------
+    # 兴趣选项
+    cursor.execute("SELECT count(*) as cnt FROM interests")
+    if cursor.fetchone()['cnt'] == 0:
+        cursor.executemany('INSERT INTO interests (name, sort_order) VALUES (?, ?)', [
+            ('技术研发', 1), ('产品设计', 2), ('市场营销', 3), ('运营管理', 4),
+            ('教育培训', 5), ('金融投资', 6), ('行政办公', 7), ('创业管理', 8)
+        ])
+
+    # 能力维度
+    cursor.execute("SELECT count(*) as cnt FROM ability_dimensions")
+    if cursor.fetchone()['cnt'] == 0:
+        cursor.executemany('INSERT INTO ability_dimensions (name, code, sort_order) VALUES (?, ?, ?)', [
+            ('沟通能力', 'communication', 1),
+            ('学习能力', 'learning', 2),
+            ('团队协作', 'teamwork', 3),
+            ('专业技能', 'professional', 4),
+            ('创新能力', 'innovation', 5)
+        ])
+
     conn.commit()
     conn.close()
     print("数据库初始化完成，文件位置：", SQLITE_DB_PATH)

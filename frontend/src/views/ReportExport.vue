@@ -17,7 +17,7 @@
         <div 
           class="type-card" 
           v-for="(item, index) in reportTypes" 
-          :key="index"
+          :key="item.id"
           :class="{ active: item.id === activeReportId }"
           @click="selectReportType(item.id)"
         >
@@ -25,9 +25,7 @@
           <div class="card-content">
             <h4 class="card-title">{{ item.name }}</h4>
             <p class="card-desc">{{ item.description }}</p>
-            <div class="card-features">
-              <span class="feature-tag" v-for="tag in item.features" :key="tag">{{ tag }}</span>
-            </div>
+            <!-- features 不再显示，如果需要可自行从后端数据添加 -->
           </div>
         </div>
       </div>
@@ -246,7 +244,7 @@
         <!-- 导出按钮 -->
         <div class="export-actions">
           <button class="btn-preview" @click="previewReport">👁️ 预览报告</button>
-          <button class="btn-export" @click="exportReport">📤 立即导出</button>
+          <button class="btn-export" @click="exportReport" :disabled="isExporting">📤 立即导出</button>
           <button class="btn-save-template" @click="saveAsTemplate">💾 保存为模板</button>
         </div>
       </div>
@@ -284,27 +282,25 @@
                 <th>报告类型</th>
                 <th>导出格式</th>
                 <th>导出时间</th>
-                <th>文件大小</th>
                 <th>操作</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(record, index) in filteredHistory" :key="index">
-                <td>{{ record.name }}</td>
+              <tr v-for="(record, index) in paginatedHistory" :key="record.id">
+                <td>{{ record.title }}</td>
                 <td>
-                  <span class="type-tag" :style="{ backgroundColor: record.typeColor }">{{ record.typeName }}</span>
+                  <span class="type-tag" :style="{ backgroundColor: getTypeColor(record.type) }">{{ getTypeName(record.type) }}</span>
                 </td>
                 <td>{{ record.format.toUpperCase() }}</td>
-                <td>{{ record.time }}</td>
-                <td>{{ record.size }}</td>
+                <td>{{ formatDate(record.created_at) }}</td>
                 <td class="action-buttons">
-                  <button class="btn-download" @click="downloadRecord(record)">下载</button>
-                  <button class="btn-delete" @click="deleteRecord(index)">删除</button>
+                  <button class="btn-download" @click="downloadReport(record.id)">下载</button>
+                  <button class="btn-delete" @click="deleteRecord(record.id)">删除</button>
                   <button class="btn-reexport" @click="reexportRecord(record)">重新导出</button>
                 </td>
               </tr>
-              <tr v-if="filteredHistory.length === 0">
-                <td colspan="6" class="empty-row">暂无导出记录</td>
+              <tr v-if="historyReports.length === 0">
+                <td colspan="5" class="empty-row">暂无导出记录</td>
               </tr>
             </tbody>
           </table>
@@ -343,51 +339,21 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-// 初始化路由实例
 const router = useRouter()
 
-// 页面核心数据
-const reportTypes = ref([
-  {
-    id: 1,
-    icon: '📊',
-    name: '综合职业规划报告',
-    description: '包含测评结果、能力分析、发展路径的完整报告',
-    color: '#1890ff',
-    features: ['完整数据', '可视化图表', '专业建议', '可打印']
-  },
-  {
-    id: 2,
-    icon: '🎯',
-    name: '能力短板分析报告',
-    description: '聚焦能力短板，提供详细的提升建议和学习资源',
-    color: '#faad14',
-    features: ['短板分析', '提升方案', '资源推荐', '进度跟踪']
-  },
-  {
-    id: 3,
-    icon: '🗺️',
-    name: '发展路径规划报告',
-    description: '详细的分阶段发展路径，包含里程碑和目标设置',
-    color: '#52c41a',
-    features: ['阶段规划', '里程碑', '进度统计', '资源匹配']
-  },
-  {
-    id: 4,
-    icon: '📈',
-    name: '职业测评结果报告',
-    description: '仅包含职业兴趣测评的原始数据和基础分析',
-    color: '#ff7a45',
-    features: ['原始数据', '基础分析', '简洁明了', '快速导出']
-  }
-])
-
-// 激活的报告类型
-const activeReportId = ref(1)
-const activeReport = ref(reportTypes.value[0])
+// ---------- 状态 ----------
+const reportTypes = ref([])                     // 报告类型列表（从后端获取）
+const activeReportId = ref(null)                 // 当前选中的报告类型ID
+const activeReport = ref(null)                   // 当前选中的报告类型对象
+const contentCategories = ref([])                 // 内容分类（从模板构建）
+const showHistory = ref(false)                    // 是否显示历史记录
+const isExporting = ref(false)                    // 导出中状态
+const showExportModal = ref(false)                 // 导出进度弹窗
+const exportProgress = ref(0)                      // 导出进度
+const exportStatus = ref('正在准备导出数据...')      // 导出状态
 
 // 导出配置
 const exportConfig = ref({
@@ -401,202 +367,122 @@ const exportConfig = ref({
   chartType: 'default'
 })
 
-// 报告内容分类
-const contentCategories = ref([
-  {
-    name: '测评基础信息',
-    checked: true,
-    items: [
-      { name: '个人基本信息', description: '姓名、性别、学历等基础信息', checked: true },
-      { name: '测评时间与环境', description: '测评完成时间、设备等信息', checked: true },
-      { name: '测评有效性分析', description: '测评数据的可靠性分析', checked: false }
-    ]
-  },
-  {
-    name: '职业兴趣测评结果',
-    checked: true,
-    items: [
-      { name: '兴趣维度得分', description: '各职业兴趣维度的具体得分', checked: true },
-      { name: '兴趣雷达图', description: '可视化的兴趣维度雷达图', checked: true },
-      { name: '兴趣类型解读', description: '基于得分的兴趣类型分析', checked: true },
-      { name: '匹配职业推荐', description: '基于兴趣的职业匹配推荐', checked: true }
-    ]
-  },
-  {
-    name: '能力短板分析',
-    checked: true,
-    items: [
-      { name: '能力维度得分', description: '各能力维度的具体得分', checked: true },
-      { name: '短板识别结果', description: '核心短板的详细分析', checked: true },
-      { name: '提升建议', description: '针对短板的具体提升建议', checked: true },
-      { name: '学习资源推荐', description: '匹配短板的学习资源', checked: false }
-    ]
-  },
-  {
-    name: '发展路径规划',
-    checked: true,
-    items: [
-      { name: '职业目标设定', description: '短期和长期职业目标', checked: true },
-      { name: '分阶段规划', description: '各阶段的具体目标和任务', checked: true },
-      { name: '里程碑设置', description: '关键的时间节点和成果', checked: true },
-      { name: '进度跟踪图表', description: '可视化的进度跟踪图表', checked: false }
-    ]
-  },
-  {
-    name: '专业建议与总结',
-    checked: true,
-    items: [
-      { name: '整体评估总结', description: '综合的职业发展评估', checked: true },
-      { name: '个性化建议', description: '针对个人的专属发展建议', checked: true },
-      { name: '风险提示', description: '职业发展中的潜在风险', checked: false },
-      { name: '后续行动计划', description: '可落地的后续行动建议', checked: true }
-    ]
-  }
-])
-
-// 导出记录相关
-const showHistory = ref(false)
-const exportHistory = ref([
-  {
-    name: '我的职业规划报告',
-    typeId: 1,
-    typeName: '综合职业规划报告',
-    typeColor: '#1890ff',
-    format: 'pdf',
-    time: '2026-02-15 14:30:25',
-    size: '2.4MB'
-  },
-  {
-    name: '能力短板分析报告',
-    typeId: 2,
-    typeName: '能力短板分析报告',
-    typeColor: '#faad14',
-    format: 'word',
-    time: '2026-02-10 09:15:40',
-    size: '1.8MB'
-  },
-  {
-    name: '发展路径规划报告',
-    typeId: 3,
-    typeName: '发展路径规划报告',
-    typeColor: '#52c41a',
-    format: 'pdf',
-    time: '2026-02-05 16:20:10',
-    size: '3.2MB'
-  },
-  {
-    name: '职业测评结果报告',
-    typeId: 4,
-    typeName: '职业测评结果报告',
-    typeColor: '#ff7a45',
-    format: 'excel',
-    time: '2026-02-01 11:05:30',
-    size: '0.8MB'
-  }
-])
+// 历史报告列表（从后端获取）
+const historyReports = ref([])
 
 // 筛选条件
 const searchKeyword = ref('')
 const filterType = ref('all')
 const filterFormat = ref('all')
 
-// 分页相关
+// 分页
 const currentPage = ref(1)
 const pageSize = ref(10)
 
-// 导出弹窗相关
-const showExportModal = ref(false)
-const exportProgress = ref(0)
-const exportStatus = ref('正在准备导出数据...')
+// ---------- 工具函数 ----------
+const getHeaders = () => {
+  const token = localStorage.getItem('token')
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` })
+  }
+}
 
-// 选择报告类型
+// 格式化日期
+const formatDate = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  return `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2,'0')}-${date.getDate().toString().padStart(2,'0')} ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`
+}
+
+// 根据类型ID获取类型名称
+const getTypeName = (typeId) => {
+  const type = reportTypes.value.find(t => t.id === Number(typeId))
+  return type ? type.name : '未知'
+}
+
+// 根据类型ID获取颜色
+const getTypeColor = (typeId) => {
+  const type = reportTypes.value.find(t => t.id === Number(typeId))
+  return type ? type.color : '#999'
+}
+
+// ---------- 数据获取 ----------
+// 获取报告类型列表
+const fetchReportTypes = async () => {
+  try {
+    const res = await fetch('/api/report/types')
+    if (!res.ok) throw new Error('获取报告类型失败')
+    const data = await res.json()
+    reportTypes.value = data
+    if (data.length > 0) {
+      selectReportType(data[0].id)
+    }
+  } catch (error) {
+    console.error(error)
+    alert('加载报告类型失败')
+  }
+}
+
+// 根据类型ID获取报告模板（内容分类）
+const fetchReportTemplate = async (typeId) => {
+  try {
+    const res = await fetch(`/api/report/templates/${typeId}`)
+    if (!res.ok) throw new Error('获取模板失败')
+    const template = await res.json()
+    // 将后端返回的modules转换为contentCategories格式
+    // 假设template.modules = [ {key, name, default}, ... ]
+    // 每个模块可以作为一个分类，其子项可以自定义或从默认配置中补充
+    // 这里简单构造：每个模块作为一个分类，分类下有一个子项代表是否包含该模块
+    const categories = template.modules.map(module => ({
+      name: module.name,
+      checked: module.default,
+      items: [
+        {
+          name: `包含${module.name}`,
+          description: '',
+          checked: module.default
+        }
+      ]
+    }))
+    contentCategories.value = categories
+  } catch (error) {
+    console.error(error)
+    contentCategories.value = []
+  }
+}
+
+// 获取历史报告列表
+const fetchHistory = async () => {
+  try {
+    const res = await fetch('/api/report/history', { headers: getHeaders() })
+    if (!res.ok) throw new Error('获取历史记录失败')
+    const data = await res.json()
+    historyReports.value = data
+  } catch (error) {
+    console.error(error)
+    alert('加载历史记录失败')
+  }
+}
+
+// ---------- 操作 ----------
 const selectReportType = (id) => {
   activeReportId.value = id
-  const selectedReport = reportTypes.value.find(item => item.id === id)
-  activeReport.value = selectedReport
-  
-  // 更新默认报告名称
-  exportConfig.value.reportName = `我的${selectedReport.name}`
+  const selected = reportTypes.value.find(t => t.id === id)
+  activeReport.value = selected
+  if (selected) {
+    exportConfig.value.reportName = `我的${selected.name}`
+    fetchReportTemplate(id)
+  }
 }
 
-// 切换分类选中状态
+// 切换分类选中状态（兼容原有逻辑）
 const toggleCategory = (category) => {
-  // 如果取消选中，取消所有子项
   if (!category.checked) {
-    category.items.forEach(item => {
-      item.checked = false
-    })
+    category.items.forEach(item => item.checked = false)
   } else {
-    // 如果选中，选中所有子项
-    category.items.forEach(item => {
-      item.checked = true
-    })
+    category.items.forEach(item => item.checked = true)
   }
-}
-
-// 筛选后的导出记录
-const filteredHistory = computed(() => {
-  let filtered = exportHistory.value
-  
-  // 关键词筛选
-  if (searchKeyword.value) {
-    filtered = filtered.filter(record => 
-      record.name.includes(searchKeyword.value)
-    )
-  }
-  
-  // 类型筛选
-  if (filterType.value !== 'all') {
-    filtered = filtered.filter(record => 
-      record.typeId === Number(filterType.value)
-    )
-  }
-  
-  // 格式筛选
-  if (filterFormat.value !== 'all') {
-    filtered = filtered.filter(record => 
-      record.format === filterFormat.value
-    )
-  }
-  
-  // 分页处理
-  const startIndex = (currentPage.value - 1) * pageSize.value
-  const endIndex = startIndex + pageSize.value
-  return filtered.slice(startIndex, endIndex)
-})
-
-// 总页数
-const totalPages = computed(() => {
-  let filtered = exportHistory.value
-  
-  // 应用筛选条件计算总条数
-  if (searchKeyword.value) {
-    filtered = filtered.filter(record => 
-      record.name.includes(searchKeyword.value)
-    )
-  }
-  
-  if (filterType.value !== 'all') {
-    filtered = filtered.filter(record => 
-      record.typeId === Number(filterType.value)
-    )
-  }
-  
-  if (filterFormat.value !== 'all') {
-    filtered = filtered.filter(record => 
-      record.format === filterFormat.value
-    )
-  }
-  
-  return Math.ceil(filtered.length / pageSize.value) || 1
-})
-
-// 清空筛选
-const clearFilter = () => {
-  searchKeyword.value = ''
-  filterType.value = 'all'
-  filterFormat.value = 'all'
-  currentPage.value = 1
 }
 
 // 预览报告
@@ -612,43 +498,78 @@ const previewReport = () => {
 }
 
 // 导出报告
-const exportReport = () => {
-  // 显示导出弹窗
+const exportReport = async () => {
+  if (!activeReportId.value) return
+
+  isExporting.value = true
   showExportModal.value = true
   exportProgress.value = 0
-  exportStatus.value = '正在准备导出数据...'
-  
-  // 模拟导出进度
-  const progressInterval = setInterval(() => {
-    exportProgress.value += Math.floor(Math.random() * 10) + 5
-    
-    if (exportProgress.value <= 30) {
-      exportStatus.value = '正在整理报告数据...'
-    } else if (exportProgress.value <= 60) {
-      exportStatus.value = '正在生成报告内容...'
-    } else if (exportProgress.value <= 90) {
-      exportStatus.value = '正在转换文件格式...'
-    } else if (exportProgress.value < 100) {
-      exportStatus.value = '正在准备下载文件...'
-    }
-    
-    if (exportProgress.value >= 100) {
-      exportProgress.value = 100
-      exportStatus.value = '报告导出完成！'
-      clearInterval(progressInterval)
-      
-      // 添加到导出记录
-      exportHistory.value.unshift({
-        name: exportConfig.value.reportName,
-        typeId: activeReportId.value,
-        typeName: activeReport.value.name,
-        typeColor: activeReport.value.color,
+  exportStatus.value = '正在生成报告...'
+
+  try {
+    // 调用生成报告接口
+    const res = await fetch('/api/report/generate', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        title: exportConfig.value.reportName,
+        type: activeReportId.value,
         format: exportConfig.value.format,
-        time: new Date().toLocaleString().replace(/\//g, '-'),
-        size: `${(Math.random() * 3 + 0.5).toFixed(1)}MB`
+        modules: contentCategories.value
+          .filter(c => c.checked)
+          .map(c => c.name) // 简化：传递模块名称作为key
       })
+    })
+    if (!res.ok) throw new Error('生成报告失败')
+    const data = await res.json()
+    const reportId = data.id
+
+    // 模拟进度更新
+    exportProgress.value = 50
+    exportStatus.value = '报告生成成功，准备下载...'
+
+    // 触发下载
+    await downloadReport(reportId)
+
+    exportProgress.value = 100
+    exportStatus.value = '导出完成！'
+
+    // 刷新历史记录
+    await fetchHistory()
+  } catch (error) {
+    console.error(error)
+    exportStatus.value = '导出失败：' + error.message
+    exportProgress.value = 0
+  } finally {
+    isExporting.value = false
+  }
+}
+
+// 下载报告文件
+const downloadReport = async (reportId) => {
+  try {
+    const res = await fetch(`/api/report/${reportId}/download`, {
+      headers: getHeaders()
+    })
+    if (!res.ok) throw new Error('下载失败')
+
+    const blob = await res.blob()
+    const disposition = res.headers.get('Content-Disposition')
+    let filename = `report.${exportConfig.value.format}`
+    if (disposition && disposition.includes('filename=')) {
+      filename = disposition.split('filename=')[1].replace(/"/g, '')
     }
-  }, 300)
+
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error(error)
+    throw error
+  }
 }
 
 // 完成导出
@@ -656,13 +577,13 @@ const completeExport = () => {
   showExportModal.value = false
 }
 
-// 打开导出文件
+// 打开导出文件（模拟）
 const openExportedFile = () => {
-  alert(`已打开「${exportConfig.value.reportName}.${exportConfig.value.format}」文件！`)
+  alert(`文件已下载到您的电脑，请查看下载文件夹。`)
   showExportModal.value = false
 }
 
-// 保存为模板
+// 保存为模板（模拟）
 const saveAsTemplate = () => {
   const templateName = prompt('请输入模板名称：', exportConfig.value.reportName)
   if (templateName) {
@@ -670,37 +591,93 @@ const saveAsTemplate = () => {
   }
 }
 
-// 模板管理
+// 模板管理（模拟）
 const manageTemplates = () => {
   router.push('/template-management')
 }
 
-// 下载记录
-const downloadRecord = (record) => {
-  alert(`正在下载「${record.name}.${record.format}」文件...`)
-}
-
 // 删除记录
-const deleteRecord = (index) => {
-  if (confirm('确定要删除这条导出记录吗？')) {
-    exportHistory.value.splice(index, 1)
+const deleteRecord = async (reportId) => {
+  if (!confirm('确定要删除这条导出记录吗？')) return
+  try {
+    // 如果后端有删除接口，可调用；否则仅前端删除
+    // 假设后端无删除接口，暂时前端删除
+    const index = historyReports.value.findIndex(r => r.id === reportId)
+    if (index !== -1) {
+      historyReports.value.splice(index, 1)
+    }
+    alert('删除成功')
+  } catch (error) {
+    console.error(error)
+    alert('删除失败')
   }
 }
 
 // 重新导出
 const reexportRecord = (record) => {
-  // 恢复该记录的配置
-  selectReportType(record.typeId)
+  selectReportType(record.type)
   exportConfig.value.format = record.format
-  exportConfig.value.reportName = record.name
-  
-  // 开始导出
+  exportConfig.value.reportName = record.title
   exportReport()
 }
 
-// 页面挂载初始化
-onMounted(() => {
-  selectReportType(1)
+// 清空筛选
+const clearFilter = () => {
+  searchKeyword.value = ''
+  filterType.value = 'all'
+  filterFormat.value = 'all'
+  currentPage.value = 1
+}
+
+// 筛选后的历史记录
+const filteredHistory = computed(() => {
+  let filtered = historyReports.value
+
+  if (searchKeyword.value) {
+    filtered = filtered.filter(r => r.title.includes(searchKeyword.value))
+  }
+  if (filterType.value !== 'all') {
+    filtered = filtered.filter(r => r.type === Number(filterType.value))
+  }
+  if (filterFormat.value !== 'all') {
+    filtered = filtered.filter(r => r.format === filterFormat.value)
+  }
+  return filtered
+})
+
+// 分页后的记录
+const paginatedHistory = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return filteredHistory.value.slice(start, end)
+})
+
+// 总页数
+const totalPages = computed(() => {
+  return Math.ceil(filteredHistory.value.length / pageSize.value) || 1
+})
+
+// 当筛选条件变化时重置页码
+watch([searchKeyword, filterType, filterFormat], () => {
+  currentPage.value = 1
+})
+
+// 切换历史记录显示时获取数据
+watch(showHistory, (newVal) => {
+  if (newVal) {
+    fetchHistory()
+  }
+})
+
+// 初始化
+onMounted(async () => {
+  // 检查登录
+  if (!localStorage.getItem('token')) {
+    alert('请先登录')
+    router.push('/login')
+    return
+  }
+  await fetchReportTypes()
 })
 </script>
 
