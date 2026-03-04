@@ -1,6 +1,7 @@
 # routes/report.py
 from flask import Blueprint, request, jsonify, send_file
 import io
+from report_utils import export_report_file
 
 report_bp = Blueprint('report', __name__, url_prefix='/api')
 
@@ -51,3 +52,12 @@ def export_report():
         download_name=f"report.{format_type}",
         mimetype='application/octet-stream'
     )
+
+
+@report_bp.route('/report/export/<int:report_id>', methods=['GET'])
+def export_report_by_id(report_id):
+    fmt = (request.args.get('format') or 'html').lower()
+    res = export_report_file(report_id, fmt)
+    if res is None:
+        return jsonify({'error': 'not found'}), 404
+    return res

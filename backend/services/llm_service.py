@@ -1,7 +1,7 @@
 """
 services/llm_service.py
 
-提供与职业规划相关的“大模型”接口实现（本地启发式 + 可选调用外部 API 的包装）
+提供与职业规划相关的"大模型"接口实现（本地启发式 + 可选调用外部 API 的包装）
 
 函数：
 - parse_resume(file_path) -> dict
@@ -15,43 +15,61 @@ services/llm_service.py
 import os
 import json
 from typing import Dict, Any, List
-from algorithms import recommend_jobs, compute_match_score
+from backend.algorithms import recommend_jobs, compute_match_score
 
-# 改成 DeepSeek 的 key
-DEEPSEEK_KEY = os.environ.get('DEEPSEEK_API_KEY')
+# 高级算法类（若存在则优先使用）
+try:
+    from career_ml import CareerRecommend
+except Exception:
+    CareerRecommend = None
+
+
+def _get_deepseek_key():
+    """✅ 动态获取 API Key，确保 load_dotenv 后生效"""
+    return os.environ.get('DEEPSEEK_API_KEY')
+
 
 def _call_deepseek(prompt: str) -> str:
-    """如果配置了 DEEPSEEK_API_KEY，则调用 DeepSeek API，否则返回空字符串。"""
-    if not DEEPSEEK_KEY:
+    """调用 DeepSeek HTTP 接口（兼容 OpenAI-style chat completion）"""
+    api_key = _get_deepseek_key()
+    if not api_key:
+        print('⚠️ DEEPSEEK_API_KEY 未配置，使用本地模板')
         return ''
     try:
-        from openai import OpenAI
-        client = OpenAI(
-            api_key=DEEPSEEK_KEY,
-            base_url="https://api.deepseek.com/v1"
-        )
-        resp = client.chat.completions.create(
-            model='deepseek-chat',
-            messages=[{'role': 'user', 'content': prompt}],
-            max_tokens=600
-        )
-        return resp.choices[0].message.content
+        import requests
+        url = 'https://api.siliconflow.cn/v1/chat/completions'
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+        payload = {
+            'model': 'deepseek-ai/DeepSeek-V3',
+            'messages': [{'role': 'user', 'content': prompt}],
+            'max_tokens': 600
+        }
+        r = requests.post(url, headers=headers, json=payload, timeout=60)
+        r.raise_for_status()
+        j = r.json()
+        # 兼容多种返回结构
+        if 'choices' in j and len(j['choices']) > 0:
+            c = j['choices'][0]
+            if isinstance(c.get('message'), dict) and 'content' in c['message']:
+                return c['message']['content']
+            if 'text' in c:
+                return c['text']
+        return j.get('result') or ''
     except Exception as e:
-        print('deepseek call failed', e)
+        print(f'❌ DeepSeek 调用失败：{e}')
         return ''
 
 
 def parse_resume(file_path: str) -> Dict[str, Any]:
-    """解析简历（演示版）：
-    - 支持 txt/简单文本或返回模拟结构
-    返回结构化学生信息字典，包含 skills, certificates, internships, interests, completeness, competitiveness
-    """
+    """解析简历（演示版）"""
     try:
         _, ext = os.path.splitext(file_path.lower())
         if ext in ('.txt', '.md'):
             with open(file_path, 'r', encoding='utf-8') as f:
                 txt = f.read()
-            # 简单关键词抽取：查找技能行（以 Skills: 开头）
             skills = []
             for line in txt.splitlines():
                 if ':' in line:
@@ -72,7 +90,6 @@ def parse_resume(file_path: str) -> Dict[str, Any]:
     except Exception:
         pass
 
-    # fallback mock
     return {
         'name': '测试学生',
         'major': '计算机',
@@ -87,15 +104,22 @@ def parse_resume(file_path: str) -> Dict[str, Any]:
 
 
 def intelligent_recommendation(student: Dict[str, Any], jobs: List[Dict[str, Any]], top_n: int = 5) -> List[Dict[str, Any]]:
-    """返回推荐岗位列表以及每个岗位的匹配详情。"""
+    """返回推荐岗位列表以及每个岗位的匹配详情"""
+    if CareerRecommend is not None:
+        try:
+            cr = CareerRecommend()
+            recs_raw = cr.get_match_list(student, jobs, top_k=top_n)
+            out = []
+            for r in recs_raw:
+                out.append({'job': r['job'], 'match': {'overall_score': r['score'], 'skill_score': r.get('skill_score')}})
+            return out
+        except Exception:
+            pass
+
     recs = recommend_jobs(student, jobs, top_n)
-    # 转换为可序列化结构
     out = []
     for job, detail in recs:
-        item = {
-            'job': job,
-            'match': detail
-        }
+        item = {'job': job, 'match': detail}
         out.append(item)
     return out
 
@@ -106,25 +130,31 @@ def generate_plan_suggestion(student: Dict[str, Any], job_name: str) -> str:
     template.append(f"目标岗位：{job_name}")
     template.append("总体建议：")
     template.append("1. 技能提升：根据岗位需求补齐关键技能，例如掌握相关框架与工具。")
-    template.append("2. 项目经验：建议完成至少1-2个相关项目，展示端到端能力。")
+    template.append("2. 项目经验：建议完成至少 1-2 个相关项目，展示端到端能力。")
     template.append("3. 简历优化：将关键技能与项目成果量化展示，突出业绩与指标。")
     template.append("4. 面试准备：整理常见技术问题与行为问题的回答要点。")
 
     prompt = '\n'.join(template) + '\n\n学生信息：' + json.dumps(student, ensure_ascii=False)
+    
+    print('🔍 正在调用 DeepSeek 生成规划建议...')
     ai = _call_deepseek(prompt)
     if ai:
+        print('✅ DeepSeek 调用成功')
         return ai
+    print('⚠️ DeepSeek 调用失败，使用本地模板')
     return '\n'.join(template)
 
 
 def chat_qa(question: str, context: str = '') -> str:
-    """简洁的问答接口：若配置大模型，调用之；否则用规则回复。"""
-    if DEEPSEEK_KEY:
+    """简洁的问答接口"""
+    api_key = _get_deepseek_key()
+    if api_key:
+        print('🔍 正在调用 DeepSeek 回答问答...')
         out = _call_deepseek(f"Q: {question}\n上下文：{context}")
         if out:
+            print('✅ DeepSeek 问答成功')
             return out
 
-    # 简单规则示例
     q = question.lower()
     if '如何' in q or '怎样' in q:
         return '要提升核心技能，建议系统学习相关课程、实践项目并通过线上平台参与挑战。'

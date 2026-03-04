@@ -2,7 +2,8 @@ from flask import Blueprint, request, jsonify, send_file
 import io, json, datetime
 from db import get_db
 from services import llm_service
-from algorithms import score_student_competitiveness
+from backend.algorithms import score_student_competitiveness
+from report_utils import export_report_file
 
 assessment_bp = Blueprint('assessment', __name__, url_prefix='/api/assessment')
 
@@ -59,28 +60,7 @@ def submit_assessment():
 def export_report(report_id):
     """导出历史报告：默认 HTML，若安装 pdfkit 且请求 ?format=pdf 则尝试生成 PDF"""
     fmt = (request.args.get('format') or 'html').lower()
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute('SELECT * FROM report_history WHERE id = ?', (report_id,))
-    row = cur.fetchone()
-    conn.close()
-    if not row:
+    res = export_report_file(report_id, fmt)
+    if res is None:
         return jsonify({'error': 'not found'}), 404
-
-    content = row['content'] or '<div>无内容</div>'
-
-    if fmt == 'pdf':
-        # 尝试使用 pdfkit（外部依赖和 wkhtmltopdf）
-        try:
-            import pdfkit
-            pdf_bytes = pdfkit.from_string(content, False)
-            return send_file(io.BytesIO(pdf_bytes), as_attachment=True, download_name=f'report_{report_id}.pdf', mimetype='application/pdf')
-        except Exception as e:
-            # 回退为 HTML 下载
-            pass
-
-    # 返回 HTML 文件
-    bio = io.BytesIO()
-    bio.write(content.encode('utf-8'))
-    bio.seek(0)
-    return send_file(bio, as_attachment=True, download_name=f'report_{report_id}.html', mimetype='text/html')
+    return res
