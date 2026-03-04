@@ -142,13 +142,6 @@
         <div class="form-step" v-show="currentStep === 4">
           <div class="form-title">你的专属职业规划</div>
           <div class="plan-result">
-            <!-- 添加 loading 提示 -->
-            <div v-if="loading" class="loading-tip">
-              🔄 正在调用 AI 生成职业规划，请稍候...
-            </div>
-
-            <!-- 添加 AI 生成结果显示 -->
-            <div v-else-if="planResult" class="ai-result" v-html="planResult"></div>
             <div class="result-header">
               <h3>{{ planInfo.name }}的{{ planInfo.grade }}/{{ planInfo.major }}职业规划</h3>
               <div class="result-date">生成时间：{{ currentDate }}</div>
@@ -232,13 +225,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-// 添加 axios 导入
-import axios from 'axios'
 
-// 添加 loading 和 planResult 状态
-const loading = ref(false)
-const planResult = ref('')
-const token = localStorage.getItem('token') || ''
 // 当前步骤
 const currentStep = ref(1)
 
@@ -481,38 +468,28 @@ const exportPlan = async () => {
   await finishPlan() // 复用完成规划逻辑
 }
 
-// 完成规划
+// 完成规划 - 生成报告并跳转
 const finishPlan = async () => {
-  savePlan()
-  
-  // 调用后端 DeepSeek 生成规划
-  loading.value = true
+  await savePlan()
+
   try {
-    const res = await axios.post('http://localhost:5000/api/llm/generate_plan', {
-      student: {
-        name: planInfo.value.name,
-        major: planInfo.value.major,
-        grade: planInfo.value.grade,
-        skills: planInfo.value.interest,
-        interests: planInfo.value.interest
-      },
-      job_name: planInfo.value.target || '未指定'
-    }, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+    const res = await fetch('/api/report/generate', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        title: `${planInfo.value.name}的职业规划报告`,
+        type: 1, // 综合职业规划报告
+        format: 'html',
+        modules: [] // 可根据需要传递选中的模块
+      })
     })
-    planResult.value = res.data.plan
-    alert('AI 规划生成成功！')
-  } catch (err) {
-    console.error(err)
-    alert('生成失败：' + (err.response?.data?.message || err.message))
-  } finally {
-    loading.value = false
+    if (!res.ok) throw new Error('生成报告失败')
+    const data = await res.json()
+    const reportId = data.id
+    router.push(`/report?id=${reportId}`)
+  } catch (error) {
+    alert('生成报告失败：' + error.message)
   }
-  
-  router.push('/report')
 }
 
 // 初始化
