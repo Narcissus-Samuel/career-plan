@@ -2,8 +2,34 @@ from flask import Blueprint, request, jsonify
 from services import llm_service
 from db import get_db
 from .auth import token_required
+import os
 
 llm_bp = Blueprint('llm', __name__, url_prefix='/api/llm')
+
+
+@llm_bp.route('/test_connection', methods=['GET'])
+def test_connection():
+    """✅ 测试 DeepSeek 连接状态"""
+    api_key = llm_service._get_deepseek_key()
+    if api_key:
+        test_prompt = "请用一句话回答：1+1 等于几"
+        result = llm_service._call_deepseek(test_prompt)
+        if result:
+            return jsonify({
+                'status': 'ok',
+                'message': 'DeepSeek 连接成功',
+                'response': result[:100]
+            })
+        else:
+            return jsonify({
+                'status': 'warning',
+                'message': 'API Key 存在但调用失败，请检查网络和 API Key 有效性'
+            })
+    else:
+        return jsonify({
+            'status': 'error',
+            'message': 'DEEPSEEK_API_KEY 未配置'
+        }), 400
 
 
 @llm_bp.route('/recommend', methods=['POST'])
@@ -12,7 +38,6 @@ def recommend():
     data = request.json or {}
     student = data.get('student')
     top_n = int(data.get('top_n', 5))
-    # load jobs from db
     conn = get_db()
     cur = conn.cursor()
     cur.execute('SELECT * FROM job')

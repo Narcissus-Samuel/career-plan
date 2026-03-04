@@ -1,12 +1,19 @@
 # app.py
+import sys
+import os
+from dotenv import load_dotenv
+
+# ✅ 先加载环境变量，再导入其他模块
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+
+# 把项目根目录（frontend）加入 Python 路径
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from flask import Flask, jsonify
 from flask_cors import CORS
-import os
 from db import get_db, init_db
 from config import UPLOAD_FOLDER
 from routes import register_blueprints
-from dotenv import load_dotenv
-load_dotenv()  # 加在最顶部
 
 app = Flask(__name__)
 # 设置 secret key（必须，用于 session 存储）

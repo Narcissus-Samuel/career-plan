@@ -1,4 +1,4 @@
-from algorithms import compute_match_score, recommend_jobs, score_student_competitiveness
+from backend.algorithms import compute_match_score, recommend_jobs, score_student_competitiveness
 
 # 简单单元测试
 if __name__ == '__main__':

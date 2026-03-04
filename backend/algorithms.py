@@ -1,13 +1,13 @@
 """
-算法模块：职业匹配、推荐与评分
+算法模块：职业匹配、推荐与评分（基础实现）
 
-实现说明：
-- 基于技能重叠度和兴趣匹配的简单启发式算法
-- 提供可单元测试的函数：compute_match_score, recommend_jobs, score_student_competitiveness
+说明：
+- 提供可单元测试的函数：`compute_match_score`, `recommend_jobs`, `score_student_competitiveness`
+- 为项目中其他服务（如 `services/llm_service.py`）提供稳定的接口
 """
 from typing import List, Dict, Any, Tuple
-import math
 import json
+from difflib import SequenceMatcher
 
 
 def _list_from_json(maybe_json):
@@ -24,31 +24,45 @@ def _list_from_json(maybe_json):
 
 def compute_match_score(student: Dict[str, Any], job_profile: Dict[str, Any]) -> Dict[str, Any]:
     """
-    计算学生与岗位画像的匹配分：
-    - 技能匹配（权重0.6）：学生技能与岗位技能交集比
-    - 兴趣匹配（权重0.2）：学生兴趣与岗位名称/行业包含的相关关键词
-    - 软技能匹配（权重0.2）：基于岗位画像中 soft_abilities 与学生 competitiveness
-    返回字典包含 overall_score 与各维度分数。
+    计算学生与岗位画像的匹配分。
+    输出包含 overall_score、skill_score、text_similarity、soft_score、skill_overlap、exp_bonus。
     """
+    # 1) 技能匹配（考虑技能重要性）
     stu_skills = set([s.lower() for s in _list_from_json(student.get('skills'))])
-    job_skills = set([s.lower() for s in _list_from_json(job_profile.get('skills'))])
+    job_skills_list = _list_from_json(job_profile.get('skills'))
+    # 支持岗位技能为 list 或 dict（带权重）
+    job_skills = set()
+    skill_weights = {}
+    if isinstance(job_skills_list, dict):
+        for k, v in job_skills_list.items():
+            job_skills.add(str(k).lower())
+            try:
+                skill_weights[str(k).lower()] = float(v)
+            except Exception:
+                skill_weights[str(k).lower()] = 1.0
+    else:
+        for s in job_skills_list:
+            job_skills.add(str(s).lower())
+            skill_weights[str(s).lower()] = 1.0
 
-    skill_overlap = len(stu_skills & job_skills)
-    skill_score = 0.0
-    if job_skills:
-        skill_score = skill_overlap / max(len(job_skills), 1)
+    matched = stu_skills & job_skills
+    if not job_skills:
+        skill_score = 0.0
+    else:
+        matched_weight = sum(skill_weights.get(s, 1.0) for s in matched)
+        total_weight = sum(skill_weights.get(s, 1.0) for s in job_skills)
+        skill_score = matched_weight / max(total_weight, 1e-6)
 
-    # interest match（关键词包含）
-    interests = [i.lower() for i in _list_from_json(student.get('interests'))]
-    interest_score = 0.0
-    if interests:
-        name = (job_profile.get('job_name') or '').lower()
-        industry = (job_profile.get('industry') or '') if isinstance(job_profile.get('industry'), str) else ''
-        text = name + ' ' + industry
-        match_count = sum(1 for it in interests if it in text)
-        interest_score = min(1.0, match_count / len(interests))
+    # 2) 文本相似度（兴趣+技能 与 岗位描述）
+    text_a = ' '.join(_list_from_json(student.get('interests')) + _list_from_json(student.get('skills'))).lower()
+    desc = (job_profile.get('job_description') or '') or (job_profile.get('company_info') or '')
+    text_b = (job_profile.get('job_name') or '') + ' ' + str(desc)
+    text_b = text_b.lower()
+    txt_sim = 0.0
+    if text_a.strip() and text_b.strip():
+        txt_sim = SequenceMatcher(None, text_a, text_b).ratio()
 
-    # soft abilities vs competitiveness
+    # 3) 软能力匹配：岗位需要的软能力 vs 学生竞争力/完整度
     soft = job_profile.get('soft_abilities') or {}
     if isinstance(soft, str):
         try:
@@ -59,23 +73,36 @@ def compute_match_score(student: Dict[str, Any], job_profile: Dict[str, Any]) ->
     if soft:
         vals = [v for v in soft.values() if isinstance(v, (int, float))]
         if vals:
-            avg_soft_req = sum(vals) / (len(vals) * 100.0)  # 归一化到0-1
+            avg_soft_req = sum(vals) / (len(vals) * 100.0)
 
     competitiveness = (student.get('competitiveness') or 50) / 100.0
+    completeness = (student.get('completeness') or 50) / 100.0
     soft_score = 1.0 - abs(competitiveness - avg_soft_req)
-    soft_score = max(0.0, min(1.0, soft_score))
+    soft_score = max(0.0, min(1.0, soft_score)) * 0.9 + completeness * 0.1
 
-    w_skill = 0.6
-    w_interest = 0.2
-    w_soft = 0.2
-    overall = skill_score * w_skill + interest_score * w_interest + soft_score * w_soft
+    # 经验加成
+    exp_bonus = 0.0
+    internships = student.get('internships') or ''
+    if isinstance(internships, str) and internships:
+        if '月' in internships or '年' in internships or 'month' in internships or 'year' in internships:
+            exp_bonus = 0.05
+        else:
+            exp_bonus = 0.02
+
+    # 合并得分（基础权重）
+    w_skill = 0.55
+    w_text = 0.25
+    w_soft = 0.20
+    overall = skill_score * w_skill + txt_sim * w_text + soft_score * w_soft + exp_bonus
+    overall = max(0.0, min(1.0, overall))
 
     return {
         'overall_score': round(overall, 4),
         'skill_score': round(skill_score, 4),
-        'interest_score': round(interest_score, 4),
+        'text_similarity': round(txt_sim, 4),
         'soft_score': round(soft_score, 4),
-        'skill_overlap': list(stu_skills & job_skills),
+        'skill_overlap': list(matched),
+        'exp_bonus': round(exp_bonus, 4)
     }
 
 
@@ -86,7 +113,6 @@ def recommend_jobs(student: Dict[str, Any], jobs: List[Dict[str, Any]], top_n: i
     """
     scored = []
     for job in jobs:
-        # job_profile may be merged; ensure fields exist
         job_profile = {
             'job_name': job.get('job_name') or job.get('jobName') or '',
             'skills': job.get('skills') or job.get('required_skills') or [],
@@ -101,8 +127,7 @@ def recommend_jobs(student: Dict[str, Any], jobs: List[Dict[str, Any]], top_n: i
 
 def score_student_competitiveness(student: Dict[str, Any]) -> int:
     """
-    根据简历信息给出一个 0-100 的竞争力评分（启发式）：
-    - 技能数量、证书、实习经验数量、完整度都参与计算
+    根据简历信息给出一个 0-100 的竞争力评分（启发式）
     """
     skills = _list_from_json(student.get('skills'))
     certs = _list_from_json(student.get('certificates'))
@@ -121,7 +146,6 @@ def score_student_competitiveness(student: Dict[str, Any]) -> int:
 
 
 if __name__ == '__main__':
-    # 简单自测
     student = {'skills': ['python', 'django'], 'interests': ['后端'], 'competitiveness': 70}
     jobs = [{'job_name': '后端开发工程师', 'skills': ['python', 'flask'], 'industry': '软件'}]
     print(recommend_jobs(student, jobs))

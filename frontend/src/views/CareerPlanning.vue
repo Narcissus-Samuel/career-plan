@@ -142,6 +142,13 @@
         <div class="form-step" v-show="currentStep === 4">
           <div class="form-title">你的专属职业规划</div>
           <div class="plan-result">
+            <!-- 添加 loading 提示 -->
+            <div v-if="loading" class="loading-tip">
+              🔄 正在调用 AI 生成职业规划，请稍候...
+            </div>
+
+            <!-- 添加 AI 生成结果显示 -->
+            <div v-else-if="planResult" class="ai-result" v-html="planResult"></div>
             <div class="result-header">
               <h3>{{ planInfo.name }}的{{ planInfo.grade }}/{{ planInfo.major }}职业规划</h3>
               <div class="result-date">生成时间：{{ currentDate }}</div>
@@ -225,7 +232,13 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
+// 添加 axios 导入
+import axios from 'axios'
 
+// 添加 loading 和 planResult 状态
+const loading = ref(false)
+const planResult = ref('')
+const token = localStorage.getItem('token') || ''
 // 当前步骤
 const currentStep = ref(1)
 
@@ -338,9 +351,36 @@ const exportPlan = () => {
 }
 
 // 完成规划
-const finishPlan = () => {
+const finishPlan = async () => {
   savePlan()
-  alert('职业规划生成完成！可前往“报告生成”页面查看完整版。')
+  
+  // 调用后端 DeepSeek 生成规划
+  loading.value = true
+  try {
+    const res = await axios.post('http://localhost:5000/api/llm/generate_plan', {
+      student: {
+        name: planInfo.value.name,
+        major: planInfo.value.major,
+        grade: planInfo.value.grade,
+        skills: planInfo.value.interest,
+        interests: planInfo.value.interest
+      },
+      job_name: planInfo.value.target || '未指定'
+    }, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    planResult.value = res.data.plan
+    alert('AI 规划生成成功！')
+  } catch (err) {
+    console.error(err)
+    alert('生成失败：' + (err.response?.data?.message || err.message))
+  } finally {
+    loading.value = false
+  }
+  
   router.push('/report')
 }
 
@@ -734,5 +774,28 @@ onMounted(() => {
     text-align: left;
     margin-bottom: 5px;
   }
+}
+/* AI 生成 loading 提示 */
+.loading-tip {
+  text-align: center;
+  padding: 30px;
+  color: #2f54eb;
+  font-size: 16px;
+}
+
+/* AI 生成结果样式 */
+.ai-result {
+  line-height: 1.8;
+  color: #333;
+}
+.ai-result h3 {
+  color: #2f54eb;
+  margin: 15px 0 10px;
+}
+.ai-result ul {
+  padding-left: 20px;
+}
+.ai-result li {
+  margin: 8px 0;
 }
 </style>
