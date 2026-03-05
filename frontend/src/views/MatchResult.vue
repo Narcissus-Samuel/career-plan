@@ -99,15 +99,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue' // 关键修改：导入nextTick
-import { ElLoading } from 'element-plus' // 移除 ElMessage 导入
+// 核心修复：合并重复的导入，只保留一次 Vue API 导入
+import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
+import { ElLoading, ElMessage, ElMessageBox } from 'element-plus' // 合并 element-plus 导入
 import { useRouter } from 'vue-router'
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
 
 const router = useRouter()
+
 // 岗位列表（复用岗位画像的12个岗位）
 const jobList = ref([
   { jobName: '数据分析师' },
@@ -123,9 +123,48 @@ const jobList = ref([
   { jobName: '人工智能工程师' },
   { jobName: '金融分析师' }
 ])
+
+// 学生信息（新增：定义缺失的 studentInfo 变量）
+const studentInfo = ref(JSON.parse(localStorage.getItem('studentInfo') || '{}'))
+
 // 匹配结果数据（默认空，页面加载时调用后端计算）
 const matchList = reactive([])
 
+// 匹配表单
+const matchForm = ref({
+  targetJob: ''
+})
+
+// 匹配结果
+const matchResultVisible = ref(false)
+const matchResult = ref({
+  totalScore: 0,
+  dimensionScores: [],
+  gapAnalysis: {}
+})
+
+// 核心：判断是否有学生信息（控制按钮禁用）
+const hasStudentInfo = ref(false)
+
+// 初始化雷达图
+let radarChart = null
+
+// 修复：合并重复的 onMounted，统一初始化逻辑
+onMounted(() => {
+  // 加载匹配数据
+  toPageData()
+  // 检查学生信息
+  checkStudentInfo()
+  // 监听路由返回时重新检查（比如从录入页返回）
+  window.addEventListener('storage', checkStudentInfo)
+})
+
+// 组件卸载时清理事件监听（防止内存泄漏）
+onUnmounted(() => {
+  window.removeEventListener('storage', checkStudentInfo)
+})
+
+// 获取匹配数据
 async function toPageData() {
   try {
     const token = localStorage.getItem('token') || ''
@@ -150,34 +189,10 @@ async function toPageData() {
   }
 }
 
-// 匹配表单
-const matchForm = ref({
-  targetJob: ''
-})
-
-// 匹配结果
-const matchResultVisible = ref(false)
-const matchResult = ref({
-  totalScore: 0,
-  dimensionScores: [],
-  gapAnalysis: {}
-})
-
-// 核心：判断是否有学生信息（控制按钮禁用）
-const hasStudentInfo = ref(false)
-
-// 页面加载时检查本地存储的学生信息
-// 初始化雷达图
-let radarChart = null
-
-onMounted(() => {
-  toPageData()
-})
-onMounted(() => {
-  checkStudentInfo()
-  // 监听路由返回时重新检查（比如从录入页返回）
-  window.addEventListener('storage', checkStudentInfo)
-})
+// 初始化雷达图（空实现，避免报错）
+const initRadarChart = () => {
+  // 如需实现雷达图，可补充逻辑
+}
 
 // 检查学生信息的通用函数
 const checkStudentInfo = () => {
@@ -195,6 +210,7 @@ const goToStudentInfo = () => {
 const startMatch = () => {
   // 1. 校验：未选择岗位
   if (!matchForm.value.targetJob) {
+    ElMessage.warning('请选择目标岗位！')
     return
   }
 
@@ -275,6 +291,7 @@ const startMatch = () => {
     } catch (error) {
       // 异常捕获：避免代码报错导致loading无法关闭
       console.error('匹配分析出错：', error)
+      ElMessage.error('匹配分析失败，请重试！')
     } finally {
       // 无论成功/失败，关闭加载提示
       loadingInstance.close()
@@ -359,11 +376,9 @@ const renderChart = (chartDom) => {
   window.addEventListener('resize', resizeHandler)
   
   // 组件卸载时清理：防止内存泄漏
-  onMounted(() => {
-    return () => {
-      window.removeEventListener('resize', resizeHandler)
-      myChart.dispose()
-    }
+  onUnmounted(() => {
+    window.removeEventListener('resize', resizeHandler)
+    myChart.dispose()
   })
 }
 
