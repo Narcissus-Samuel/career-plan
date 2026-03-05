@@ -287,6 +287,9 @@ const abilityAnalysis = ref([])
 // 职业适配建议
 const careerSuggestion = ref('')
 
+// 后端返回的报告ID
+const reportId = ref(null)
+
 // 初始化：读取本地保存的测评数据
 onMounted(() => {
   // 尝试读取本地存储的测评数据
@@ -389,7 +392,7 @@ const nextQuestion = () => {
 }
 
 // 完成测评
-const finishAssessment = () => {
+const finishAssessment = async () => {
   isAssessing.value = false
   hasFinished.value = true
   
@@ -398,7 +401,20 @@ const finishAssessment = () => {
   
   // 保存完成状态
   localStorage.setItem('abilityAssessmentFinished', 'true')
-  localStorage.setItem('abilityAssessmentFinishDate', finishDate.value)
+
+  // 调用后端提交测评数据并获取报告ID
+  try {
+    const userId = localStorage.getItem('userId') || null
+    const res = await axios.post('/api/assessment/submit', {
+      user_id: userId,
+      answers: userAnswers.value
+    })
+    if (res.data && res.data.report_id) {
+      reportId.value = res.data.report_id
+    }
+  } catch (err) {
+    console.error('提交测评失败', err)
+  }
   
   // 计算测评结果
   calculateResult()
@@ -574,7 +590,12 @@ const viewResult = () => {
 
 // 导出测评报告
 const exportReport = () => {
-  // 模拟导出PDF（实际项目可集成jsPDF库）
+  if (reportId.value) {
+    // 调用后端下载
+    window.open(`/api/assessment/export/${reportId.value}?format=html`, '_blank')
+    return
+  }
+  // 如果没有reportId则保持原模拟逻辑
   alert('测评报告已导出为PDF格式！\n（实际项目中可集成jsPDF/后端导出实现真实导出功能）')
   
   // 示例：生成简单的文本报告

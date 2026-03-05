@@ -102,10 +102,12 @@
 import { ref, onMounted, nextTick } from 'vue' // 关键修改：导入nextTick
 import { ElLoading } from 'element-plus' // 移除 ElMessage 导入
 import { useRouter } from 'vue-router'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import axios from 'axios'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
 
 const router = useRouter()
-
 // 岗位列表（复用岗位画像的12个岗位）
 const jobList = ref([
   { jobName: '数据分析师' },
@@ -121,6 +123,32 @@ const jobList = ref([
   { jobName: '人工智能工程师' },
   { jobName: '金融分析师' }
 ])
+// 匹配结果数据（默认空，页面加载时调用后端计算）
+const matchList = reactive([])
+
+async function toPageData() {
+  try {
+    const token = localStorage.getItem('token') || ''
+    const res = await axios.post('/api/llm/recommend', { student: studentInfo.value, top_n: 5 }, { headers: { Authorization: `Bearer ${token}` } })
+    if (res.data && res.data.results) {
+      matchList.splice(0, matchList.length)
+      res.data.results.forEach((item, idx) => {
+        const job = item.job || {}
+        const match = item.match || {}
+        matchList.push({
+          rank: idx + 1,
+          jobName: job.job_name || job.jobName || '',
+          matchScore: match.overall_score || 0,
+          details: match
+        })
+      })
+      initRadarChart() // 更新雷达图
+    }
+  } catch (e) {
+    console.error('获取匹配结果失败', e)
+    // 可以保留默认静态数据作为备用
+  }
+}
 
 // 匹配表单
 const matchForm = ref({
@@ -139,6 +167,12 @@ const matchResult = ref({
 const hasStudentInfo = ref(false)
 
 // 页面加载时检查本地存储的学生信息
+// 初始化雷达图
+let radarChart = null
+
+onMounted(() => {
+  toPageData()
+})
 onMounted(() => {
   checkStudentInfo()
   // 监听路由返回时重新检查（比如从录入页返回）

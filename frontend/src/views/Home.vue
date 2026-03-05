@@ -37,6 +37,7 @@
           </ul>
         </div>
         <div class="nav-right">
+          <button class="btn-toggle-theme" @click="toggleTheme">🌙</button>
           <button class="btn-login" @click="$router.push('/login')">登录</button>
           <button class="btn-register" @click="$router.push('/register')">注册</button>
         </div>
@@ -245,6 +246,18 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 
+// 主题切换（深色模式）
+const darkMode = ref(localStorage.getItem('darkMode') === 'true')
+function applyTheme() {
+  if (darkMode.value) document.body.classList.add('dark')
+  else document.body.classList.remove('dark')
+}
+function toggleTheme() {
+  darkMode.value = !darkMode.value
+  localStorage.setItem('darkMode', darkMode.value)
+  applyTheme()
+}
+
 const router = useRouter()
 
 // ---------- 轮播相关 ----------
@@ -386,6 +399,7 @@ const handleFreeFilter = (e) => {
 onMounted(() => {
   fetchAllContents()
   startCarousel()
+  applyTheme()
 })
 
 onUnmounted(() => {

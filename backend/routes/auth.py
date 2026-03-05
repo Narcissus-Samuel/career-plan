@@ -7,6 +7,7 @@ from flask import Blueprint, request, jsonify, session, Response
 from werkzeug.security import generate_password_hash, check_password_hash
 from captcha.image import ImageCaptcha  # 需要安装：pip install captcha
 from db import get_db
+from functools import wraps
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api')
 
@@ -23,6 +24,55 @@ def _get_user_by_identifier(identifier):
     user = cursor.fetchone()
     conn.close()
     return user
+
+
+def verify_token(token: str):
+    """简单的 token 验证：token 格式为 mock-token-<user_id>。返回 user row 或 None"""
+    if not token or not token.startswith('mock-token-'):
+        return None
+    try:
+        uid = int(token.split('-')[-1])
+    except Exception:
+        return None
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users WHERE id = ?", (uid,))
+    user = cur.fetchone()
+    conn.close()
+    return user
+
+
+def token_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        auth = request.headers.get('Authorization', '')
+        if auth.startswith('Bearer '):
+            token = auth.split(' ', 1)[1]
+        else:
+            token = auth
+        user = verify_token(token)
+        if not user:
+            return jsonify({'error': 'unauthorized'}), 401
+        # attach user to request context
+        request.user = user
+        return f(*args, **kwargs)
+    return wrapper
+
+
+def admin_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        auth = request.headers.get('Authorization', '')
+        if auth.startswith('Bearer '):
+            token = auth.split(' ', 1)[1]
+        else:
+            token = auth
+        user = verify_token(token)
+        if not user or user['role'] != 'admin':
+            return jsonify({'error': 'admin required'}), 403
+        request.user = user
+        return f(*args, **kwargs)
+    return wrapper
 
 # ---------- 图形验证码 ----------
 @auth_bp.route('/captcha', methods=['GET'])
@@ -161,7 +211,7 @@ def login():
     if not check_password_hash(user['password_hash'], password):
         return jsonify({'error': 'invalid credentials'}), 401
 
-    # 生成简单 token
+    # 生成简单 token（可换为 JWT）
     token = f"mock-token-{user['id']}"
     return jsonify({'token': token, 'user': {'id': user['id'], 'username': user['username'], 'role': user['role']}})
 
