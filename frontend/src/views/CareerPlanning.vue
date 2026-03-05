@@ -1,738 +1,351 @@
 <template>
-  <div class="career-planning">
-    <!-- 1. 页面头部（保持和首页一致的导航风格） -->
-    <header class="page-header">
-      <div class="header-wrap">
-        <div class="page-title">
-          <span class="title-icon">🎯</span>
-          <h1>职业规划定制中心</h1>
+  <div class="career-report-container">
+    <el-page-header content="生涯规划报告" @back="$router.push('/match-result')"></el-page-header>
+
+    <!-- 报告操作区 -->
+    <el-card style="margin: 20px 0;">
+      <el-row :gutter="20">
+        <el-col :span="8">
+          <el-button type="primary" @click="generateReport">重新生成报告</el-button>
+        </el-col>
+        <el-col :span="8">
+          <el-button type="success" @click="editReport">编辑报告内容</el-button>
+        </el-col>
+        <el-col :span="8">
+          <el-button type="warning" @click="exportReport">导出PDF报告</el-button>
+        </el-col>
+      </el-row>
+    </el-card>
+
+    <!-- 报告内容区 -->
+    <el-card v-if="reportVisible" title="大学生职业规划报告" style="margin: 20px 0;">
+      <div class="report-content" ref="reportContent">
+        <!-- 报告封面 -->
+        <div class="report-cover">
+          <h1>大学生职业规划报告</h1>
+          <p>报告生成时间：{{ reportTime }}</p>
+          <p>目标岗位：{{ targetJob }}</p>
+          <p>姓名：{{ studentName }}</p>
+          <p>专业：{{ studentMajor }}</p>
         </div>
-        <div class="page-nav">
-          <button class="back-btn" @click="$router.push('/')">← 返回首页</button>
-          <button class="save-btn" @click="savePlan">保存规划</button>
-          <button class="export-btn" @click="exportPlan">导出报告</button>
+
+        <!-- 一、职业探索与岗位匹配 -->
+        <div class="report-section">
+          <h2>一、职业探索与岗位匹配分析</h2>
+          <h3>1.1 匹配度总览</h3>
+          <p>你与「{{ targetJob }}」岗位的综合匹配度为 <span class="score">{{ matchResult.totalScore }}</span> 分。</p>
+
+          <h3>1.2 各维度匹配详情</h3>
+          <el-table :data="matchResult.dimensionScores" border size="small" style="margin: 10px 0;">
+            <el-table-column prop="dimension" label="匹配维度"></el-table-column>
+            <el-table-column prop="score" label="匹配分数"></el-table-column>
+            <el-table-column prop="weight" label="权重"></el-table-column>
+            <el-table-column prop="contribution" label="加权得分"></el-table-column>
+          </el-table>
+
+          <h3>1.3 差距分析</h3>
+          <el-collapse>
+            <el-collapse-item title="基础要求差距">
+              <p>{{ matchResult.gapAnalysis.base }}</p>
+            </el-collapse-item>
+            <el-collapse-item title="职业技能差距">
+              <p>{{ matchResult.gapAnalysis.skills }}</p>
+            </el-collapse-item>
+            <el-collapse-item title="职业素养差距">
+              <p>{{ matchResult.gapAnalysis.quality }}</p>
+            </el-collapse-item>
+            <el-collapse-item title="发展潜力差距">
+              <p>{{ matchResult.gapAnalysis.potential }}</p>
+            </el-collapse-item>
+          </el-collapse>
+        </div>
+
+        <!-- 二、职业目标设定 -->
+        <div class="report-section">
+          <h2>二、职业目标设定</h2>
+          <h3>2.1 短期目标（1-2年）</h3>
+          <p>毕业后入职{{ targetJob }}相关岗位，完成从学生到职场人的转变，掌握岗位核心技能，通过试用期考核。</p>
+          <h3>2.2 中期目标（3-5年）</h3>
+          <p>成为{{ targetJob }}岗位的资深从业者，具备独立负责项目的能力，争取晋升为团队骨干或小组长。</p>
+          <h3>2.3 长期目标（5-10年）</h3>
+          <p>成为{{ targetJob }}相关领域的专家或管理者，如技术专家、项目经理、部门主管等。</p>
+        </div>
+
+        <!-- 三、职业路径规划 -->
+        <div class="report-section">
+          <h2>三、职业路径规划</h2>
+          <h3>3.1 垂直晋升路径</h3>
+          <div class="path-list">
+            <el-tag v-for="(item, index) in verticalPath" :key="index" size="large">
+              {{ item }}
+              <el-icon v-if="index < verticalPath.length - 1"><ArrowRight /></el-icon>
+            </el-tag>
+          </div>
+
+          <h3>3.2 换岗发展路径</h3>
+          <div class="path-list">
+            <el-tag v-for="(item, index) in switchPath" :key="index" size="large">
+              {{ item }}
+              <el-icon v-if="index < switchPath.length - 1"><ArrowRight /></el-icon>
+            </el-tag>
+          </div>
+        </div>
+
+        <!-- 四、行动计划与成果展示 -->
+        <div class="report-section">
+          <h2>四、行动计划与成果展示</h2>
+          <h3>4.1 短期计划（在校期间/入职前1年）</h3>
+          <ul>
+            <li>学习{{ skillGap }}相关技能，完成至少1个实战项目</li>
+            <li>参加{{ targetJob }}相关实习，积累职场经验</li>
+            <li>考取{{ certificateGap }}相关证书，提升竞争力</li>
+            <li>评估周期：每月一次，通过项目完成度、技能掌握度评估</li>
+          </ul>
+
+          <h3>4.2 中期计划（入职1-3年）</h3>
+          <ul>
+            <li>深入学习岗位进阶技能，参与核心项目开发/运营</li>
+            <li>建立行业人脉，参加相关技术/行业交流活动</li>
+            <li>尝试独立负责小型项目，提升管理能力</li>
+            <li>评估周期：每季度一次，通过项目绩效、晋升考核评估</li>
+          </ul>
+        </div>
+
+        <!-- 五、总结与建议 -->
+        <div class="report-section">
+          <h2>五、总结与建议</h2>
+          <p>综合来看，你与{{ targetJob }}岗位的匹配度较高，具备良好的发展潜力。建议重点弥补{{ skillGap }}技能短板，
+          同时保持学习能力和创新能力的提升。职业规划是动态调整的过程，建议每半年重新评估一次匹配度，
+          根据自身发展和行业变化调整目标和计划。</p>
         </div>
       </div>
-    </header>
-
-    <!-- 2. 规划步骤导航 -->
-    <section class="step-nav">
-      <div class="step-wrap">
-        <div class="step-item" :class="{ active: currentStep === 1, finished: currentStep > 1 }">
-          <div class="step-num">1</div>
-          <div class="step-text">基础信息</div>
-        </div>
-        <div class="step-line"></div>
-        <div class="step-item" :class="{ active: currentStep === 2, finished: currentStep > 2 }">
-          <div class="step-num">2</div>
-          <div class="step-text">职业兴趣</div>
-        </div>
-        <div class="step-line"></div>
-        <div class="step-item" :class="{ active: currentStep === 3, finished: currentStep > 3 }">
-          <div class="step-num">3</div>
-          <div class="step-text">能力评估</div>
-        </div>
-        <div class="step-line"></div>
-        <div class="step-item" :class="{ active: currentStep === 4, finished: currentStep > 4 }">
-          <div class="step-num">4</div>
-          <div class="step-text">规划生成</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 3. 规划表单区域（分步显示） -->
-    <section class="form-section">
-      <div class="form-wrap">
-        <!-- 步骤1：基础信息 -->
-        <div class="form-step" v-show="currentStep === 1">
-          <div class="form-title">填写你的基础信息</div>
-          <div class="form-content">
-            <div class="form-row">
-              <label class="form-label">姓名：</label>
-              <input type="text" class="form-input" v-model="planInfo.name" placeholder="请输入你的姓名">
-            </div>
-            <div class="form-row">
-              <label class="form-label">性别：</label>
-              <div class="radio-group">
-                <label class="radio-item">
-                  <input type="radio" v-model="planInfo.gender" value="男"> 男
-                </label>
-                <label class="radio-item">
-                  <input type="radio" v-model="planInfo.gender" value="女"> 女
-                </label>
-              </div>
-            </div>
-            <div class="form-row">
-              <label class="form-label">年级：</label>
-              <select class="form-select" v-model="planInfo.grade">
-                <option value="">请选择年级</option>
-                <option value="大一">大一</option>
-                <option value="大二">大二</option>
-                <option value="大三">大三</option>
-                <option value="大四">大四</option>
-              </select>
-            </div>
-            <div class="form-row">
-              <label class="form-label">专业：</label>
-              <input type="text" class="form-input" v-model="planInfo.major" placeholder="请输入你的专业">
-            </div>
-            <div class="form-row">
-              <label class="form-label">目标方向：</label>
-              <select class="form-select" v-model="planInfo.target">
-                <option value="">请选择职业目标</option>
-                <option value="就业">就业</option>
-                <option value="考研">考研</option>
-                <option value="留学">留学</option>
-                <option value="考公">考公</option>
-                <option value="创业">创业</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-btn-group">
-            <button class="next-btn" @click="nextStep">下一步 →</button>
-          </div>
-        </div>
-
-        <!-- 步骤2：职业兴趣 -->
-        <div class="form-step" v-show="currentStep === 2">
-          <div class="form-title">选择你的职业兴趣（可多选）</div>
-          <div class="form-content">
-            <div class="checkbox-group">
-              <label class="checkbox-item" v-for="item in interestList" :key="item.id">
-                <input type="checkbox" v-model="planInfo.interest" :value="item.name"> {{ item.name }}
-              </label>
-            </div>
-            <div class="form-row">
-              <label class="form-label">兴趣描述：</label>
-              <textarea class="form-textarea" v-model="planInfo.interestDesc" placeholder="请补充你的兴趣相关描述（选填）"></textarea>
-            </div>
-          </div>
-          <div class="form-btn-group">
-            <button class="prev-btn" @click="prevStep">← 上一步</button>
-            <button class="next-btn" @click="nextStep">下一步 →</button>
-          </div>
-        </div>
-
-        <!-- 步骤3：能力评估 -->
-        <div class="form-step" v-show="currentStep === 3">
-          <div class="form-title">评估你的核心能力</div>
-          <div class="form-content">
-            <div class="form-row" v-for="item in abilityList" :key="item.id">
-              <label class="form-label">{{ item.name }}：</label>
-              <div class="rate-group">
-                <span class="rate-item" v-for="star in 5" :key="star" 
-                  :class="{ active: star <= planInfo.ability[item.key] }"
-                  @click="setAbility(item.key, star)"
-                >★</span>
-                <span class="rate-text">{{ planInfo.ability[item.key] }}星</span>
-              </div>
-            </div>
-            <div class="form-row">
-              <label class="form-label">能力短板：</label>
-              <textarea class="form-textarea" v-model="planInfo.abilityDesc" placeholder="请描述你的能力短板及提升计划"></textarea>
-            </div>
-          </div>
-          <div class="form-btn-group">
-            <button class="prev-btn" @click="prevStep">← 上一步</button>
-            <button class="next-btn" @click="nextStep">下一步 →</button>
-          </div>
-        </div>
-
-        <!-- 步骤4：规划生成 -->
-        <div class="form-step" v-show="currentStep === 4">
-          <div class="form-title">你的专属职业规划</div>
-          <div class="plan-result">
-            <div class="result-header">
-              <h3>{{ planInfo.name }}的{{ planInfo.grade }}/{{ planInfo.major }}职业规划</h3>
-              <div class="result-date">生成时间：{{ currentDate }}</div>
-            </div>
-            <div class="result-content">
-              <div class="result-item">
-                <div class="result-label">目标方向：</div>
-                <div class="result-value">{{ planInfo.target || '未选择' }}</div>
-              </div>
-              <div class="result-item">
-                <div class="result-label">职业兴趣：</div>
-                <div class="result-value">{{ planInfo.interest.join('、') || '未选择' }}</div>
-              </div>
-              <div class="result-item">
-                <div class="result-label">核心能力评估：</div>
-                <div class="result-value">
-                  <div v-for="item in abilityList" :key="item.id">
-                    {{ item.name }}：{{ planInfo.ability[item.key] }}星
-                  </div>
-                </div>
-              </div>
-              <div class="result-item">
-                <div class="result-label">能力提升计划：</div>
-                <div class="result-value">{{ planInfo.abilityDesc || '未填写' }}</div>
-              </div>
-              <div class="result-item">
-                <div class="result-label">阶段性规划：</div>
-                <div class="result-value">
-                  <ul class="stage-list">
-                    <li v-if="planInfo.grade === '大一'">
-                      <strong>大一阶段：</strong> 夯实专业基础，参加1-2个相关社团，了解行业基本情况
-                    </li>
-                    <li v-if="planInfo.grade === '大二'">
-                      <strong>大二阶段：</strong> 考取核心证书，参与相关实习/项目，明确细分方向
-                    </li>
-                    <li v-if="planInfo.grade === '大三'">
-                      <strong>大三阶段：</strong> 针对性提升目标方向能力，准备实习/备考/申请材料
-                    </li>
-                    <li v-if="planInfo.grade === '大四'">
-                      <strong>大四阶段：</strong> 冲刺目标，完成求职/考研/留学/考公相关流程
-                    </li>
-                    <li v-else>请选择年级后查看个性化阶段性规划</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="form-btn-group">
-            <button class="prev-btn" @click="prevStep">← 上一步</button>
-            <button class="finish-btn" @click="finishPlan">完成规划</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 4. 推荐资源区域 -->
-    <section class="resource-section" v-show="currentStep === 4">
-      <div class="resource-wrap">
-        <div class="resource-title">为你推荐的规划资源</div>
-        <div class="resource-list">
-          <div class="resource-card" v-for="(item, i) in resourceList" :key="i" @click="$router.push(`/detail/${i+10}`)">
-            <div class="resource-icon">{{ item.icon }}</div>
-            <div class="resource-name">{{ item.name }}</div>
-            <div class="resource-desc">{{ item.desc }}</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 5. 页脚 -->
-    <footer class="page-footer">
-      <div class="footer-wrap">
-        © 2026 大学生职业规划系统 | 你的职业未来，我们一起规划
-      </div>
-    </footer>
+    </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
+import { ElMessage, ElLoading, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
+import { ArrowRight } from '@element-plus/icons-vue'
+// 如需导出PDF，需安装：npm install html2pdf.js
+import html2pdf from 'html2pdf.js'
 
 const router = useRouter()
 
-// 当前步骤
-const currentStep = ref(1)
+// 报告数据
+const reportVisible = ref(false)
+const reportTime = ref('')
+const targetJob = ref('')
+const studentName = ref('')
+const studentMajor = ref('')
+const matchResult = ref({})
 
-// 规划信息
-const planInfo = ref({
-  name: '',
-  gender: '',
-  grade: '',
-  major: '',
-  target: '',
-  interest: [],
-  interestDesc: '',
-  ability: {
-    communication: 0,
-    learning: 0,
-    teamwork: 0,
-    professional: 0,
-    innovation: 0
-  },
-  abilityDesc: ''
-})
+// 职业路径（根据目标岗位动态调整）
+const verticalPath = ref([])
+const switchPath = ref([])
 
-// 兴趣列表
-const interestList = ref([
-  { id: 1, name: '技术研发' },
-  { id: 2, name: '产品设计' },
-  { id: 3, name: '市场营销' },
-  { id: 4, name: '运营管理' },
-  { id: 5, name: '教育培训' },
-  { id: 6, name: '金融投资' },
-  { id: 7, name: '行政办公' },
-  { id: 8, name: '创业管理' }
-])
+// 差距补充
+const skillGap = ref('')
+const certificateGap = ref('')
 
-// 能力列表
-const abilityList = ref([
-  { id: 1, name: '沟通能力', key: 'communication' },
-  { id: 2, name: '学习能力', key: 'learning' },
-  { id: 3, name: '团队协作', key: 'teamwork' },
-  { id: 4, name: '专业技能', key: 'professional' },
-  { id: 5, name: '创新能力', key: 'innovation' }
-])
+// 页面加载时读取本地存储数据
+onMounted(() => {
+  // 读取匹配结果和学生信息
+  const savedMatchResult = localStorage.getItem('matchResult')
+  const savedTargetJob = localStorage.getItem('targetJob')
+  const savedStudentInfo = localStorage.getItem('studentInfo')
 
-// 推荐资源列表
-const resourceList = ref([
-  { icon: '📚', name: '《大学生职业规划指南》', desc: '全阶段规划方法论，适合新手入门' },
-  { icon: '🎓', name: '目标专业考研真题集', desc: '近5年真题+解析，针对性备考' },
-  { icon: '👨💼', name: '名企校招面试技巧', desc: 'HR亲授，通过率提升80%' },
-  { icon: '🌏', name: '留学申请文书模板', desc: '适配Top50院校，含推荐信模板' },
-  { icon: '💼', name: '考公岗位筛选工具', desc: '按专业/地区/学历精准匹配岗位' }
-])
-
-// 当前日期
-const currentDate = computed(() => {
-  const date = new Date()
-  return `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`
-})
-
-// 下一步
-const nextStep = () => {
-  // 步骤1校验
-  if (currentStep.value === 1) {
-    if (!planInfo.value.name || !planInfo.value.grade || !planInfo.value.major) {
-      alert('请填写姓名、年级、专业等必填信息！')
-      return
-    }
-  }
-  // 步骤2校验
-  if (currentStep.value === 2 && planInfo.value.interest.length === 0) {
-    alert('请至少选择一个职业兴趣！')
+  if (!savedMatchResult || !savedTargetJob) {
+    ElMessage.warning('暂无匹配结果，请先完成人岗匹配')
+    router.push('/match-result')
     return
   }
-  // 步骤3校验
-  if (currentStep.value === 3) {
-    const hasAbility = Object.values(planInfo.value.ability).some(v => v > 0)
-    if (!hasAbility) {
-      alert('请至少评估一项核心能力！')
-      return
+
+  // 解析数据
+  matchResult.value = JSON.parse(savedMatchResult)
+  targetJob.value = savedTargetJob
+  
+  if (savedStudentInfo) {
+    const studentInfo = JSON.parse(savedStudentInfo)
+    studentName.value = studentInfo.basic.name || '未知'
+    studentMajor.value = studentInfo.basic.major || '未知'
+  }
+
+  // 初始化报告
+  initReportData()
+  reportVisible.value = true
+})
+
+// 初始化报告数据
+const initReportData = () => {
+  // 设置报告生成时间
+  const now = new Date()
+  reportTime.value = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+
+  // 根据目标岗位设置发展路径
+  const pathConfig = {
+    '数据分析师': {
+      vertical: ['初级数据分析师', '中级数据分析师', '高级数据分析师', '数据分析主管', '数据总监'],
+      switch: ['大数据开发工程师', '产品经理', '金融分析师']
+    },
+    '前端开发工程师': {
+      vertical: ['初级前端', '中级前端', '高级前端', '前端技术组长', '前端架构师'],
+      switch: ['UI设计师', '全栈开发工程师', '产品经理']
+    },
+    '产品经理': {
+      vertical: ['产品助理', '初级产品经理', '高级产品经理', '产品总监', 'CEO'],
+      switch: ['数据分析师', '电商运营', '项目经理']
+    },
+    'UI设计师': {
+      vertical: ['UI设计师', '资深UI设计师', '交互设计组长', '设计总监', '创意总监'],
+      switch: ['前端开发工程师', '产品经理', '电商运营']
+    },
+    '电商运营': {
+      vertical: ['运营助理', '电商运营专员', '运营主管', '运营经理', '运营总监'],
+      switch: ['产品经理', '数据分析师', 'UI设计师']
     }
   }
-  
-  if (currentStep.value < 4) {
-    currentStep.value++
+
+  // 默认使用数据分析师路径
+  const config = pathConfig[targetJob.value] || pathConfig['数据分析师']
+  verticalPath.value = config.vertical
+  switchPath.value = config.switch
+
+  // 设置差距补充
+  skillGap.value = targetJob.value === '数据分析师' ? 'Tableau、SQL' : '核心专业'
+  certificateGap.value = targetJob.value === '数据分析师' ? 'CDA、计算机二级' : '行业相关'
+}
+
+// 重新生成报告
+const generateReport = () => {
+  const loadingInstance = ElLoading.service({
+    lock: true,
+    text: '正在重新生成报告...',
+    background: 'rgba(0, 0, 0, 0.7)'
+  })
+
+  setTimeout(() => {
+    initReportData()
+    loadingInstance.close()
+    ElMessage.success('报告重新生成成功！')
+  }, 1500)
+}
+
+// 编辑报告
+const editReport = () => {
+  ElMessageBox.prompt('请输入需要修改的报告内容（仅示例，真实场景需富文本编辑）', '编辑报告', {
+    inputType: 'textarea',
+    inputRows: 10,
+    confirmButtonText: '保存',
+    cancelButtonText: '取消'
+  }).then(({ value }) => {
+    if (value) {
+      ElMessage.success('报告编辑成功！')
+    }
+  }).catch(() => {
+    ElMessage.info('已取消编辑')
+  })
+}
+
+// 导出PDF报告
+const exportReport = () => {
+  const loadingInstance = ElLoading.service({
+    lock: true,
+    text: '正在导出PDF报告，请稍候...',
+    background: 'rgba(0, 0, 0, 0.7)'
+  })
+
+  // 获取报告内容DOM
+  const reportContent = document.querySelector('.report-content')
+  if (!reportContent) {
+    loadingInstance.close()
+    ElMessage.error('导出失败：未找到报告内容')
+    return
   }
-}
 
-// 上一步
-const prevStep = () => {
-  if (currentStep.value > 1) {
-    currentStep.value--
+  // 配置导出选项
+  const opt = {
+    margin: 10,
+    filename: `${targetJob.value}_职业规划报告_${reportTime.value.replace(/[:\s]/g, '-')}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
   }
-}
 
-// 设置能力评分
-const setAbility = (key, star) => {
-  planInfo.value.ability[key] = star
+  // 执行导出
+  html2pdf().set(opt).from(reportContent).save().then(() => {
+    loadingInstance.close()
+    ElMessage.success('PDF报告导出成功！')
+  }).catch((error) => {
+    loadingInstance.close()
+    console.error('导出失败：', error)
+    ElMessage.error('PDF报告导出失败，请重试')
+  })
 }
-
-// 保存规划
-const savePlan = () => {
-  // 模拟保存到本地存储
-  localStorage.setItem('careerPlan', JSON.stringify(planInfo.value))
-  alert('规划保存成功！')
-}
-
-// 导出报告
-const exportPlan = () => {
-  alert('报告导出功能已触发，即将生成PDF文件！')
-  // 实际项目中可集成jsPDF等库实现真实导出
-}
-
-// 完成规划
-const finishPlan = () => {
-  savePlan()
-  alert('职业规划生成完成！可前往“报告生成”页面查看完整版。')
-  router.push('/report')
-}
-
-// 初始化
-onMounted(() => {
-  // 读取本地保存的规划信息
-  const savedPlan = localStorage.getItem('careerPlan')
-  if (savedPlan) {
-    planInfo.value = JSON.parse(savedPlan)
-  }
-})
 </script>
 
 <style scoped>
-/* 全局容器 */
-.career-planning {
-  width: 100%;
+.career-report-container {
+  padding: 20px;
+  background-color: #f5f7fa;
   min-height: 100vh;
-  font-family: "Microsoft Yahei", sans-serif;
-  color: #333;
-  background: #f8f9fa;
-  margin: 0;
-  padding: 0;
 }
 
-/* 1. 页面头部 */
-.page-header {
-  height: 70px;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  width: 100%;
-}
-.header-wrap {
-  width: 1200px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  height: 100%;
-}
-.page-title {
-  display: flex;
-  align-items: center;
-  color: #2f54eb;
-}
-.title-icon {
-  font-size: 24px;
-  margin-right: 8px;
-}
-.page-title h1 {
-  font-size: 20px;
-  margin: 0;
-}
-.page-nav {
-  display: flex;
-  gap: 10px;
-}
-.back-btn {
-  padding: 6px 15px;
-  border: 1px solid #2f54eb;
-  color: #2f54eb;
-  background: #fff;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.save-btn {
-  padding: 6px 15px;
-  border: 1px solid #52c41a;
-  color: #52c41a;
-  background: #fff;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.export-btn {
-  padding: 6px 15px;
-  border: none;
-  color: #fff;
-  background: #2f54eb;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-/* 2. 步骤导航 */
-.step-nav {
-  padding: 30px 0;
-  background: #fff;
-  margin: 20px 0;
-}
-.step-wrap {
-  width: 1200px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.step-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  position: relative;
-}
-.step-num {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #e8e8e8;
-  color: #666;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  margin-bottom: 8px;
-  transition: all 0.3s;
-}
-.step-text {
-  font-size: 14px;
-  color: #666;
-}
-.step-item.active .step-num {
-  background: #2f54eb;
-  color: #fff;
-}
-.step-item.active .step-text {
-  color: #2f54eb;
-  font-weight: bold;
-}
-.step-item.finished .step-num {
-  background: #52c41a;
-  color: #fff;
-}
-.step-line {
-  width: 80px;
-  height: 2px;
-  background: #e8e8e8;
-  margin: 0 10px;
-}
-.step-item.finished + .step-line {
-  background: #52c41a;
-}
-
-/* 3. 表单区域 */
-.form-section {
-  padding: 0 0 30px;
-}
-.form-wrap {
-  width: 1200px;
-  margin: 0 auto;
-  background: #fff;
-  border-radius: 8px;
-  padding: 30px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-}
-.form-title {
-  font-size: 18px;
-  font-weight: bold;
-  margin-bottom: 20px;
-  color: #2f54eb;
-  border-left: 4px solid #2f54eb;
-  padding-left: 10px;
-}
-.form-content {
-  margin-bottom: 30px;
-}
-.form-row {
-  display: flex;
-  align-items: center;
-  margin-bottom: 20px;
-}
-.form-label {
-  width: 100px;
-  text-align: right;
-  margin-right: 20px;
-  font-size: 14px;
-}
-.form-input, .form-select {
-  flex: 1;
-  height: 36px;
-  padding: 0 10px;
-  border: 1px solid #e8e8e8;
-  border-radius: 4px;
-  outline: none;
-}
-.form-textarea {
-  flex: 1;
-  min-height: 100px;
-  padding: 10px;
-  border: 1px solid #e8e8e8;
-  border-radius: 4px;
-  outline: none;
-  resize: vertical;
-}
-.radio-group {
-  display: flex;
-  gap: 20px;
-}
-.radio-item {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-}
-.radio-item input {
-  margin-right: 5px;
-}
-.checkbox-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
-  flex: 1;
-}
-.checkbox-item {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  width: calc(25% - 12px);
-}
-.checkbox-item input {
-  margin-right: 5px;
-}
-.rate-group {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.rate-item {
-  font-size: 20px;
-  color: #e8e8e8;
-  cursor: pointer;
-}
-.rate-item.active {
-  color: #faad14;
-}
-.rate-text {
-  font-size: 14px;
-  color: #666;
-}
-.form-btn-group {
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-}
-.prev-btn {
-  padding: 8px 20px;
-  border: 1px solid #e8e8e8;
-  color: #666;
-  background: #fff;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.next-btn, .finish-btn {
-  padding: 8px 20px;
-  border: none;
-  color: #fff;
-  background: #2f54eb;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.finish-btn {
-  background: #52c41a;
-}
-
-/* 规划结果 */
-.plan-result {
-  border: 1px solid #e8e8e8;
-  border-radius: 8px;
+.report-content {
   padding: 20px;
-}
-.result-header {
-  border-bottom: 1px solid #e8e8e8;
-  padding-bottom: 10px;
-  margin-bottom: 20px;
-}
-.result-header h3 {
-  margin: 0 0 5px 0;
-  color: #2f54eb;
-}
-.result-date {
-  font-size: 12px;
-  color: #999;
-}
-.result-content {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-.result-item {
-  display: flex;
-}
-.result-label {
-  width: 120px;
-  font-weight: bold;
-  color: #666;
-}
-.result-value {
-  flex: 1;
-  line-height: 1.6;
-}
-.stage-list {
-  padding-left: 20px;
-  margin: 0;
-}
-.stage-list li {
-  margin-bottom: 8px;
+  font-family: "Microsoft YaHei", sans-serif;
+  line-height: 1.8;
 }
 
-/* 4. 推荐资源 */
-.resource-section {
-  padding: 20px 0 40px;
-}
-.resource-wrap {
-  width: 1200px;
-  margin: 0 auto;
-}
-.resource-title {
-  font-size: 18px;
-  font-weight: bold;
-  margin-bottom: 20px;
-  color: #2f54eb;
-}
-.resource-list {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-.resource-card {
-  width: calc(20% - 16px);
-  background: #fff;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  cursor: pointer;
-  transition: all 0.3s;
-}
-.resource-card:hover {
-  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-  border-color: #2f54eb;
-}
-.resource-icon {
-  font-size: 24px;
-  margin-bottom: 10px;
-}
-.resource-name {
-  font-weight: bold;
-  margin-bottom: 5px;
-}
-.resource-desc {
-  font-size: 12px;
-  color: #666;
-  line-height: 1.4;
-}
-
-/* 5. 页脚 */
-.page-footer {
-  background: #fff;
-  padding: 20px 0;
-  border-top: 1px solid #e8e8e8;
+.report-cover {
   text-align: center;
-  color: #666;
-  font-size: 14px;
-  margin-top: 20px;
-}
-.footer-wrap {
-  width: 1200px;
-  margin: 0 auto;
+  padding: 40px 0;
+  border-bottom: 2px solid #409EFF;
+  margin-bottom: 40px;
 }
 
-/* 响应式适配 */
-@media (max-width: 1200px) {
-  .header-wrap, .step-wrap, .form-wrap, .resource-wrap, .footer-wrap {
-    width: 90%;
-  }
-  .resource-card {
-    width: calc(33.33% - 14px);
-  }
+.report-cover h1 {
+  font-size: 32px;
+  color: #409EFF;
+  margin-bottom: 20px;
 }
-@media (max-width: 768px) {
-  .step-line {
-    width: 40px;
-  }
-  .checkbox-item {
-    width: calc(50% - 12px);
-  }
-  .resource-card {
-    width: calc(50% - 10px);
-  }
-  .form-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .form-label {
-    width: 100%;
-    text-align: left;
-    margin-bottom: 5px;
-  }
+
+.report-section {
+  margin-bottom: 40px;
+}
+
+.report-section h2 {
+  color: #303133;
+  border-left: 5px solid #409EFF;
+  padding-left: 10px;
+  margin-bottom: 20px;
+}
+
+.report-section h3 {
+  color: #666;
+  margin: 15px 0;
+}
+
+.score {
+  color: #409EFF;
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.path-list {
+  margin: 10px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+ul {
+  padding-left: 20px;
+}
+
+li {
+  margin: 5px 0;
 }
 </style>

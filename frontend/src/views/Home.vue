@@ -10,9 +10,11 @@
           </div>
           <ul class="nav-menu">
             <li class="menu-item active" @click="$router.push('/')">首页</li>
+            <li class="menu-item" @click="$router.push('/job-portrait')">岗位画像</li>
+            <li class="menu-item" @click="$router.push('/match-result')">人岗匹配</li>
+            <li class="menu-item" @click="$router.push('/student-ability')">学生信息</li>
             <li class="menu-item" @click="$router.push('/career-planning')">职业规划</li>
-            <li class="menu-item" @click="$router.push('/ability-assessment')">能力测评</li>
-            <li class="menu-item" @click="$router.push('/report-generate')">报告生成</li>
+            <!-- <li class="menu-item" @click="$router.push('/ability-assessment')">能力测评</li> -->
             <li class="menu-item" @click="$router.push('/resource-library')">资源库</li>
             <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
             <li class="menu-item dropdown">
@@ -107,7 +109,7 @@
     </section>
 
     <!-- 4. 核心分类入口 -->
-    <section class="category-section">
+    <!-- <section class="category-section">
       <div class="category-wrap">
         <div class="category-card" @click="$router.push('/job-planning')">
           <div class="card-icon">👨💼</div>
@@ -135,7 +137,7 @@
           <div class="card-desc">项目分析、资源对接</div>
         </div>
       </div>
-    </section>
+    </section> -->
 
     <!-- 5. 内容筛选区（含滑动分页） -->
     <section class="content-section">

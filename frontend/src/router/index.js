@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import html2pdf from 'html2pdf.js'
 // 导入所有页面组件
 import Home from '../views/Home.vue'
-import StudentInfo from '../views/StudentInfo.vue'
+import StudentAbility from '../views/StudentAbility.vue'
 import MatchResult from '../views/MatchResult.vue'
 import Report from '../views/Report.vue'
 import JobPortrait from '../views/JobPortrait.vue'
@@ -47,10 +48,10 @@ const routes = [
     component: Register 
   },
   // 原有功能页面路由
-  { 
-    path: '/student-info', 
-    name: 'StudentInfo',
-    component: StudentInfo 
+  {
+     path: '/student-ability', 
+     name: 'StudentAbility', 
+     component: StudentAbility 
   },
   { 
     path: '/match-result', 
