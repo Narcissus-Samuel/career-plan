@@ -14,7 +14,6 @@
             <li class="menu-item" @click="$router.push('/match-result')">人岗匹配</li>
             <li class="menu-item" @click="$router.push('/student-ability')">学生信息</li>
             <li class="menu-item" @click="$router.push('/career-planning')">职业规划</li>
-            <!-- <li class="menu-item" @click="$router.push('/ability-assessment')">能力测评</li> -->
             <li class="menu-item" @click="$router.push('/resource-library')">资源库</li>
             <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
             <li class="menu-item dropdown">
@@ -38,8 +37,25 @@
         </div>
         <div class="nav-right">
           <button class="btn-toggle-theme" @click="toggleTheme">🌙</button>
-          <button class="btn-login" @click="$router.push('/login')">登录</button>
-          <button class="btn-register" @click="$router.push('/register')">注册</button>
+          
+          <!-- 未登录：显示登录/注册按钮 -->
+          <button class="btn-login" @click="$router.push('/login')" v-if="!isLogin">登录</button>
+          <button class="btn-register" @click="$router.push('/register')" v-if="!isLogin">注册</button>
+          
+          <!-- 已登录：显示用户头像 + 下拉菜单 -->
+          <div class="user-profile" v-if="isLogin">
+            <img 
+              :src="userAvatar || 'https://picsum.photos/seed/avatar/40/40'" 
+              alt="用户头像" 
+              class="avatar"
+              @click="toggleUserMenu"
+            >
+            <div class="user-menu" v-show="isUserMenuOpen">
+              <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
+              <div class="menu-item" @click="$router.push('/settings')">账号设置</div>
+              <div class="menu-item logout" @click="handleLogout">退出登录</div>
+            </div>
+          </div>
         </div>
       </div>
     </header>
@@ -109,7 +125,7 @@
       </div>
     </section>
 
-    <!-- 4. 核心分类入口 -->
+    <!-- 4. 核心分类入口（注释保留，如需启用可取消注释） -->
     <!-- <section class="category-section">
       <div class="category-wrap">
         <div class="category-card" @click="$router.push('/job-planning')">
@@ -242,11 +258,52 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 
-// 主题切换（深色模式）
+// ========== 新增：登录状态核心逻辑 ==========
+const router = useRouter()
+const route = useRoute()
+
+// 登录状态（从本地存储读取，初始值安全）
+const isLogin = ref(!!localStorage.getItem('token'))
+// 用户头像（无则用默认头像）
+const userAvatar = ref(localStorage.getItem('avatar') || '')
+// 用户下拉菜单展开状态
+const isUserMenuOpen = ref(false)
+
+// 监听路由变化，确保登录/退出后状态实时更新
+watch(
+  () => route.path,
+  () => {
+    isLogin.value = !!localStorage.getItem('token')
+    userAvatar.value = localStorage.getItem('avatar') || ''
+  },
+  { immediate: true }
+)
+
+// 切换用户菜单显示/隐藏
+const toggleUserMenu = () => {
+  isUserMenuOpen.value = !isUserMenuOpen.value
+}
+
+// 退出登录逻辑（移除alert弹窗）
+const handleLogout = () => {
+  // 清空本地存储的登录信息
+  localStorage.removeItem('token')
+  localStorage.removeItem('avatar')
+  localStorage.removeItem('nickname')
+  
+  // 更新状态
+  isLogin.value = false
+  isUserMenuOpen.value = false
+  
+  // 跳转到首页
+  router.push('/')
+}
+
+// ========== 原有：主题切换逻辑 ==========
 const darkMode = ref(localStorage.getItem('darkMode') === 'true')
 function applyTheme() {
   if (darkMode.value) document.body.classList.add('dark')
@@ -258,9 +315,7 @@ function toggleTheme() {
   applyTheme()
 }
 
-const router = useRouter()
-
-// ---------- 轮播相关 ----------
+// ========== 原有：轮播图逻辑 ==========
 const carouselRef = ref(null)
 const currentIndex = ref(0)
 const carouselList = ref([
@@ -284,30 +339,29 @@ const nextSlide = () => {
 const goToSlide = (index) => {
   currentIndex.value = index
 }
+// 轮播图上传（移除所有alert弹窗）
 const handleImageUpload = (e) => {
   const file = e.target.files[0]
   if (!file) return
   const isImage = file.type.startsWith('image/')
   if (!isImage) {
-    alert('请上传图片格式的文件（jpg/png）！')
-    return
+    return // 移除alert提示
   }
   const isLt5M = file.size / 1024 / 1024 < 5
   if (!isLt5M) {
-    alert('图片大小不能超过5MB！')
-    return
+    return // 移除alert提示
   }
   const reader = new FileReader()
   reader.onload = (event) => {
     carouselList.value.push({ url: event.target.result })
     currentIndex.value = carouselList.value.length - 1
-    alert('轮播图片更新成功！')
+    // 移除alert提示
   }
   reader.readAsDataURL(file)
   e.target.value = ''
 }
 
-// ---------- 内容列表（一次性获取全部，前端分页滑动） ----------
+// ========== 原有：内容列表分页逻辑 ==========
 const allData = ref([])
 const loading = ref(false)
 const pageSize = ref(8)
@@ -325,9 +379,21 @@ const getPageData = (page) => {
 const fetchAllContents = async () => {
   loading.value = true
   try {
-    // 假设后端接口支持 size 参数，这里传一个较大的值获取全部数据
-    const res = await axios.get('/api/contents?size=1000')
-    allData.value = res.data.data || []
+    // 模拟数据（如果后端接口未就绪，可先用这个测试）
+    allData.value = [
+      { id: 1, title: '互联网产品经理职业规划', imgUrl: 'https://picsum.photos/seed/job1/300/200', stage: '大三/大四', type: '互联网' },
+      { id: 2, title: '金融行业风控岗位发展路径', imgUrl: 'https://picsum.photos/seed/job2/300/200', stage: '大四/毕业', type: '金融' },
+      { id: 3, title: '教育行业教师职业规划', imgUrl: 'https://picsum.photos/seed/job3/300/200', stage: '大二/大三', type: '教育' },
+      { id: 4, title: '制造业工程师成长路径', imgUrl: 'https://picsum.photos/seed/job4/300/200', stage: '大三/实习', type: '制造业' },
+      { id: 5, title: '医疗行业临床医生规划', imgUrl: 'https://picsum.photos/seed/job5/300/200', stage: '读研/规培', type: '医疗健康' },
+      { id: 6, title: '公务员岗位报考与备考指南', imgUrl: 'https://picsum.photos/seed/job6/300/200', stage: '大四/毕业', type: '公务员' },
+      { id: 7, title: '国企技术岗职业发展规划', imgUrl: 'https://picsum.photos/seed/job7/300/200', stage: '毕业/入职', type: '国企' },
+      { id: 8, title: '外企市场岗成长路径', imgUrl: 'https://picsum.photos/seed/job8/300/200', stage: '大三/实习', type: '外企' },
+      { id: 9, title: '科研院所研究员职业规划', imgUrl: 'https://picsum.photos/seed/job9/300/200', stage: '读研/读博', type: '科研' },
+    ]
+    // 真实接口（后端就绪后替换）
+    // const res = await axios.get('/api/contents?size=1000')
+    // allData.value = res.data.data || []
   } catch (error) {
     console.error('获取内容列表失败', error)
   } finally {
@@ -339,8 +405,7 @@ const handlePageChange = (page) => {
   currentPage.value = page
 }
 
-// ---------- 其他功能（导航、搜索、筛选等）----------
-// 核心功能按钮跳转逻辑（修复重复定义问题，保留正确的路由跳转）
+// ========== 原有：其他功能逻辑 ==========
 const goToFeature = (type) => {
   switch(type) {
     case '测评':
@@ -360,14 +425,14 @@ const goToFeature = (type) => {
   }
 }
 
+// 搜索功能（移除alert弹窗）
 const handleSearch = () => {
   const searchInput = document.querySelector('.search-input')
   const keyword = searchInput.value.trim()
   if (keyword) {
     router.push(`/search?keyword=${encodeURIComponent(keyword)}`)
-  } else {
-    alert('请输入搜索关键词！')
   }
+  // 移除空关键词的alert提示
 }
 
 const switchTab = (tabType) => {
@@ -395,7 +460,7 @@ const handleFreeFilter = (e) => {
   console.log('仅看免费内容：', e.target.checked)
 }
 
-// ---------- 生命周期 ----------
+// ========== 原有：生命周期 ==========
 onMounted(() => {
   fetchAllContents()
   startCarousel()
@@ -418,19 +483,60 @@ onUnmounted(() => {
   margin: 0;
   padding: 0;
 }
-/* ===== 新增滑动容器样式 ===== */
+
+/* 新增：用户头像和菜单样式 */
+.user-profile {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid #f0f0f0;
+}
+.user-menu {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  width: 120px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  border-radius: 4px;
+  z-index: 999;
+}
+.user-menu .menu-item {
+  padding: 8px 15px;
+  font-size: 14px;
+  cursor: pointer;
+  height: auto;
+  line-height: normal;
+  margin: 0;
+  color: #000; /* 用户下拉菜单文字黑色 */
+}
+.user-menu .menu-item:hover {
+  background: #f5f7fa;
+}
+.user-menu .logout {
+  color: #ff4d4f;
+  border-top: 1px solid #e8e8e8;
+}
+
+/* 滑动容器样式 */
 .content-slider-container {
   width: 100%;
-  overflow: hidden;        /* 隐藏溢出的页面 */
+  overflow: hidden;        
   position: relative;
 }
 .content-slider {
-  display: flex;           /* 横向排列页面 */
+  display: flex;           
   width: 100%;
-  transition: transform 0.3s ease;  /* 平滑滑动 */
+  transition: transform 0.3s ease;  
 }
 .slider-page {
-  flex: 0 0 100%;          /* 每个页面占容器宽度的100% */
+  flex: 0 0 100%;          
   width: 100%;
 }
 .content-preview {
@@ -439,6 +545,7 @@ onUnmounted(() => {
   gap: 20px;
   width: 100%;
 }
+
 /* 1. 顶部导航样式 */
 .top-nav {
   height: 60px;
@@ -464,7 +571,7 @@ onUnmounted(() => {
   margin-right: 40px;
   font-size: 18px;
   font-weight: bold;
-  color: #2f54eb;
+  color: #000; /* logo文字黑色 */
 }
 .logo-icon {
   font-size: 24px;
@@ -484,9 +591,10 @@ onUnmounted(() => {
   position: relative;
   height: 60px;
   line-height: 60px;
+  color: #000; /* 导航菜单项默认黑色 */
 }
 .menu-item.active {
-  color: #2f54eb;
+  color: #000; /* 激活状态也为黑色 */
 }
 .menu-item.active::after {
   content: '';
@@ -495,8 +603,9 @@ onUnmounted(() => {
   left: 0;
   width: 100%;
   height: 2px;
-  background: #2f54eb;
+  background: #2f54eb; /* 激活下划线保留蓝色 */
 }
+
 /* 下拉菜单样式 */
 .dropdown {
   position: relative;
@@ -527,6 +636,7 @@ onUnmounted(() => {
   gap: 8px;
   height: auto;
   line-height: normal;
+  color: #000; /* 下拉菜单项文字黑色 */
 }
 .dropdown-item:hover {
   background: #f5f7fa;
@@ -545,11 +655,20 @@ onUnmounted(() => {
 .nav-right {
   display: flex;
   gap: 10px;
+  align-items: center;
+}
+.btn-toggle-theme {
+  padding: 6px 10px;
+  border: none;
+  background: #f5f7fa;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #000; /* 主题切换按钮文字黑色 */
 }
 .btn-login {
   padding: 6px 15px;
   border: 1px solid #2f54eb;
-  color: #2f54eb;
+  color: #000; /* 登录按钮文字黑色 */
   background: #fff;
   border-radius: 4px;
   cursor: pointer;
@@ -557,7 +676,7 @@ onUnmounted(() => {
 .btn-register {
   padding: 6px 15px;
   border: none;
-  color: #fff;
+  color: #fff; /* 注册按钮文字白色（背景蓝色保留） */
   background: #2f54eb;
   border-radius: 4px;
   cursor: pointer;

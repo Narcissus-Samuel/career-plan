@@ -16,7 +16,6 @@
           </el-select>
         </el-form-item>
         <el-form-item class="btn-group">
-          <!-- 新增：按钮禁用逻辑 + 提示文字 -->
           <el-button 
             type="primary" 
             @click="startMatch"
@@ -24,7 +23,6 @@
           >
             {{ hasStudentInfo ? '开始匹配分析' : '请先完成个人信息录入' }}
           </el-button>
-          <!-- 辅助提示：无信息时显示引导 -->
           <el-text v-if="!hasStudentInfo" type="warning" style="margin-left: 10px;">
             👉 <a @click="goToStudentInfo" style="color: #E6A23C; cursor: pointer;">点击前往信息录入页</a>
           </el-text>
@@ -40,10 +38,9 @@
         <span class="total-score">{{ matchResult.totalScore }}分</span>
       </div>
       
-      <!-- 各维度匹配详情 - 均匀列宽 -->
+      <!-- 各维度匹配详情 -->
       <div class="dimension-section">
         <h4 class="section-title">各维度匹配详情</h4>
-        <!-- 关键修改：添加table-layout:fixed + 每列flex=1实现均匀分配 -->
         <el-table 
           :data="matchResult.dimensionScores" 
           border 
@@ -74,13 +71,13 @@
       <div class="gap-analysis-section">
         <h4 class="section-title">差距分析与提升建议</h4>
         <el-collapse style="width: 100%;">
-          <el-collapse-item title="基础要求差距" style="border-bottom: 1px solid #f0f0f0;">
+          <el-collapse-item title="基础要求差距">
             <p class="gap-content">{{ matchResult.gapAnalysis.base }}</p>
           </el-collapse-item>
-          <el-collapse-item title="职业技能差距" style="border-bottom: 1px solid #f0f0f0;">
+          <el-collapse-item title="职业技能差距">
             <p class="gap-content">{{ matchResult.gapAnalysis.skills }}</p>
           </el-collapse-item>
-          <el-collapse-item title="职业素养差距" style="border-bottom: 1px solid #f0f0f0;">
+          <el-collapse-item title="职业素养差距">
             <p class="gap-content">{{ matchResult.gapAnalysis.quality }}</p>
           </el-collapse-item>
           <el-collapse-item title="发展潜力差距">
@@ -99,16 +96,15 @@
 </template>
 
 <script setup>
-// 核心修复：合并重复的导入，只保留一次 Vue API 导入
 import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
-import { ElLoading, ElMessage, ElMessageBox } from 'element-plus' // 合并 element-plus 导入
+import { ElLoading, ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import * as echarts from 'echarts'
 
 const router = useRouter()
 
-// 岗位列表（复用岗位画像的12个岗位）
+// 岗位列表
 const jobList = ref([
   { jobName: '数据分析师' },
   { jobName: '前端开发工程师' },
@@ -124,10 +120,10 @@ const jobList = ref([
   { jobName: '金融分析师' }
 ])
 
-// 学生信息（新增：定义缺失的 studentInfo 变量）
+// 学生信息
 const studentInfo = ref(JSON.parse(localStorage.getItem('studentInfo') || '{}'))
 
-// 匹配结果数据（默认空，页面加载时调用后端计算）
+// 匹配结果数据
 const matchList = reactive([])
 
 // 匹配表单
@@ -143,23 +139,18 @@ const matchResult = ref({
   gapAnalysis: {}
 })
 
-// 核心：判断是否有学生信息（控制按钮禁用）
+// 判断是否有学生信息
 const hasStudentInfo = ref(false)
 
 // 初始化雷达图
 let radarChart = null
 
-// 修复：合并重复的 onMounted，统一初始化逻辑
 onMounted(() => {
-  // 加载匹配数据
   toPageData()
-  // 检查学生信息
   checkStudentInfo()
-  // 监听路由返回时重新检查（比如从录入页返回）
   window.addEventListener('storage', checkStudentInfo)
 })
 
-// 组件卸载时清理事件监听（防止内存泄漏）
 onUnmounted(() => {
   window.removeEventListener('storage', checkStudentInfo)
 })
@@ -181,20 +172,17 @@ async function toPageData() {
           details: match
         })
       })
-      initRadarChart() // 更新雷达图
+      initRadarChart()
     }
   } catch (e) {
     console.error('获取匹配结果失败', e)
-    // 可以保留默认静态数据作为备用
   }
 }
 
-// 初始化雷达图（空实现，避免报错）
-const initRadarChart = () => {
-  // 如需实现雷达图，可补充逻辑
-}
+// 初始化雷达图
+const initRadarChart = () => {}
 
-// 检查学生信息的通用函数
+// 检查学生信息
 const checkStudentInfo = () => {
   const studentInfo = localStorage.getItem('studentInfo')
   const studentAbility = localStorage.getItem('studentAbility')
@@ -206,35 +194,30 @@ const goToStudentInfo = () => {
   router.push('/student-ability')
 }
 
-// 开始匹配分析（新增学生信息校验）
+// 开始匹配分析
 const startMatch = () => {
-  // 1. 校验：未选择岗位
   if (!matchForm.value.targetJob) {
     ElMessage.warning('请选择目标岗位！')
     return
   }
 
-  // 2. 核心校验：无学生信息则拦截
   if (!hasStudentInfo.value) {
     router.push('/student-ability')
     return
   }
   
-  // 3. 显示加载提示
   const loadingInstance = ElLoading.service({
     lock: true,
     text: '正在进行人岗匹配分析，请稍候...',
-    background: 'rgba(0, 0, 0, 0.7)',
+    // 关键修改：加载层背景改为半透明白色，移除黑色
+    background: 'rgba(255, 255, 255, 0.9)',
     fullscreen: true
   })
   
-  // 模拟匹配计算（真实项目中替换为后端接口调用）
   setTimeout(() => {
     try {
-      // 模拟从本地读取学生信息（真实场景：从后端接口获取）
       const studentAbility = JSON.parse(localStorage.getItem('studentAbility') || '{}')
       
-      // 根据学生真实能力动态生成匹配分数（示例逻辑）
       const dimensionScores = [
         { 
           dimension: '基础要求', 
@@ -266,10 +249,8 @@ const startMatch = () => {
         }
       ]
       
-      // 计算总分
       const totalScore = dimensionScores.reduce((sum, item) => sum + item.contribution, 0)
       
-      // 动态差距分析（结合目标岗位和学生信息）
       const gapAnalysis = {
         base: `基础要求匹配度${studentAbility.baseScore >= 80 ? '优秀' : '良好'}，学历、专业${studentAbility.baseScore >= 80 ? '均符合' : '基本符合'}目标岗位（${matchForm.value.targetJob}）要求。`,
         skills: `职业技能匹配度${studentAbility.skillScore >= 80 ? '优秀' : (studentAbility.skillScore >= 60 ? '良好' : '待提升')}，${studentAbility.skillScore >= 80 ? '已掌握全部核心技能' : `缺少${matchForm.value.targetJob}岗位所需的部分专项技能，建议针对性补充学习`}。`,
@@ -283,28 +264,23 @@ const startMatch = () => {
         gapAnalysis
       }
       
-      // 关键修改：先显示匹配结果，再通过nextTick确保DOM渲染完成后初始化图表
       matchResultVisible.value = true
       nextTick(() => {
         initMatchChart()
       })
     } catch (error) {
-      // 异常捕获：避免代码报错导致loading无法关闭
       console.error('匹配分析出错：', error)
       ElMessage.error('匹配分析失败，请重试！')
     } finally {
-      // 无论成功/失败，关闭加载提示
       loadingInstance.close()
     }
   }, 2000)
 }
 
-// 初始化匹配对比图表（增加鲁棒性）
+// 初始化匹配对比图表
 const initMatchChart = () => {
-  // 关键优化：多次尝试获取DOM元素，确保能找到
   let chartDom = document.getElementById('match-chart')
   if (!chartDom) {
-    // 兜底：如果第一次没找到，延迟50ms再试一次
     setTimeout(() => {
       chartDom = document.getElementById('match-chart')
       if (chartDom) {
@@ -317,16 +293,14 @@ const initMatchChart = () => {
   renderChart(chartDom)
 }
 
-// 抽离图表渲染逻辑，便于复用
+// 渲染图表
 const renderChart = (chartDom) => {
-  // 先销毁已存在的图表实例，避免重复渲染
   if (echarts.getInstanceByDom(chartDom)) {
     echarts.dispose(chartDom)
   }
   
   const myChart = echarts.init(chartDom)
   
-  // 岗位要求的能力值（模拟）
   const jobRequirements = {
     '基础要求': 95,
     '职业技能': 90,
@@ -334,19 +308,39 @@ const renderChart = (chartDom) => {
     '发展潜力': 80
   }
   
-  // 学生能力值（从匹配结果中读取）
   const studentAbilities = {}
   matchResult.value.dimensionScores.forEach(item => {
     studentAbilities[item.dimension] = item.score
   })
   
   const option = {
-    title: { text: '人岗匹配维度对比', left: 'center' },
+    // 图表背景改为白色
+    backgroundColor: '#ffffff',
+    title: { 
+      text: '人岗匹配维度对比', 
+      left: 'center',
+      textStyle: { color: '#666666' } // 标题文字改为灰色，移除黑色
+    },
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    legend: { data: ['岗位要求', '我的能力'], bottom: 0 },
+    legend: { 
+      data: ['岗位要求', '我的能力'], 
+      bottom: 0,
+      textStyle: { color: '#666666' } // 图例文字改为灰色
+    },
     grid: { left: '5%', right: '5%', bottom: '10%', top: '15%', containLabel: true },
-    xAxis: { type: 'category', data: ['基础要求', '职业技能', '职业素养', '发展潜力'] },
-    yAxis: { type: 'value', max: 100 },
+    xAxis: { 
+      type: 'category', 
+      data: ['基础要求', '职业技能', '职业素养', '发展潜力'],
+      axisLine: { lineStyle: { color: '#eeeeee' } }, // 轴线改为浅灰色
+      axisLabel: { color: '#666666' } // 轴标签改为灰色
+    },
+    yAxis: { 
+      type: 'value', 
+      max: 100,
+      axisLine: { lineStyle: { color: '#eeeeee' } },
+      axisLabel: { color: '#666666' },
+      splitLine: { lineStyle: { color: '#eeeeee' } } // 网格线改为浅灰色
+    },
     series: [
       {
         name: '岗位要求',
@@ -363,10 +357,8 @@ const renderChart = (chartDom) => {
     ]
   }
   
-  // 设置并渲染图表
   myChart.setOption(option)
   
-  // 防抖resize：避免频繁触发导致性能问题
   const resizeHandler = () => {
     clearTimeout(window.resizeTimer)
     window.resizeTimer = setTimeout(() => {
@@ -375,7 +367,6 @@ const renderChart = (chartDom) => {
   }
   window.addEventListener('resize', resizeHandler)
   
-  // 组件卸载时清理：防止内存泄漏
   onUnmounted(() => {
     window.removeEventListener('resize', resizeHandler)
     myChart.dispose()
@@ -384,7 +375,6 @@ const renderChart = (chartDom) => {
 
 // 生成生涯报告
 const generateReport = () => {
-  // 保存匹配结果到本地（供报告页使用）
   localStorage.setItem('matchResult', JSON.stringify(matchResult.value))
   localStorage.setItem('targetJob', matchForm.value.targetJob)
   router.push('/career-planning')
@@ -398,122 +388,203 @@ const changeJob = () => {
 </script>
 
 <style scoped>
+/* 核心修改：完全移除最大宽度限制，全屏显示 */
 .job-match-container {
   padding: 20px;
-  background-color: #f5f7fa;
+  background-color: #ffffff; /* 纯白背景 */
   min-height: 100vh;
-  max-width: 1200px;
-  margin: 0 auto; /* 居中显示 */
+  width: 100vw !important; /* 强制占满视口宽度 */
+  max-width: none !important; /* 移除最大宽度限制 */
+  margin: 0 !important; /* 移除居中边距 */
+  box-sizing: border-box;
+  overflow-x: hidden; /* 防止横向滚动 */
 }
 
-/* 卡片通用样式 */
+/* 全局样式穿透：确保整个页面都是白色 */
+:deep(html),
+:deep(body),
+:deep(#app) {
+  background-color: #ffffff !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: #666666 !important; /* 全局文字改为灰色，避免黑色 */
+}
+
+/* 卡片样式：纯白无阴影无边框 */
 .card-item {
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  box-shadow: none !important; /* 移除阴影 */
   border-radius: 8px;
-  overflow: hidden;
+  border: 1px solid #f9f9f9 !important; /* 极浅的边框 */
+  background-color: #ffffff !important;
 }
 
 /* 岗位选择表单样式 */
 .job-select-form {
-  padding: 10px 0;
+  padding: 20px;
 }
 
 .btn-group {
-  margin-top: 10px;
+  margin-top: 20px;
 }
 
 /* 总评分区域 */
 .total-score-section {
-  padding: 15px 0;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 20px 0;
+  border-bottom: 1px solid #f9f9f9; /* 极浅的分割线 */
   display: flex;
   align-items: center;
   flex-wrap: wrap;
 }
 
+.total-score-section h3 {
+  font-size: 18px;
+  color: #666666 !important; /* 灰色文字 */
+  margin: 0;
+  font-weight: 500;
+}
+
 .total-score {
-  font-size: 24px;
-  font-weight: bold;
-  color: #1989fa;
-  margin-left: 10px;
+  font-size: 28px;
+  font-weight: 600;
+  color: #409EFF;
+  margin-left: 15px;
 }
 
 /* 各功能区块通用样式 */
 .dimension-section,
 .chart-section,
 .gap-analysis-section {
-  padding: 20px 0;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 25px 0;
+  border-bottom: 1px solid #f9f9f9;
 }
 
-/* 最后一个区块去掉下边框 */
 .gap-analysis-section {
   border-bottom: none;
 }
 
 /* 区块标题样式 */
 .section-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 500;
-  color: #303133;
-  margin-bottom: 15px;
-  padding-left: 5px;
+  color: #666666 !important;
+  margin-bottom: 20px;
+  padding-left: 8px;
   border-left: 4px solid #409EFF;
+  display: flex;
+  align-items: center;
 }
 
 /* 差距分析内容样式 */
 .gap-content {
   line-height: 1.8;
-  color: #666;
+  color: #666666 !important;
   padding: 10px 0;
   margin: 0;
+  font-size: 15px;
 }
 
 /* 操作按钮组 */
 .operation-btn-group {
-  padding: 20px 0;
+  padding: 25px 0;
   text-align: center;
 }
 
 .operation-btn-group .el-button {
-  margin: 0 10px;
+  margin: 0 15px;
+  padding: 12px 30px;
+  border-radius: 8px;
+  font-size: 15px;
 }
 
-/* 表格样式优化 - 确保列宽均匀 */
+/* 表格样式优化 - 全白风格 */
 :deep(.el-table) {
-  --el-table-header-text-color: #303133;
-  --el-table-row-hover-bg-color: #f8f9fa;
-  border-radius: 4px;
+  --el-table-header-text-color: #666666 !important;
+  --el-table-row-hover-bg-color: #f9f9f9 !important;
+  border-radius: 8px;
+  border: 1px solid #f9f9f9 !important;
+  background-color: #ffffff !important;
 }
 
-/* 表格单元格居中 */
 :deep(.el-table td),
 :deep(.el-table th) {
   text-align: center;
+  padding: 12px 0;
+  font-size: 14px;
+  color: #666666 !important;
+  border-bottom: 1px solid #f9f9f9 !important;
+}
+
+:deep(.el-table th) {
+  background-color: #f9f9f9 !important;
+  font-weight: 500;
 }
 
 /* 折叠面板样式优化 */
 :deep(.el-collapse-item__header) {
   font-weight: 500;
-  color: #303133;
-  padding: 12px 15px;
+  color: #666666 !important;
+  padding: 15px 20px;
+  font-size: 15px;
+  background-color: #ffffff !important;
+  border-bottom: 1px solid #f9f9f9 !important;
 }
 
 :deep(.el-collapse-item__content) {
-  padding: 15px;
+  padding: 20px;
+  background-color: #ffffff !important;
+  border: none !important;
 }
 
 /* 禁用按钮样式 */
 :deep(.el-button:disabled) {
-  background-color: #e5e7eb;
-  border-color: #d1d5db;
-  color: #9ca3af;
+  background-color: #f9f9f9 !important;
+  border-color: #f0f0f0 !important;
+  color: #cccccc !important;
+}
+
+/* 页面头部样式优化 */
+:deep(.el-page-header) {
+  margin-bottom: 10px;
+  padding: 10px 0;
+}
+
+:deep(.el-page-header__content) {
+  font-size: 22px;
+  font-weight: 600;
+  color: #666666 !important;
+}
+
+/* 选择器样式优化 */
+:deep(.el-select) {
+  border-radius: 8px;
+}
+
+:deep(.el-select .el-input__wrapper) {
+  border-radius: 8px;
+  box-shadow: none;
+  border: 1px solid #f0f0f0 !important;
+  background-color: #ffffff !important;
+}
+
+:deep(.el-select .el-input__wrapper:focus) {
+  border-color: #409EFF;
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.1);
+}
+
+/* 加载层样式修改 - 白色主题 */
+:deep(.el-loading-mask) {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+:deep(.el-loading-text) {
+  color: #666666 !important;
 }
 
 /* 响应式适配 */
 @media (max-width: 768px) {
   .job-match-container {
-    padding: 10px;
+    padding: 15px;
+    width: 100vw !important;
   }
   
   .total-score-section {
@@ -523,21 +594,19 @@ const changeJob = () => {
   
   .total-score {
     margin-left: 0;
-    margin-top: 5px;
+    margin-top: 10px;
   }
   
   .operation-btn-group .el-button {
     display: block;
     width: 100%;
-    margin: 5px 0;
+    margin: 8px 0;
   }
   
-  /* 移动端表格列宽自适应 */
   :deep(.el-table) {
-    font-size: 12px;
+    font-size: 13px;
   }
   
-  /* 移动端图表高度适配 */
   .chart-section #match-chart {
     height: 300px !important;
   }
