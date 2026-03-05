@@ -9,6 +9,8 @@ import JobPortrait from '../views/JobPortrait.vue'
 // 新增：导入登录、注册组件
 import Login from '../views/Login.vue'
 import Register from '../views/Register.vue'
+import AdminLogin from '../views/AdminLogin.vue'
+import AdminDashboard from '../views/AdminDashboard.vue'
 
 // 新增：导入其他功能页面组件（未创建的组件先用Home占位）
 import CareerPlanning from '../views/CareerPlanning.vue'
@@ -40,6 +42,16 @@ const routes = [
     path: '/login', 
     name: 'Login',
     component: Login 
+  },
+  {
+    path: '/admin-login',
+    name: 'AdminLogin',
+    component: AdminLogin
+  },
+  {
+    path: '/admin',
+    name: 'AdminDashboard',
+    component: AdminDashboard
   },
   // 新增：注册页路由
   { 
