@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import html2pdf from 'html2pdf.js'
+import { ArrowRight, ArrowLeft } from '@element-plus/icons-vue'
 // 导入所有页面组件
 import Home from '../views/Home.vue'
 import StudentAbility from '../views/StudentAbility.vue'
@@ -19,6 +20,7 @@ import ReportGenerate from '../views/ReportGenerate.vue'
 import ResourceLibrary from '../views/ResourceLibrary.vue'
 import AboutUs from '../views/AboutUs.vue'
 import CareerInterestTest from '../views/CareerInterestTest.vue'
+import ResumeUpload from '../views/ResumeUpload.vue'
 const PostgraduatePlanning = () => import('../views/Home.vue') // 临时占位
 const StudyAbroadPlanning = () => import('../views/Home.vue') // 临时占位
 const CivilServicePlanning = () => import('../views/Home.vue') // 临时占位
@@ -86,6 +88,7 @@ const routes = [
     name: 'CareerPlanning',
     component: CareerPlanning 
   },
+  { path: '/resume-upload', component: ResumeUpload },
   { 
     path: '/ability-assessment', 
     name: 'AbilityAssessment',

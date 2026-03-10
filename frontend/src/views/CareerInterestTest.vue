@@ -139,17 +139,17 @@
         <div class="result-chart">
           <h3>职业兴趣维度得分</h3>
           <div class="chart-container">
-            <!-- 简化版雷达图展示 -->
+            <!-- 修复后的雷达图 -->
             <div class="radar-chart">
+              <div class="radar-grid"></div>
               <div class="radar-axis" v-for="(axis, idx) in radarAxes" :key="idx" :style="getRadarAxisStyle(idx)">
                 <div class="axis-label">{{ axis.label }}</div>
                 <div class="axis-line"></div>
                 <div 
                   class="axis-point" 
                   :style="{ 
-                    height: `${axis.score * 2}px`, 
-                    width: `${axis.score * 2}px`,
-                    bottom: `${axis.score}%` 
+                    bottom: `${axis.score}%`,
+                    transform: 'translateX(-50%)'
                   }"
                 ></div>
               </div>
@@ -209,6 +209,10 @@
           <button class="restart-btn" @click="restartTest">重新测评</button>
           <button class="export-btn" @click="exportReport">导出测评报告</button>
           <button class="share-btn" @click="shareResult">分享测评结果</button>
+          <!-- 新增：生成职业规划报告按钮 -->
+          <button class="career-plan-btn" @click="goToCareerReport">
+            📋 生成职业规划报告
+          </button>
         </div>
       </div>
     </section>
@@ -303,8 +307,13 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
+
+// 暂存相关常量
+const DRAFT_STORAGE_KEY = 'careerInterestTestDraft'
+const RESULT_STORAGE_KEY = 'careerInterestTestResult'
 
 // 基础状态
 const testStarted = ref(false)       // 是否开始测评
@@ -528,12 +537,80 @@ const radarAxes = computed(() => {
   ]
 })
 
+// 加载暂存的测试数据
+const loadTestDraft = () => {
+  const draft = localStorage.getItem(DRAFT_STORAGE_KEY)
+  if (draft) {
+    try {
+      const draftData = JSON.parse(draft)
+      currentQuestionIndex.value = draftData.currentIndex || 0
+      answers.value = draftData.answers || {}
+      currentAnswer.value = draftData.currentAnswer || 0
+      testStarted.value = draftData.testStarted || false
+      testCompleted.value = draftData.testCompleted || false
+      
+      // 如果有已完成的结果，直接加载
+      if (testCompleted.value) {
+        const result = localStorage.getItem(RESULT_STORAGE_KEY)
+        if (result) {
+          const resultData = JSON.parse(result)
+          testResultDate.value = resultData.testResultDate || ''
+        }
+      }
+      
+      ElMessage.info('检测到上次未完成的测评，已为你恢复答题进度')
+    } catch (e) {
+      console.error('加载测评暂存数据失败:', e)
+    }
+  }
+}
+
+// 保存测试暂存数据
+const saveTestDraft = () => {
+  const draftData = {
+    currentIndex: currentQuestionIndex.value,
+    answers: answers.value,
+    currentAnswer: currentAnswer.value,
+    testStarted: testStarted.value,
+    testCompleted: testCompleted.value
+  }
+  localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftData))
+}
+
+// 保存测试最终结果
+const saveTestResult = () => {
+  const resultData = {
+    scores: scores.value,
+    topType: topType.value,
+    testResultDate: testResultDate.value,
+    answers: answers.value
+  }
+  localStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify(resultData))
+  
+  // 保存到职业规划需要的key中 - 修改这里
+  const careerTestAnalysis = {
+    // 保留原始的兴趣类型名称
+    interestType: topType.value.name, // 如：现实型、研究型、艺术型等
+    coreValues: ['薪资待遇', '成长空间', '职业匹配'],
+    recommendJob: topType.value.careers[0],
+    abilityLevel: getScoreLevel(scores.value[topType.value.code]),
+    abilityScores: scores.value,
+    abilityScoresDetail: radarAxes.value
+  }
+  
+  localStorage.setItem('careerTestAnalysis', JSON.stringify(careerTestAnalysis))
+  localStorage.setItem('targetJob', topType.value.careers[0])
+}
+
 // 开始测评
 const startTest = () => {
   testStarted.value = true
   currentQuestionIndex.value = 0
   currentAnswer.value = 0
   answers.value = {}
+  
+  // 保存暂存
+  saveTestDraft()
   
   // 启动计时器
   startTimer()
@@ -557,6 +634,8 @@ const startTimer = () => {
 // 选择答案
 const selectAnswer = (score) => {
   answers.value[currentQuestionIndex.value] = score
+  // 每次选择答案都保存暂存
+  saveTestDraft()
 }
 
 // 上一题
@@ -564,6 +643,8 @@ const prevQuestion = () => {
   if (currentQuestionIndex.value > 0) {
     currentQuestionIndex.value -= 1
     currentAnswer.value = answers.value[currentQuestionIndex.value] || 0
+    // 保存暂存
+    saveTestDraft()
   }
 }
 
@@ -578,6 +659,8 @@ const nextQuestion = () => {
   if (currentQuestionIndex.value < testQuestions.value.length - 1) {
     currentQuestionIndex.value += 1
     currentAnswer.value = answers.value[currentQuestionIndex.value] || 0
+    // 保存暂存
+    saveTestDraft()
   } else {
     completeTest()
   }
@@ -601,6 +684,12 @@ const completeTest = () => {
       answers.value[idx] = 3
     }
   })
+  
+  // 保存结果和暂存
+  saveTestDraft()
+  saveTestResult()
+  
+  ElMessage.success('测评完成！已为你保存测评结果')
 }
 
 // 重新测评
@@ -611,6 +700,11 @@ const restartTest = () => {
   currentAnswer.value = 0
   answers.value = {}
   showReportModal.value = false
+  
+  // 清空暂存
+  localStorage.removeItem(DRAFT_STORAGE_KEY)
+  
+  ElMessage.info('已重置测评，可重新开始答题')
 }
 
 // 导出测评报告
@@ -620,8 +714,22 @@ const exportReport = () => {
 
 // 分享测评结果
 const shareResult = () => {
-  alert(`你的职业兴趣测评结果：${topType.value.name}(${topType.value.code})，已复制结果到剪贴板，可分享给好友！`)
-  // 实际项目中可实现剪贴板复制或分享到社交平台
+  const shareText = `我的霍兰德职业兴趣测评结果：${topType.value.name}(${topType.value.code})，适合的职业方向：${topType.value.careers.slice(0, 3).join('、')}`
+  try {
+    navigator.clipboard.writeText(shareText)
+    ElMessage.success('测评结果已复制到剪贴板，可分享给好友！')
+  } catch (e) {
+    alert(shareText + '\n\n复制失败，请手动复制')
+  }
+}
+
+// 跳转到职业规划报告页
+const goToCareerReport = () => {
+  // 确保结果已保存
+  saveTestResult()
+  
+  ElMessage.success('正在为你生成职业规划报告...')
+  router.push('/career-planning')
 }
 
 // 打印报告
@@ -631,13 +739,13 @@ const printReport = () => {
 
 // 下载PDF报告
 const downloadReport = () => {
-  alert('测评报告已开始下载，PDF文件将保存到本地！')
-  // 实际项目中可集成pdf导出库如jsPDF
+  ElMessage.success('测评报告PDF已开始下载！')
+  // 实际项目中可集成jsPDF等库实现真实下载
 }
 
 // 获取雷达图轴样式
 const getRadarAxisStyle = (index) => {
-  const angle = (index * 60) + 30 // 60度间隔，起始偏移30度
+  const angle = (index * 60) - 30 // 修正角度计算
   return {
     transform: `rotate(${angle}deg)`,
     transformOrigin: 'bottom center'
@@ -648,10 +756,10 @@ const getRadarAxisStyle = (index) => {
 const getRadarFillStyle = () => {
   // 生成多边形路径
   const points = radarAxes.value.map((axis, idx) => {
-    const angle = (idx * 60) * Math.PI / 180
-    const radius = axis.score / 100 * 100 // 转换为百分比
-    const x = 50 + radius * Math.cos(angle)
-    const y = 50 + radius * Math.sin(angle)
+    const angle = ((idx * 60) - 30) * Math.PI / 180
+    const radius = axis.score // 直接使用百分比
+    const x = 50 + (radius / 2) * Math.cos(angle)
+    const y = 50 + (radius / 2) * Math.sin(angle)
     return `${x}% ${y}%`
   })
   
@@ -669,8 +777,14 @@ const getScoreLevel = (score) => {
   return '极低'
 }
 
-// 组件卸载时清除计时器
+// 页面加载时加载暂存
+onMounted(() => {
+  loadTestDraft()
+})
+
+// 组件卸载时保存暂存并清除计时器
 onUnmounted(() => {
+  saveTestDraft()
   if (timer) clearInterval(timer)
 })
 </script>
@@ -1000,6 +1114,25 @@ onUnmounted(() => {
   height: 100%;
   position: relative;
 }
+/* 新增：雷达图网格背景 */
+.radar-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at center, 
+    rgba(47, 84, 235, 0.05) 0%, 
+    rgba(47, 84, 235, 0.05) 20%, 
+    rgba(47, 84, 235, 0.03) 20%,
+    rgba(47, 84, 235, 0.03) 40%,
+    rgba(47, 84, 235, 0.02) 40%,
+    rgba(47, 84, 235, 0.02) 60%,
+    rgba(47, 84, 235, 0.01) 60%,
+    rgba(47, 84, 235, 0.01) 80%,
+    transparent 80%);
+  border-radius: 50%;
+}
 .radar-axis {
   position: absolute;
   bottom: 50%;
@@ -1015,6 +1148,7 @@ onUnmounted(() => {
   transform: translateX(-50%);
   font-size: 12px;
   white-space: nowrap;
+  z-index: 10;
 }
 .axis-line {
   width: 2px;
@@ -1022,12 +1156,15 @@ onUnmounted(() => {
   background: #e8e8e8;
   margin: 0 auto;
 }
+/* 修复：雷达图数据点样式 */
 .axis-point {
   position: absolute;
   left: 50%;
-  transform: translateX(-50%);
+  width: 8px !important;
+  height: 8px !important;
   background: #2f54eb;
   border-radius: 50%;
+  z-index: 20;
 }
 .radar-fill {
   position: absolute;
@@ -1037,6 +1174,7 @@ onUnmounted(() => {
   height: 100%;
   background: rgba(47, 84, 235, 0.2);
   pointer-events: none;
+  z-index: 5;
 }
 .core-result {
   background: #fff;
@@ -1156,8 +1294,9 @@ onUnmounted(() => {
   display: flex;
   justify-content: center;
   gap: 20px;
+  flex-wrap: wrap;
 }
-.restart-btn, .export-btn, .share-btn {
+.restart-btn, .export-btn, .share-btn, .career-plan-btn {
   padding: 10px 30px;
   border-radius: 4px;
   font-size: 16px;
@@ -1177,6 +1316,16 @@ onUnmounted(() => {
   border: 1px solid #2f54eb;
   color: #2f54eb;
   background: #fff;
+}
+/* 新增：职业规划报告按钮样式 */
+.career-plan-btn {
+  border: none;
+  background: #1d39c4;
+  color: #fff;
+  font-weight: bold;
+}
+.career-plan-btn:hover {
+  background: #0f2699;
 }
 
 /* 测评报告弹窗 */
@@ -1386,7 +1535,7 @@ onUnmounted(() => {
     flex-direction: column;
     align-items: center;
   }
-  .restart-btn, .export-btn, .share-btn {
+  .restart-btn, .export-btn, .share-btn, .career-plan-btn {
     width: 100%;
     max-width: 300px;
   }
