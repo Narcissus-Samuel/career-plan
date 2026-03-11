@@ -5,9 +5,10 @@ import json
 
 job_bp = Blueprint('job', __name__, url_prefix='/api/jobs')
 
+# ---------- 岗位分类接口（不变）----------
 @job_bp.route('/categories', methods=['GET'])
 def get_categories():
-    """获取所有岗位大类（用于前端选择）"""
+    """获取所有岗位大类"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
@@ -30,33 +31,55 @@ def get_categories():
     conn.close()
     return jsonify(result)
 
-@job_bp.route('/profile/<string:job_name>', methods=['GET'])
-def get_job_profile(job_name):
-    """获取单个岗位的详细画像（融合大类+具体标签）"""
+# ---------- 新增：通过岗位ID获取完整详情 ----------
+@job_bp.route('/<int:job_id>', methods=['GET'])
+def get_job_detail(job_id):
+    """根据岗位ID返回完整详情（包含职位描述、公司信息等）"""
     conn = get_db()
     cursor = conn.cursor()
-
-    # 获取岗位基本信息
+    # 使用 rowid 作为唯一标识
     cursor.execute('''
-        SELECT j.rowid as id, j.job_name, j.company, j.industry, j.salary_range, j.location,
-               j.job_description, j.company_size, j.company_type, j.category_id
-        FROM job j
-        WHERE j.job_name = ?
+        SELECT rowid as id,
+               job_name, location, salary_range, company, industry,
+               company_size, company_type, job_code, job_description,
+               updated_at, company_info, source_url
+        FROM job
+        WHERE rowid = ?
+    ''', (job_id,))
+    job = cursor.fetchone()
+    conn.close()
+    if not job:
+        return jsonify({'error': '岗位不存在'}), 404
+    return jsonify(dict(job))
+
+# ---------- 可选：通过岗位名称获取详情（如果存在同名岗位，返回第一个）----------
+@job_bp.route('/profile/<string:job_name>', methods=['GET'])
+def get_job_profile(job_name):
+    """通过岗位名称获取详情（建议改用ID接口，此处保留兼容）"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT rowid as id,
+               job_name, location, salary_range, company, industry,
+               company_size, company_type, job_code, job_description,
+               updated_at, company_info, source_url, category_id
+        FROM job
+        WHERE job_name = ?
+        LIMIT 1
     ''', (job_name,))
     job = cursor.fetchone()
     if not job:
         conn.close()
         return jsonify({'error': '岗位不存在'}), 404
-
     job_dict = dict(job)
 
-    # 获取所属大类画像
-    if job['category_id']:
+    # 获取所属大类画像（可选）
+    if job_dict.get('category_id'):
         cursor.execute('''
             SELECT name, skills, certificates, soft_abilities
             FROM job_categories
             WHERE id = ?
-        ''', (job['category_id'],))
+        ''', (job_dict['category_id'],))
         category = cursor.fetchone()
         if category:
             job_dict['category_profile'] = {
@@ -70,67 +93,39 @@ def get_job_profile(job_name):
     else:
         job_dict['category_profile'] = {}
 
-    # 获取该大类的细分标签
-    if job['category_id']:
-        cursor.execute('''
-            SELECT tag_name, frequency, description
-            FROM job_tags
-            WHERE category_id = ?
-            ORDER BY frequency DESC
-        ''', (job['category_id'],))
-        tags = cursor.fetchall()
-        job_dict['tags'] = [dict(t) for t in tags]
-    else:
-        job_dict['tags'] = []
-
     conn.close()
     return jsonify(job_dict)
 
+# ---------- 岗位图谱（不变）----------
 @job_bp.route('/graph', methods=['GET'])
 def get_job_graph():
-    """获取岗位图谱数据（用于前端可视化）"""
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('''
-        SELECT from_job, to_job, relation_type, description
-        FROM job_relations
-    ''')
+    cursor.execute('SELECT from_job, to_job, relation_type, description FROM job_relations')
     edges = cursor.fetchall()
-    # 收集所有节点
     nodes_set = set()
     for e in edges:
         nodes_set.add(e['from_job'])
         nodes_set.add(e['to_job'])
     nodes = [{'id': n, 'label': n} for n in nodes_set]
     conn.close()
-    return jsonify({
-        'nodes': nodes,
-        'edges': [dict(e) for e in edges]
-    })
+    return jsonify({'nodes': nodes, 'edges': [dict(e) for e in edges]})
 
+# ---------- 获取行业列表（不变）----------
 @job_bp.route('/industries', methods=['GET'])
 def get_industries():
-    """获取所有行业列表（用于前端筛选）"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('SELECT DISTINCT industry FROM job WHERE industry IS NOT NULL AND industry != "" ORDER BY industry')
     rows = cursor.fetchall()
     conn.close()
-    industries = [row['industry'] for row in rows]
-    return jsonify(industries)
+    return jsonify([row['industry'] for row in rows])
 
+# ---------- 岗位搜索（返回列表，包含id）----------
 @job_bp.route('/search', methods=['GET'])
 def search_jobs():
     """
-    岗位搜索接口（支持关键词、行业、公司规模、分页）
-    参数：
-        keyword: 搜索关键词（匹配岗位名称或公司）
-        industry: 行业（精确匹配）
-        company_size: 公司规模（如“20-99人”）
-        page: 页码，默认1
-        size: 每页条数，默认10
-        sort_by: 排序字段（保留参数但暂时无效）
-        order: asc/desc
+    搜索参数同之前，返回列表包含 id (rowid)
     """
     page = request.args.get('page', 1, type=int)
     size = request.args.get('size', 10, type=int)
@@ -142,13 +137,11 @@ def search_jobs():
     if page < 1 or size < 1:
         return jsonify({'error': '分页参数无效'}), 400
 
-    # 使用 rowid 作为默认排序，避免无 id 列的问题
     order_sql = 'ASC' if order.lower() == 'asc' else 'DESC'
 
     conn = get_db()
     cursor = conn.cursor()
 
-    # 构建查询条件
     conditions = []
     params = []
     if keyword:
@@ -163,14 +156,16 @@ def search_jobs():
 
     where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
 
-    # 查询总数
+    # 总数
     count_sql = f"SELECT COUNT(*) as total FROM job {where_clause}"
     cursor.execute(count_sql, params)
     total = cursor.fetchone()['total']
 
-    # 查询数据，使用 rowid 作为 id 返回
+    # 列表查询，返回基本字段 + id
     sql = f"""
-        SELECT rowid as id, job_name, location, salary_range, company, industry, company_size, company_type
+        SELECT rowid as id,
+               job_name, location, salary_range, company,
+               industry, company_size, company_type
         FROM job {where_clause}
         ORDER BY rowid {order_sql}
         LIMIT ? OFFSET ?
@@ -180,17 +175,12 @@ def search_jobs():
     rows = cursor.fetchall()
     conn.close()
 
-    jobs = [dict(row) for row in rows]
-    return jsonify({
-        'total': total,
-        'page': page,
-        'size': size,
-        'items': jobs
-    })
+    items = [dict(row) for row in rows]
+    return jsonify({'total': total, 'page': page, 'size': size, 'items': items})
 
+# ---------- 简单搜索（兼容旧版，同样返回id）----------
 @job_bp.route('/simple_search', methods=['GET'])
 def simple_search():
-    """简单关键词搜索（仅匹配岗位名称和公司）"""
     keyword = request.args.get('keyword', '', type=str)
     page = request.args.get('page', 1, type=int)
     size = request.args.get('size', 10, type=int)
