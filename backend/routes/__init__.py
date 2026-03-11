@@ -24,3 +24,4 @@ def register_blueprints(app):
     app.register_blueprint(profile_bp)  # 新增
     app.register_blueprint(path_bp)      # 新增
     app.register_blueprint(assessment_bp)
+   

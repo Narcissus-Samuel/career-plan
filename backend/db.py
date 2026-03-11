@@ -1,6 +1,7 @@
 import sqlite3
 import os
 import re
+import json  # 添加这一行
 from config import SQLITE_DB_PATH, UPLOAD_FOLDER
 
 # 当 Excel 存在时需要 pandas
@@ -426,6 +427,144 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
     ''')
+
+    # ========== 岗位画像相关表 ==========
+    # 岗位分类表（存储10+个岗位大类）
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS job_categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,           -- 大类名称，如“后端开发类”
+            icon TEXT,                           -- 图标（emoji或文字）
+            description TEXT,                     -- 大类描述
+            skills TEXT,                           -- 专业技能列表（JSON数组）
+            certificates TEXT,                      -- 证书要求（JSON数组）
+            soft_abilities TEXT,                    -- 软能力要求（JSON对象，如{"沟通能力":5}）
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # 岗位标签表（存储每个大类下的细分技能标签）
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS job_tags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category_id INTEGER NOT NULL,
+            tag_name TEXT NOT NULL,                -- 标签名，如“Java”、“高并发”
+            frequency REAL,                          -- 出现频率（0-1）
+            description TEXT,                        -- 标签说明
+            FOREIGN KEY (category_id) REFERENCES job_categories(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # 在现有job表中增加category_id字段
+    cursor.execute("PRAGMA table_info(job)")
+    cols = [row['name'] for row in cursor.fetchall()]
+    if 'category_id' not in cols:
+        cursor.execute("ALTER TABLE job ADD COLUMN category_id INTEGER REFERENCES job_categories(id)")
+
+    # 岗位关联图谱表（存储晋升/换岗关系）
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS job_relations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            from_job TEXT NOT NULL,                  -- 起始岗位名称
+            to_job TEXT NOT NULL,                     -- 目标岗位名称
+            relation_type TEXT CHECK(relation_type IN ('promotion', 'transition')),
+            description TEXT,                          -- 关系描述（如“需掌握Spring Cloud”）
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # ---------- 插入预定义数据（满足不少于10个岗位画像）----------
+    cursor.execute("SELECT count(*) as cnt FROM job_categories")
+    if cursor.fetchone()['cnt'] == 0:
+        # 插入10个岗位大类
+        categories = [
+            ('前端开发类', '🌐', '负责网页和应用界面的开发与交互', 
+             json.dumps(['HTML/CSS', 'JavaScript', 'Vue/React', '前端工程化']),
+             json.dumps([]),
+             json.dumps({'沟通能力': 4, '创新能力': 4, '学习能力': 5, '抗压能力': 3, '团队协作': 4})),
+            ('后端开发类', '⚙️', '负责服务器端逻辑、数据库和API开发',
+             json.dumps(['Java/Go/Python', 'Spring Boot', 'MySQL/Redis', '微服务']),
+             json.dumps(['软考中级']),
+             json.dumps({'逻辑思维': 5, '学习能力': 5, '抗压能力': 4, '团队协作': 4, '创新能力': 3})),
+            ('产品经理类', '📱', '负责产品规划、需求分析和项目管理',
+             json.dumps(['市场调研', '需求分析', 'Axure', '数据分析']),
+             json.dumps(['PMP', 'NPDP']),
+             json.dumps({'沟通能力': 5, '创新能力': 5, '学习能力': 4, '抗压能力': 5, '团队协作': 5})),
+            ('UI/设计类', '🎨', '负责产品界面和用户体验设计',
+             json.dumps(['Figma/Sketch', 'Photoshop', '交互设计', '用户研究']),
+             json.dumps([]),
+             json.dumps({'创新能力': 5, '沟通能力': 4, '学习能力': 4, '抗压能力': 3, '团队协作': 4})),
+            ('数据分析类', '📊', '负责数据提取、分析和可视化',
+             json.dumps(['Python', 'SQL', 'Excel', 'Tableau/PowerBI']),
+             json.dumps(['CDA', 'BDA']),
+             json.dumps({'学习能力': 5, '逻辑思维': 5, '沟通能力': 4, '创新能力': 4, '抗压能力': 3})),
+            ('运维/测试类', '🔧', '负责系统运维、测试和质量保障',
+             json.dumps(['Linux', 'Shell', 'Docker/K8s', '自动化测试']),
+             json.dumps(['RHCE', 'ISTQB']),
+             json.dumps({'抗压能力': 5, '学习能力': 4, '团队协作': 4, '沟通能力': 3, '创新能力': 3})),
+            ('算法/人工智能类', '🤖', '负责机器学习模型和算法研发',
+             json.dumps(['Python', '机器学习', '深度学习', 'TensorFlow/PyTorch']),
+             json.dumps([]),
+             json.dumps({'创新能力': 5, '学习能力': 5, '逻辑思维': 5, '抗压能力': 4, '沟通能力': 3})),
+            ('项目经理类', '📋', '负责项目规划、进度控制和团队协调',
+             json.dumps(['项目管理', '敏捷开发', 'JIRA', '风险管理']),
+             json.dumps(['PMP', 'PRINCE2']),
+             json.dumps({'沟通能力': 5, '抗压能力': 5, '团队协作': 5, '领导力': 5, '创新能力': 4})),
+            ('销售/市场类', '💼', '负责产品推广、客户开发和市场分析',
+             json.dumps(['销售技巧', '客户沟通', '市场调研', 'PPT']),
+             json.dumps([]),
+             json.dumps({'沟通能力': 5, '抗压能力': 5, '创新能力': 4, '学习能力': 4, '团队协作': 4})),
+            ('技术支持类', '🛠️', '负责产品技术支持和客户问题解决',
+             json.dumps(['技术知识', '沟通技巧', '故障排查', '文档撰写']),
+             json.dumps([]),
+             json.dumps({'沟通能力': 5, '学习能力': 4, '抗压能力': 4, '团队协作': 4, '创新能力': 3})),
+        ]
+        for cat in categories:
+            cursor.execute('''
+                INSERT INTO job_categories (name, icon, description, skills, certificates, soft_abilities)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', cat)
+
+    # 插入岗位标签示例（每个大类下细分）
+    cursor.execute("SELECT count(*) as cnt FROM job_tags")
+    if cursor.fetchone()['cnt'] == 0:
+        tags = [
+            (1, 'Vue', 0.8, '前端核心框架'),
+            (1, 'React', 0.7, '前端核心框架'),
+            (1, 'TypeScript', 0.5, '类型安全'),
+            (2, 'Java', 0.9, '后端主流语言'),
+            (2, 'Spring Boot', 0.8, 'Java框架'),
+            (2, '高并发', 0.4, '大厂常见要求'),
+            (3, 'Axure', 0.8, '原型设计工具'),
+            (3, '数据分析', 0.6, '数据驱动决策'),
+        ]
+        cursor.executemany('''
+            INSERT INTO job_tags (category_id, tag_name, frequency, description)
+            VALUES (?, ?, ?, ?)
+        ''', tags)
+
+    # 插入岗位关联图谱数据（满足至少5个岗位，每个岗位2条换岗路径）
+    cursor.execute("SELECT count(*) as cnt FROM job_relations")
+    if cursor.fetchone()['cnt'] == 0:
+        relations = [
+            ('前端开发工程师', '后端开发工程师', 'transition', '学习Java/Go和数据库'),
+            ('前端开发工程师', '移动端开发工程师', 'transition', '学习iOS/Android开发'),
+            ('前端开发工程师', '全栈开发工程师', 'transition', '补充后端和数据库知识'),
+            ('后端开发工程师', '架构师', 'promotion', '深入理解分布式系统'),
+            ('后端开发工程师', '技术经理', 'promotion', '培养团队管理能力'),
+            ('后端开发工程师', '大数据开发工程师', 'transition', '学习Hadoop/Spark'),
+            ('产品经理', '高级产品经理', 'promotion', '主导产品线，提升商业思维'),
+            ('产品经理', '运营总监', 'transition', '学习用户增长和数据分析'),
+            ('产品经理', '项目经理', 'transition', '学习项目管理方法论'),
+            ('UI设计师', '资深UI设计师', 'promotion', '建立设计规范，提升视觉表现'),
+            ('UI设计师', '交互设计师', 'transition', '深入学习交互设计'),
+            ('数据分析师', '高级数据分析师', 'promotion', '掌握复杂模型，深入业务'),
+            ('数据分析师', '数据产品经理', 'transition', '培养产品思维'),
+        ]
+        cursor.executemany('''
+            INSERT INTO job_relations (from_job, to_job, relation_type, description)
+            VALUES (?, ?, ?, ?)
+        ''', relations)
 
     # ---------- 插入预定义数据 ----------
     # 兴趣选项
