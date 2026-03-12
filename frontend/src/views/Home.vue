@@ -150,7 +150,7 @@
       </div>
     </section>
 
-    <!-- 7. 招聘岗位卡片区（新增标题+筛选功能+调整悬浮详情位置） -->
+    <!-- 7. 招聘岗位卡片区（修改为五列两行，和图片一致） -->
     <section class="job-section">
       <div class="job-wrap">
         <!-- 新增：岗位信息标题 + 筛选栏 -->
@@ -190,37 +190,52 @@
           </div>
         </div>
 
-        <!-- 岗位卡片列表 -->
+        <!-- 岗位卡片容器（改为五列网格布局，和图片一致） -->
         <div 
-          class="job-card" 
-          v-for="item in filteredJobList" 
-          :key="item.id"
-          @mouseenter="hoverCard = item.id"
-          @mouseleave="hoverCard = null"
+          class="job-card-container" 
+          ref="jobContainerRef"
         >
-          <!-- 默认显示区域 -->
-          <div class="card-default">
-            <div class="company-name">{{ item.company }}</div>
-            <div class="job-title">{{ item.title }}</div>
-          </div>
-          
-          <!-- 调整：悬浮详情移至卡片右下角独立显示（修复遮挡问题） -->
-          <div class="card-detail" v-if="hoverCard === item.id">
-            <div class="detail-item">
-              <span class="label">岗位要求：</span>
-              <span class="value">{{ item.requirement }}</span>
+          <!-- 岗位卡片（五列两行排列，和图片样式一致） -->
+          <div
+            class="job-card"
+            v-for="(item, index) in filteredJobList" 
+            :key="item.id"
+            :class="{ 'animate-in': jobCardAnimateStates[index] }"
+            @mouseenter="hoverJobCard = item.id"
+            @mouseleave="hoverJobCard = null"
+            @dblclick="$router.push({ path: '/job-detail', query: { id: item.id } })"
+          >
+            <!-- 岗位卡片背景图（带弧形底部，和图片一致） -->
+            <div class="card-image-wrap">
+              <!-- 修改：使用岗位名称作为seed生成对应图片 -->
+              <img 
+                :src="`https://picsum.photos/seed/${item.jobTitle}/200/200`" 
+                alt="岗位图片" 
+                class="portrait-cover"
+              >
+              <!-- 左侧竖排文字（和图片一致） -->
+              <div class="vertical-text">
+                <span>{{ item.companyShort }}</span>
+                <span>{{ item.category }}</span>
+                <span class="date">{{ item.date }}</span>
+              </div>
+              
+              <!-- 新增：悬浮时显示的岗位画像和薪资信息（右下角） -->
+              <div class="job-hover-info" v-if="hoverJobCard === item.id">
+                <div class="job-portrait-tag">
+                  <span>岗位画像</span>
+                </div>
+                <div class="job-salary-tag">
+                  <span>{{ item.salary }}</span>
+                </div>
+              </div>
             </div>
-            <div class="detail-item">
-              <span class="label">薪资待遇：</span>
-              <span class="value salary">{{ item.salary }}</span>
-            </div>
-            <div class="detail-item">
-              <span class="label">学历要求：</span>
-              <span class="value">{{ item.education }}</span>
-            </div>
-            <div class="detail-item">
-              <span class="label">工作经验：</span>
-              <span class="value">{{ item.experience }}</span>
+            
+            <!-- 岗位信息文字（修改：岗位名称在上，公司名称在下，颜色区分） -->
+            <div class="job-card-content">
+              <div class="job-title">{{ item.jobTitle }}</div>
+              <div class="job-company">{{ item.company }}</div>
+              <!-- 移除原有的desc，如需保留可调整位置 -->
             </div>
           </div>
         </div>
@@ -384,87 +399,127 @@ const handleImageUpload = (e) => {
   e.target.value = ''
 }
 
-// ========== 招聘岗位数据 + 新增筛选逻辑 ==========
+// ========== 招聘岗位数据（改为10条，实现五列两行） ==========
 const jobList = ref([
   {
     id: 1,
-    company: '腾讯科技',
-    title: '前端开发工程师',
-    type: '技术类', // 新增：岗位类型
-    requirement: '熟练掌握Vue/React，熟悉工程化构建',
+    company: '字节跳动',
+    companyShort: '字节',
+    category: '直播',
+    jobTitle: '前端开发工程师',
+    type: '技术类',
     salary: '15K-30K',
     education: '本科及以上',
-    experience: '1-3年'
+    experience: '1-3年',
+    date: '02.13'
   },
   {
     id: 2,
     company: '阿里巴巴',
-    title: '产品经理',
-    type: '产品类', // 新增：岗位类型
-    requirement: '具备需求分析能力，熟悉互联网产品流程',
+    companyShort: '阿里',
+    category: '产品',
+    jobTitle: '产品经理',
+    type: '产品类',
     salary: '20K-40K',
     education: '本科及以上',
-    experience: '2-5年'
+    experience: '2-5年',
+    date: '12.29'
   },
   {
     id: 3,
-    company: '字节跳动',
-    title: '数据分析师',
-    type: '技术类', // 新增：岗位类型
-    requirement: '掌握SQL/Python，熟悉数据可视化工具',
+    company: '腾讯科技',
+    companyShort: '腾讯',
+    category: '算法',
+    jobTitle: '数据算法工程师',
+    type: '算法类',
     salary: '18K-35K',
     education: '本科及以上',
-    experience: '1-3年'
+    experience: '1-3年',
+    date: '12.15'
   },
   {
     id: 4,
-    company: '华为',
-    title: '嵌入式工程师',
-    type: '技术类', // 新增：岗位类型
-    requirement: '熟悉C/C++，掌握嵌入式开发流程',
+    company: '百度在线',
+    companyShort: '百度',
+    category: '设计',
+    jobTitle: 'UI/UX设计师',
+    type: '技术类',
     salary: '20K-40K',
     education: '本科及以上',
-    experience: '2-5年'
+    experience: '2-5年',
+    date: '12.01'
   },
   {
     id: 5,
-    company: '美团',
-    title: '运营专员',
-    type: '运营类', // 新增：岗位类型
-    requirement: '具备活动策划能力，熟悉用户运营',
+    company: '美团点评',
+    companyShort: '美团',
+    category: '运营',
+    jobTitle: '内容运营专员',
+    type: '运营类',
     salary: '10K-20K',
     education: '大专及以上',
-    experience: '1-2年'
+    experience: '1-2年',
+    date: '11.17'
   },
   {
     id: 6,
-    company: '京东',
-    title: 'Java开发工程师',
-    type: '技术类', // 新增：岗位类型
-    requirement: '熟练掌握SpringBoot，熟悉微服务架构',
-    salary: '18K-35K',
+    company: '京东集团',
+    companyShort: '京东',
+    category: '后端',
+    jobTitle: 'Java开发工程师',
+    type: '技术类',
+    salary: '12K-25K',
     education: '本科及以上',
-    experience: '2-5年'
+    experience: '1-3年',
+    date: '10.27'
   },
   {
     id: 7,
-    company: '百度',
-    title: 'AI算法工程师',
-    type: '算法类', // 新增：岗位类型
-    requirement: '掌握机器学习算法，熟悉Python/TensorFlow',
-    salary: '25K-50K',
-    education: '硕士及以上',
-    experience: '3-5年'
+    company: '小米科技',
+    companyShort: '小米',
+    category: '测试',
+    jobTitle: '测试开发工程师',
+    type: '技术类',
+    salary: '13K-28K',
+    education: '本科及以上',
+    experience: '1-3年',
+    date: '10.13'
   },
   {
     id: 8,
-    company: '网易',
-    title: '游戏策划',
-    type: '产品类', // 新增：岗位类型
-    requirement: '具备游戏设计思维，熟悉游戏开发流程',
-    salary: '15K-30K',
+    company: '网易游戏',
+    companyShort: '网易',
+    category: '游戏',
+    jobTitle: '游戏策划师',
+    type: '产品类',
+    salary: '20K-40K',
     education: '本科及以上',
-    experience: '1-3年'
+    experience: '2-5年',
+    date: '09.29' // 修复：将9/29改为09.29，避免斜杠导致语法错误
+  },
+  {
+    id: 9,
+    company: '华为技术',
+    companyShort: '华为',
+    category: '后端',
+    jobTitle: 'Go语言开发工程师',
+    type: '技术类',
+    salary: '12K-25K',
+    education: '大专及以上',
+    experience: '1-3年',
+    date: ''
+  },
+  {
+    id: 10,
+    company: '拼多多',
+    companyShort: '多多',
+    category: '运营',
+    jobTitle: '电商运营主管',
+    type: '运营类',
+    salary: '8K-18K',
+    education: '大专及以上',
+    experience: '1-2年',
+    date: ''
   }
 ])
 
@@ -501,6 +556,7 @@ const resetFilter = () => {
 // ========== 悬浮状态 ==========
 const hoverCard = ref(null)
 const hoverPortrait = ref(null) // 岗位画像悬浮状态
+const hoverJobCard = ref(null) // 岗位卡片悬浮状态
 
 // ========== 其他功能逻辑 ==========
 const goToFeature = (type) => {
@@ -565,12 +621,15 @@ const startSlider = () => {
 // ========== 新增：岗位画像卡片区域逻辑（番茄小说网瀑布流排版） ==========
 const portraitContainerRef = ref(null)
 const portraitSectionRef = ref(null) // 新增：岗位画像区域引用
+const jobContainerRef = ref(null) // 新增：岗位卡片容器引用
 const mousePos = ref({ x: 0, y: 0 })
 const containerRect = ref({ left: 0, top: 0, width: 0, height: 0 })
 // 新增：卡片动画状态（控制逐个飞入）
 const cardAnimateStates = ref([])
+const jobCardAnimateStates = ref([]) // 新增：岗位卡片动画状态
 // 新增：动画定时器数组（用于清理）
 const animateTimers = ref([])
+const jobAnimateTimers = ref([]) // 新增：岗位卡片动画定时器
 
 // 岗位画像数据（带封面图）
 const jobPortraitList = ref([
@@ -639,6 +698,7 @@ const jobPortraitList = ref([
 // 新增：初始化卡片动画状态
 const initCardAnimateStates = () => {
   cardAnimateStates.value = jobPortraitList.value.map(() => false)
+  jobCardAnimateStates.value = jobList.value.map(() => false) // 初始化岗位卡片动画状态
 }
 
 // 新增：监听滚动，实现滚动到区域时触发动画
@@ -649,8 +709,12 @@ const handleScroll = () => {
   // 当区域进入视口（顶部距离小于窗口高度的80%）
   if (rect.top < window.innerHeight * 0.8 && !cardAnimateStates.value[0]) {
     startCardAnimation()
-    // 只执行一次，移除监听
-    window.removeEventListener('scroll', handleScroll)
+  }
+  
+  // 岗位卡片区域动画触发
+  const jobRect = document.querySelector('.job-section').getBoundingClientRect()
+  if (jobRect.top < window.innerHeight * 0.8 && !jobCardAnimateStates.value[0]) {
+    startJobCardAnimation()
   }
 }
 
@@ -661,6 +725,16 @@ const startCardAnimation = () => {
       cardAnimateStates.value[index] = true
     }, index * 150) // 每个卡片间隔150ms飞入
     animateTimers.value.push(timer)
+  })
+}
+
+// 新增：启动岗位卡片逐个飞入动画
+const startJobCardAnimation = () => {
+  jobList.value.forEach((_, index) => {
+    const timer = setTimeout(() => {
+      jobCardAnimateStates.value[index] = true
+    }, index * 150) // 每个卡片间隔150ms飞入
+    jobAnimateTimers.value.push(timer)
   })
 }
 
@@ -675,7 +749,7 @@ const handleMouseMove = (e) => {
   }
 }
 
-// 计算每个卡片的偏移样式（番茄小说网瀑布流排版+反向鼠标跟随）
+// 计算每个岗位画像卡片的偏移样式（番茄小说网瀑布流排版+反向鼠标跟随）
 const getCardStyle = (index) => {
   const { x, y } = mousePos.value
   const { width, height } = containerRect.value
@@ -732,6 +806,7 @@ onUnmounted(() => {
   clearInterval(sliderTimer) // 清理传送带定时器
   // 清理卡片动画定时器
   animateTimers.value.forEach(timer => clearTimeout(timer))
+  jobAnimateTimers.value.forEach(timer => clearTimeout(timer)) // 清理岗位卡片定时器
   window.removeEventListener('scroll', handleScroll)
 })
 </script>
@@ -905,29 +980,30 @@ onUnmounted(() => {
   gap: 15px;
   align-items: center;
 }
+/* 核心修改：搜索框缩小至原尺寸的2/3 */
 .nav-search-wrap {
   display: flex;
-  width: 300px;
-  height: 36px;
+  width: 200px; /* 原300px × 2/3 = 200px */
+  height: 24px; /* 原36px × 2/3 = 24px */
 }
 .nav-search-input {
   flex: 1;
   height: 100%;
-  padding: 0 15px;
+  padding: 0 10px; /* 内边距同步缩小（原15px × 2/3 ≈ 10px） */
   border: 1px solid #e8e8e8;
   border-radius: 4px 0 0 4px;
   outline: none;
-  font-size: 14px;
+  font-size: 12px; /* 字体同步缩小（原14px × 2/3 ≈ 12px） */
 }
 .nav-search-btn {
-  width: 80px;
+  width: 53px; /* 原80px × 2/3 ≈ 53px */
   height: 100%;
   background: #2f54eb;
   color: #fff;
   border: none;
   border-radius: 0 4px 4px 0;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 12px; /* 字体同步缩小 */
 }
 
 .btn-toggle-theme {
@@ -1123,16 +1199,16 @@ onUnmounted(() => {
   color: #999;
 }
 
-/* 新增：招聘岗位卡片区样式（含标题、筛选、调整悬浮详情） */
+/* 新增：招聘岗位卡片区样式（改为五列两行，和图片一致） */
 .job-section {
   padding: 30px 0;
+  background: #f8f9fa;
 }
 .job-wrap {
   width: 1200px;
   margin: 0 auto;
   display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
+  flex-direction: column;
 }
 
 /* 新增：岗位信息标题 + 筛选栏样式 */
@@ -1175,86 +1251,127 @@ onUnmounted(() => {
   background: #f5f7fa;
 }
 
-/* 岗位卡片样式（修复遮挡核心：提升层级 + 调整布局） */
-.job-card {
-  width: calc(25% - 15px);
-  background: #fff;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: visible; /* 确保悬浮框不被裁剪 */
-  z-index: 1; /* 基础层级 */
-}
-/* 悬浮时提升卡片层级，确保弹窗在最上层 */
-.job-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 12px 24px rgba(0,0,0,0.15);
-  z-index: 100; /* 悬浮时提升层级，高于其他卡片 */
-}
-.card-default {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.company-name {
-  font-size: 14px;
-  color: #666;
-  font-weight: 500;
-}
-.job-title {
-  font-size: 16px;
-  color: #222;
-  font-weight: 600;
+/* 岗位卡片容器（五列网格布局，和图片一致） */
+.job-card-container {
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  /* 核心修改：使用repeat(5, 1fr)实现五列等宽，和图片一致 */
+  grid-template-columns: repeat(5, 1fr);
+  /* 统一的行列间距，保证均匀 */
+  gap: 20px;
+  padding: 20px 0;
+  /* 确保容器宽度固定，卡片尺寸一致 */
+  box-sizing: border-box;
 }
 
-/* 调整：悬浮详情移至卡片右下角独立显示（修复遮挡问题） */
-.card-detail {
-  position: absolute;
-  bottom: -140px; /* 定位到卡片下方 */
-  right: 0; /* 靠右对齐 */
-  width: 220px;
+/* 岗位卡片样式（和图片一致：图片+下方文字+左侧竖排文字） */
+.job-card {
+  width: 100%;
   background: #fff;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  padding: 15px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  overflow: hidden;
+  cursor: pointer;
+  transform: translateY(20px);
+  opacity: 0;
+  transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  z-index: 1;
+  box-sizing: border-box;
+}
+
+/* 岗位卡片飞入动画 */
+.job-card.animate-in {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* 新增：岗位卡片悬浮上浮效果 */
+.job-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  z-index: 10;
+}
+
+/* 卡片图片容器（带弧形底部，和图片一致） */
+.card-image-wrap {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  overflow: hidden;
+  /* 弧形底部 */
+  border-bottom-left-radius: 50% 20%;
+  border-bottom-right-radius: 50% 20%;
+}
+.portrait-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 左侧竖排文字（和图片一致） */
+.vertical-text {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  display: flex;
+  flex-direction: column;
+  color: #000;
+  font-size: 24px;
+  font-weight: bold;
+  line-height: 1.2;
+}
+.vertical-text .date {
+  font-size: 16px;
+  margin-top: 5px;
+  font-weight: normal;
+}
+
+/* 新增：悬浮时显示的岗位画像和薪资信息样式 */
+.job-hover-info {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  z-index: 101; /* 弹窗层级高于卡片 */
-  animation: fadeIn 0.2s ease;
-  /* 防止弹窗超出容器 */
-  pointer-events: auto;
+  z-index: 5;
 }
-/* 修复最后一行卡片弹窗超出问题 */
-.job-wrap > .job-card:nth-child(n+9) .card-detail {
-  bottom: auto;
-  top: -140px;
+.job-portrait-tag {
+  background: rgba(47, 84, 235, 0.9);
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  text-align: center;
+  animation: fadeInUp 0.3s ease;
 }
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+.job-salary-tag {
+  background: rgba(255, 255, 255, 0.9);
+  color: #2f54eb;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  animation: fadeInUp 0.4s ease;
 }
-.detail-item {
-  display: flex;
-  align-items: flex-start;
-  font-size: 13px;
+
+/* 岗位卡片内容样式（修改：岗位名称在上，公司名称在下，颜色区分） */
+.job-card-content {
+  padding: 15px;
+}
+.job-card-content .job-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #222;
+  margin-bottom: 6px;
   line-height: 1.4;
 }
-.label {
-  color: #666;
-  min-width: 70px;
-  flex-shrink: 0;
-}
-.value {
-  color: #333;
-  flex: 1;
-}
-.salary {
-  color: #ff4d4f;
-  font-weight: 600;
+.job-card-content .job-company {
+  font-size: 14px;
+  color: #999; /* 公司名称颜色更浅 */
+  line-height: 1.4;
 }
 
 /* ========== 新增：最适配十大岗位 - 传送带样式 ========== */
@@ -1408,9 +1525,23 @@ onUnmounted(() => {
   z-index: 11;
   animation: fadeInUp 0.3s ease;
 }
+
+/* 通用动画 */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 新增：淡入上移动画 */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translate(-50%, 10px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+  from { 
+    opacity: 0; 
+    transform: translate(-50%, 10px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translate(-50%, 0); 
+  }
 }
 
 /* 7. 页脚样式 */
