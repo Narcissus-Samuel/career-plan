@@ -21,6 +21,9 @@ import ResourceLibrary from '../views/ResourceLibrary.vue'
 import AboutUs from '../views/AboutUs.vue'
 import CareerInterestTest from '../views/CareerInterestTest.vue'
 import ResumeUpload from '../views/ResumeUpload.vue'
+// 新增：导入岗位详情组件
+import JobDetail from '../views/JobDetail.vue'
+
 const PostgraduatePlanning = () => import('../views/Home.vue') // 临时占位
 const StudyAbroadPlanning = () => import('../views/Home.vue') // 临时占位
 const CivilServicePlanning = () => import('../views/Home.vue') // 临时占位
@@ -30,7 +33,7 @@ import AbilityAnalysis from '../views/AbilityAnalysis.vue'
 import DevelopmentPath from '../views/DevelopmentPath.vue'
 import ReportExport from '../views/ReportExport.vue'
 const Search = () => import('../views/Home.vue') // 临时占位
-const Detail = () => import('../views/Home.vue') // 临时占位
+// 移除原有Detail占位，改用JobDetail
 
 
 const routes = [
@@ -81,6 +84,16 @@ const routes = [
     path: '/job-portrait', 
     name: 'JobPortrait',
     component: JobPortrait 
+  },
+  // 新增：岗位详情页路由（核心修改）
+  { 
+    path: '/job-detail', 
+    name: 'JobDetail',
+    component: JobDetail,
+    // 接收URL参数
+    props: (route) => ({ 
+      id: route.query.id 
+    })
   },
   // 新增：顶部导航菜单路由
   { 
@@ -167,10 +180,12 @@ const routes = [
     name: 'Search',
     component: Search 
   },
+  // 保留原有detail路由作为兼容（可选）
   { 
     path: '/detail/:id', 
     name: 'Detail',
-    component: Detail 
+    component: JobDetail,
+    props: true
   }
 ]
 
@@ -182,11 +197,11 @@ const router = createRouter({
 // 可选：添加路由守卫（如需登录后才能访问其他页面，可取消注释）
 // router.beforeEach((to, from, next) => {
 //   // 排除登录、注册、首页（可根据需求调整）
-//   const whiteList = ['/login', '/register', '/']
+//   const whiteList = ['/login', '/register', '/', '/job-detail']
 //   // 从localStorage获取token（登录成功后存储）
 //   const hasToken = localStorage.getItem('token')
   
-//   if (whiteList.includes(to.path)) {
+//   if (whiteList.includes(to.path) || to.path.startsWith('/job-detail')) {
 //     next()
 //   } else {
 //     // 无token则跳转到登录页
