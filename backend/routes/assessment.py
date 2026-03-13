@@ -1,66 +1,189 @@
-from flask import Blueprint, request, jsonify, send_file
-import io, json, datetime
+from flask import Blueprint, request, jsonify, session
 from db import get_db
-from services import llm_service
-from backend.algorithms import score_student_competitiveness
-from report_utils import export_report_file
+import json
+import random
+from services.llm_service import _call_zhipu
 
 assessment_bp = Blueprint('assessment', __name__, url_prefix='/api/assessment')
 
+@assessment_bp.route('/questions', methods=['GET'])
+def get_questions():
+    """获取所有测评题目，按 sort_order 排序后随机打乱"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('SELECT id, question, dimension FROM assessment_questions ORDER BY sort_order')
+    questions = cur.fetchall()
+    conn.close()
+
+    # 转换为字典列表
+    question_list = [{'id': q['id'], 'question': q['question'], 'dimension': q['dimension']} for q in questions]
+
+    # 随机打乱顺序
+    random.shuffle(question_list)
+
+    return jsonify(question_list)
 
 @assessment_bp.route('/submit', methods=['POST'])
 def submit_assessment():
-    """接收测评答案，计算维度分、生成报告并保存历史记录"""
-    data = request.json or {}
-    user_id = data.get('user_id')
-    answers = data.get('answers')  # list of {id, dimension, score}
-    if not answers:
+    """提交测评答案，计算维度得分，生成推荐并保存结果"""
+    data = request.get_json()
+    if not data or 'answers' not in data:
         return jsonify({'error': 'answers required'}), 400
 
-    # 计算维度分
-    dimension_scores = {}
-    for a in answers:
-        dim = a.get('dimension')
-        score = int(a.get('score') or 0)
-        dimension_scores[dim] = dimension_scores.get(dim, 0) + score
+    answers = data['answers']
+    user_id = data.get('user_id')
+    session_id = data.get('session_id', 'guest')
+    test_mode = data.get('test_mode', False)  # 正式环境默认关闭测试模式
 
-    # 计算综合竞争力得分
-    student_snapshot = {
-        'user_id': user_id,
-        'skills': [],
-        'certificates': [],
-        'internships': None,
-        'completeness': int(sum([int(a.get('score') or 0) for a in answers]) / (len(answers) * 5.0) * 100),
-    }
-    competitiveness = score_student_competitiveness(student_snapshot)
-    student_snapshot['competitiveness'] = competitiveness
+    if not answers:
+        return jsonify({'error': 'answers cannot be empty'}), 400
 
-    # 生成报告内容（HTML）
-    # 使用 llm_service 的文本生成接口
-    # 以能力得分与建议为上下文，询问生成职业适配建议
-    context = {
-        'dimension_scores': dimension_scores,
-        'competitiveness': competitiveness
-    }
-    report_html = llm_service.generate_plan_suggestion(student_snapshot, job_name='综合能力测评报告')
+    # 计算每个维度的总分和计数
+    dimension_totals = {}
+    dimension_counts = {}
 
-    # 保存到 report_history
     conn = get_db()
     cur = conn.cursor()
-    cur.execute('INSERT INTO report_history (student_id, job_name, content, format_type) VALUES (?, ?, ?, ?)',
-                (user_id, '测评报告', report_html, 'html'))
+
+    for answer in answers:
+        question_id = answer.get('question_id')
+        score = answer.get('score')
+        if not question_id or not isinstance(score, int) or score < 1 or score > 5:
+            continue
+
+        # 从数据库获取问题的维度
+        cur.execute('SELECT dimension FROM assessment_questions WHERE id = ?', (question_id,))
+        row = cur.fetchone()
+        if row:
+            dimension = row['dimension']
+            if dimension not in dimension_totals:
+                dimension_totals[dimension] = 0
+                dimension_counts[dimension] = 0
+            dimension_totals[dimension] += score
+            dimension_counts[dimension] += 1
+
+    # 计算平均分
+    dimension_scores = {}
+    for dim in dimension_totals:
+        dimension_scores[dim] = round(dimension_totals[dim] / dimension_counts[dim], 2)
+
+    # 生成推荐
+    if test_mode or not should_call_llm_api():
+        recommendation = "【测试模式】推荐功能已启用，正式使用时将生成个性化职业建议。"
+        print(f"⚠️  当前为测试模式，未调用 LLM API")
+    else:
+        print(f"✅ 正式模式，正在调用 LLM API 生成推荐...")
+        recommendation = generate_career_recommendation(dimension_scores)
+
+    # 保存到数据库
+    cur.execute('''
+        INSERT INTO assessment_results (user_id, session_id, dimension_scores, recommendation, raw_answers)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (user_id, session_id, json.dumps(dimension_scores), recommendation, json.dumps(answers)))
     conn.commit()
-    report_id = cur.lastrowid
+    result_id = cur.lastrowid
     conn.close()
 
-    return jsonify({'report_id': report_id, 'content': report_html, 'dimension_scores': dimension_scores, 'competitiveness': competitiveness})
+    return jsonify({
+        'success': True,
+        'result_id': result_id,
+        'dimension_scores': dimension_scores,
+        'recommendation': recommendation
+    })
 
+@assessment_bp.route('/history/<int:user_id>', methods=['GET'])
+def get_history(user_id):
+    """获取用户的最近10条测评记录"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT id, dimension_scores, recommendation, created_at
+        FROM assessment_results
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        LIMIT 10
+    ''', (user_id,))
+    results = cur.fetchall()
+    conn.close()
 
-@assessment_bp.route('/export/<int:report_id>', methods=['GET'])
-def export_report(report_id):
-    """导出历史报告：默认 HTML，若安装 pdfkit 且请求 ?format=pdf 则尝试生成 PDF"""
-    fmt = (request.args.get('format') or 'html').lower()
-    res = export_report_file(report_id, fmt)
-    if res is None:
-        return jsonify({'error': 'not found'}), 404
-    return res
+    history = []
+    for row in results:
+        history.append({
+            'id': row['id'],
+            'dimension_scores': json.loads(row['dimension_scores']),
+            'recommendation': row['recommendation'],
+            'created_at': row['created_at']
+        })
+
+    return jsonify(history)
+
+def generate_career_recommendation(dimension_scores):
+    """根据维度得分生成职业推荐报告"""
+    # 霍兰德六维度排序
+    holland_types = {
+        'R': '实际型 (Realistic)',
+        'I': '研究型 (Investigative)',
+        'A': '艺术型 (Artistic)',
+        'S': '社会型 (Social)',
+        'E': '企业型 (Enterprising)',
+        'C': '常规型 (Conventional)'
+    }
+
+    # 假设 dimension_scores 的键是 'R', 'I', 'A', 'S', 'E', 'C'
+    sorted_dims = sorted(dimension_scores.items(), key=lambda x: x[1], reverse=True)
+
+    prompt = f"""
+基于霍兰德职业兴趣理论，以下是用户的维度得分（1-5 分）：
+{sorted_dims}
+
+请生成一份职业推荐报告，包括：
+1. 维度得分解读
+2. 主要兴趣类型分析
+3. 推荐职业方向（3-5 个具体职业）
+4. 职业发展建议
+
+请使用 Markdown 格式输出。
+"""
+
+    try:
+        print(f"🔍 正在调用阿里云 LLM 生成推荐...")
+        response = _call_zhipu(prompt)
+        if response:
+            print(f"✅ LLM 调用成功，返回 {len(response)} 字符")
+            return response.strip()
+        else:
+            print(f"⚠️ LLM 返回空内容，使用默认推荐")
+            return "生成推荐失败，请稍后重试。"
+    except Exception as e:
+        print(f"❌ LLM 调用异常：{e}")
+        return "生成推荐失败，请稍后重试。"
+
+def should_call_llm_api():
+    """检查是否应该调用 LLM API"""
+    import os
+    from db import get_db
+    # 检查环境变量开关
+    if os.getenv('ENABLE_LLM_RECOMMENDATION', 'false').lower() != 'true':
+        print(f"⚠️ ENABLE_LLM_RECOMMENDATION 未开启")
+        return False
+    
+    # 添加每日调用次数检查逻辑
+    max_calls = int(os.getenv('MAX_DAILY_API_CALLS', '100'))
+    conn = get_db()
+    cur = conn.cursor()
+    # 统计今日已调用次数
+    cur.execute('''
+        SELECT COUNT(*) as cnt FROM assessment_results 
+        WHERE DATE(created_at) = DATE('now') 
+        AND recommendation NOT LIKE '%测试模式%'
+    ''')
+    today_count = cur.fetchone()['cnt']
+    conn.close()
+    
+    print(f"📊 今日已调用 LLM {today_count}/{max_calls} 次")
+    
+    if today_count >= max_calls:
+        print(f"⚠️ 已达到每日调用上限")
+        return False
+    
+    return True

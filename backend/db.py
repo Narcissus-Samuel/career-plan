@@ -397,6 +397,30 @@ def init_db():
         )
     ''')
 
+    # 测评题目表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS assessment_questions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            question TEXT NOT NULL,
+            dimension TEXT NOT NULL,
+            sort_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # 测评结果表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS assessment_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            session_id TEXT DEFAULT 'guest',
+            dimension_scores TEXT NOT NULL,
+            recommendation TEXT,
+            raw_answers TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     # 报告记录表
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS reports (
