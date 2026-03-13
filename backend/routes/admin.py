@@ -1,6 +1,13 @@
 from flask import Blueprint, request, jsonify
 from db import get_db
 from .auth import admin_required, verify_token
+# 新增导入
+from services.llm_service import (
+    cluster_categories_with_zhipu,
+    assign_categories_by_keywords,
+    generate_category_profile_with_zhipu
+)
+from services.llm_service import rebuild_job_graph
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
@@ -81,3 +88,83 @@ def delete_user(user_id):
     conn.commit()
     conn.close()
     return jsonify({'status': 'deleted'})
+
+# ========== 新增接口：自动聚类生成岗位大类 ==========
+@admin_bp.route('/cluster-categories', methods=['POST'])
+@admin_required
+def cluster_categories():
+    """
+    第一步：调用大模型自动聚类，生成10-15个大类，并存入job_categories表。
+    第二步：根据聚类结果，为所有岗位分配category_id（基于关键词匹配）。
+    """
+    data = request.get_json() or {}
+    sample_size = data.get('sample_size', 500)  # 抽样数量，默认500
+
+    # 1. 清空现有大类（确保完全基于大模型生成）
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM job_categories")
+    conn.commit()
+    conn.close()
+
+    # 2. 调用大模型聚类
+    categories = cluster_categories_with_zhipu(sample_size)
+    if not categories:
+        return jsonify({'error': '聚类失败，未获得有效结果'}), 500
+
+    # 3. 将大类插入数据库
+    conn = get_db()
+    cursor = conn.cursor()
+    category_job_titles_map = {}
+    for cat in categories:
+        cat_name = cat.get('category_name')
+        job_titles = cat.get('job_titles', [])
+        if not cat_name:
+            continue
+        cursor.execute("INSERT INTO job_categories (name) VALUES (?)", (cat_name,))
+        conn.commit()
+        cat_id = cursor.lastrowid
+        category_job_titles_map[cat_name] = job_titles
+    conn.close()
+
+    # 4. 为岗位分配类别
+    assigned_count = assign_categories_by_keywords(category_job_titles_map)
+
+    return jsonify({
+        'message': f'聚类完成，生成了 {len(categories)} 个大类，已为 {assigned_count} 个岗位分配类别',
+        'categories': categories
+    })
+
+# ========== 新增接口：为所有大类生成通用画像 ==========
+@admin_bp.route('/generate-all-category-profiles', methods=['POST'])
+@admin_required
+def generate_all_category_profiles():
+    """为每个大类生成通用画像（技能、证书、软能力）"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM job_categories")
+    cat_ids = [row['id'] for row in cursor.fetchall()]
+    conn.close()
+
+    success = []
+    for cat_id in cat_ids:
+        if generate_category_profile_with_zhipu(cat_id):
+            success.append(cat_id)
+
+    return jsonify({
+        'message': f'成功生成 {len(success)} 个大类画像',
+        'success_ids': success
+    })
+
+@admin_bp.route('/build-job-graph', methods=['POST'])
+@admin_required
+def build_job_graph():
+    """重建岗位图谱（垂直晋升+横向换岗）"""
+    try:
+        v_count, l_count = rebuild_job_graph()
+        return jsonify({
+            'success': True,
+            'message': f'图谱重建完成，新增垂直路径 {v_count} 条，横向路径 {l_count} 条'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
