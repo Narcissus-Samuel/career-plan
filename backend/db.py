@@ -1,10 +1,9 @@
 import sqlite3
 import os
 import re
-import json  # 添加这一行
+import json
 from config import SQLITE_DB_PATH, UPLOAD_FOLDER
 
-# 当 Excel 存在时需要 pandas
 try:
     import pandas as pd
 except ImportError:
@@ -25,25 +24,19 @@ COLUMN_ALIASES = {
     "岗位来源地址": "source_url",
 }
 
-
 def get_db():
-    """获取 SQLite 数据库连接，并设置 row_factory 为 Row 类型（支持列名访问）"""
-    # 确保数据库文件的目录存在
     db_dir = os.path.dirname(SQLITE_DB_PATH)
     if not os.path.exists(db_dir):
         os.makedirs(db_dir)
     conn = sqlite3.connect(SQLITE_DB_PATH)
-    conn.row_factory = sqlite3.Row  # 这样查询结果可以通过列名访问，如 row['name']
+    conn.row_factory = sqlite3.Row
     return conn
 
-
 def sanitize_columns(columns):
-    """将列名转换为安全的 snake_case 名称"""
     new_cols = []
     for col in columns:
         if col in COLUMN_ALIASES:
             col = COLUMN_ALIASES[col]
-        # 只保留字母数字和下划线
         col = re.sub(r"\W+", "_", col)
         col = col.strip(" _").lower()
         if not col:
@@ -51,24 +44,19 @@ def sanitize_columns(columns):
         new_cols.append(col)
     return new_cols
 
-
 def init_db():
-    """初始化数据库表结构（如果表不存在则创建）"""
     conn = get_db()
     cursor = conn.cursor()
 
-    # 如果存在 Excel 文件（放在 backend 目录下），则根据它自动创建 job 表并导入数据
+    # 如果存在 Excel 文件，自动创建 job 表并导入数据
     base_dir = os.path.dirname(__file__)
-    # 相对路径文件名，可修改或通过配置提供
-    excel_filename = '20260226105856_457.xls'
+    excel_filename = '20260226105856_457.xls'  # 你的文件名
     excel_path = os.path.join(base_dir, excel_filename)
     if pd is not None and os.path.exists(excel_path):
         df = pd.read_excel(excel_path)
-        # 重命名列并清理名称
         sanitized = sanitize_columns(df.columns.tolist())
         df.columns = sanitized
 
-        # 选择主键：优先 job_code，然后任意唯一列
         pk = None
         if 'job_code' in df.columns:
             pk = 'job_code'
@@ -78,12 +66,10 @@ def init_db():
                     pk = col
                     break
 
-        # 构造 CREATE TABLE 语句
         col_defs = []
         if pk is None:
             col_defs.append('id INTEGER PRIMARY KEY AUTOINCREMENT')
         for col in df.columns:
-            # infer sqlite type
             dtype = str(df[col].dtype)
             if 'int' in dtype:
                 typ = 'INTEGER'
@@ -97,7 +83,6 @@ def init_db():
                 col_defs.append(f"{col} {typ}")
         cursor.execute(f"CREATE TABLE IF NOT EXISTS job ({', '.join(col_defs)})")
 
-        # 插入数据
         for _, row in df.iterrows():
             values = [None if pd.isna(x) else x for x in row.tolist()]
             cols = df.columns.tolist()
@@ -108,7 +93,7 @@ def init_db():
             )
         conn.commit()
     else:
-        # 原来手写的表结构，保留为备用
+        # 备用 job 表结构（如果你没有 Excel 文件，会创建这个）
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS job (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -123,54 +108,53 @@ def init_db():
             )
         ''')
 
-    # 创建学生表（可关联到 users 表）
+    # 学生表
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS student (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,      -- 如果用户登录，可保存对应ID
+            user_id INTEGER,
             name TEXT,
             major TEXT,
             grade TEXT,
-            skills TEXT,          -- 存储 JSON 字符串，如 ["Python","SQL"]
-            certificates TEXT,     -- 存储 JSON 字符串
+            skills TEXT,
+            certificates TEXT,
             internships TEXT,
-            interests TEXT,        -- 存储 JSON 字符串
-            completeness INTEGER,  -- 完整度评分
-            competitiveness INTEGER, -- 竞争力评分
+            interests TEXT,
+            completeness INTEGER,
+            competitiveness INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    # 如果表已经存在但旧版本没有 user_id 字段，尝试添加
     cursor.execute("PRAGMA table_info(student)")
     cols = [row['name'] for row in cursor.fetchall()]
     if 'user_id' not in cols:
         cursor.execute("ALTER TABLE student ADD COLUMN user_id INTEGER")
 
-    # 创建岗位画像表（用于存储大模型生成的岗位画像）
+    # 岗位画像表（用于存储大模型生成的单个岗位画像）
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS job_profile (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             job_name TEXT UNIQUE,
-            skills TEXT,           -- JSON 数组
-            certificates TEXT,      -- JSON 数组
-            soft_abilities TEXT,    -- JSON 对象，如 {"innovation":85,"learning":90}
+            skills TEXT,
+            certificates TEXT,
+            soft_abilities TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
 
-    # 创建匹配结果表
+    # 匹配结果表
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS match_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             student_id INTEGER,
             job_name TEXT,
             match_score REAL,
-            details TEXT,           -- JSON 对象，存储各维度得分
+            details TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
 
-    # 创建报告历史表
+    # 报告历史表
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS report_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -182,21 +166,21 @@ def init_db():
         )
     ''')
 
-    # 新增：创建用户/管理员、验证码等相关表
+    # 用户表
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             phone TEXT UNIQUE,
             password_hash TEXT NOT NULL,
-            role TEXT DEFAULT 'user',        -- user/admin
+            role TEXT DEFAULT 'user',
             is_active INTEGER DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
 
-    # 存储短信验证码或注册验证码，后续可以用于验证
+    # 验证码表
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS verification_codes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -205,22 +189,22 @@ def init_db():
             expires_at TIMESTAMP
         )
     ''')
-    #让前端首页的 contentList 从数据库动态加载。
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS content (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        img_url TEXT,
-        stage TEXT,
-        type TEXT,
-        category TEXT,               -- 分类：direction/template/case
-        sort_order INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-''')
 
-    # ========== 新增：发展路径规划相关表 ==========
-    # 用户扩展信息表（关联 users.id）
+    # 内容表（首页用）
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS content (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            img_url TEXT,
+            stage TEXT,
+            type TEXT,
+            category TEXT,
+            sort_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # 用户扩展信息表
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS user_profiles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -236,7 +220,7 @@ def init_db():
         )
     ''')
 
-    # 兴趣选项表（预定义）
+    # 兴趣选项表
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS interests (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -258,7 +242,7 @@ def init_db():
         )
     ''')
 
-    # 能力维度表（预定义）
+    # 能力维度表
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS ability_dimensions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -335,7 +319,7 @@ def init_db():
         )
     ''')
 
-    # 发展路径类型表（预定义模板）
+    # 发展路径类型表
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS path_types (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -353,7 +337,7 @@ def init_db():
         )
     ''')
 
-    # 路径阶段模板表（关联 path_types）
+    # 路径阶段模板表
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS path_stage_templates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -362,8 +346,8 @@ def init_db():
             period TEXT,
             status TEXT DEFAULT 'pending',
             sort_order INTEGER DEFAULT 0,
-            goals TEXT,       -- JSON数组，存储目标内容列表
-            milestones TEXT,  -- JSON数组，存储里程碑对象 {name, date}
+            goals TEXT,
+            milestones TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (path_id) REFERENCES path_types(id) ON DELETE CASCADE
         )
@@ -393,7 +377,7 @@ def init_db():
             title TEXT,
             field TEXT,
             introduction TEXT,
-            services TEXT,   -- JSON数组
+            services TEXT,
             contact TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -407,13 +391,13 @@ def init_db():
             color TEXT,
             title TEXT NOT NULL,
             description TEXT,
-            requirements TEXT, -- JSON数组
+            requirements TEXT,
             link TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
 
-    # 报告记录表（区别于 report_history，用于存储生成的报告内容）
+    # 报告记录表
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS reports (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -421,8 +405,8 @@ def init_db():
             title TEXT NOT NULL,
             type TEXT,
             format TEXT,
-            content TEXT,      -- 报告内容（JSON或文本）
-            file_path TEXT,    -- 生成的文件路径（可选）
+            content TEXT,
+            file_path TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
@@ -433,141 +417,47 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS job_categories (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE NOT NULL,           -- 大类名称，如“后端开发类”
-            icon TEXT,                           -- 图标（emoji或文字）
-            description TEXT,                     -- 大类描述
-            skills TEXT,                           -- 专业技能列表（JSON数组）
-            certificates TEXT,                      -- 证书要求（JSON数组）
-            soft_abilities TEXT,                    -- 软能力要求（JSON对象，如{"沟通能力":5}）
+            name TEXT UNIQUE NOT NULL,
+            icon TEXT,
+            description TEXT,
+            skills TEXT,
+            certificates TEXT,
+            soft_abilities TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
 
-    # 岗位标签表（存储每个大类下的细分技能标签）
+    # 岗位标签表（细分技能）
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS job_tags (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             category_id INTEGER NOT NULL,
-            tag_name TEXT NOT NULL,                -- 标签名，如“Java”、“高并发”
-            frequency REAL,                          -- 出现频率（0-1）
-            description TEXT,                        -- 标签说明
+            tag_name TEXT NOT NULL,
+            frequency REAL,
+            description TEXT,
             FOREIGN KEY (category_id) REFERENCES job_categories(id) ON DELETE CASCADE
         )
     ''')
 
-    # 在现有job表中增加category_id字段
+    # 在 job 表中增加 category_id 字段
     cursor.execute("PRAGMA table_info(job)")
     cols = [row['name'] for row in cursor.fetchall()]
     if 'category_id' not in cols:
         cursor.execute("ALTER TABLE job ADD COLUMN category_id INTEGER REFERENCES job_categories(id)")
 
-    # 岗位关联图谱表（存储晋升/换岗关系）
+    # 岗位关联图谱表
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS job_relations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            from_job TEXT NOT NULL,                  -- 起始岗位名称
-            to_job TEXT NOT NULL,                     -- 目标岗位名称
+            from_job TEXT NOT NULL,
+            to_job TEXT NOT NULL,
             relation_type TEXT CHECK(relation_type IN ('promotion', 'transition')),
-            description TEXT,                          -- 关系描述（如“需掌握Spring Cloud”）
+            description TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
 
-    # ---------- 插入预定义数据（满足不少于10个岗位画像）----------
-    cursor.execute("SELECT count(*) as cnt FROM job_categories")
-    if cursor.fetchone()['cnt'] == 0:
-        # 插入10个岗位大类
-        categories = [
-            ('前端开发类', '🌐', '负责网页和应用界面的开发与交互', 
-             json.dumps(['HTML/CSS', 'JavaScript', 'Vue/React', '前端工程化']),
-             json.dumps([]),
-             json.dumps({'沟通能力': 4, '创新能力': 4, '学习能力': 5, '抗压能力': 3, '团队协作': 4})),
-            ('后端开发类', '⚙️', '负责服务器端逻辑、数据库和API开发',
-             json.dumps(['Java/Go/Python', 'Spring Boot', 'MySQL/Redis', '微服务']),
-             json.dumps(['软考中级']),
-             json.dumps({'逻辑思维': 5, '学习能力': 5, '抗压能力': 4, '团队协作': 4, '创新能力': 3})),
-            ('产品经理类', '📱', '负责产品规划、需求分析和项目管理',
-             json.dumps(['市场调研', '需求分析', 'Axure', '数据分析']),
-             json.dumps(['PMP', 'NPDP']),
-             json.dumps({'沟通能力': 5, '创新能力': 5, '学习能力': 4, '抗压能力': 5, '团队协作': 5})),
-            ('UI/设计类', '🎨', '负责产品界面和用户体验设计',
-             json.dumps(['Figma/Sketch', 'Photoshop', '交互设计', '用户研究']),
-             json.dumps([]),
-             json.dumps({'创新能力': 5, '沟通能力': 4, '学习能力': 4, '抗压能力': 3, '团队协作': 4})),
-            ('数据分析类', '📊', '负责数据提取、分析和可视化',
-             json.dumps(['Python', 'SQL', 'Excel', 'Tableau/PowerBI']),
-             json.dumps(['CDA', 'BDA']),
-             json.dumps({'学习能力': 5, '逻辑思维': 5, '沟通能力': 4, '创新能力': 4, '抗压能力': 3})),
-            ('运维/测试类', '🔧', '负责系统运维、测试和质量保障',
-             json.dumps(['Linux', 'Shell', 'Docker/K8s', '自动化测试']),
-             json.dumps(['RHCE', 'ISTQB']),
-             json.dumps({'抗压能力': 5, '学习能力': 4, '团队协作': 4, '沟通能力': 3, '创新能力': 3})),
-            ('算法/人工智能类', '🤖', '负责机器学习模型和算法研发',
-             json.dumps(['Python', '机器学习', '深度学习', 'TensorFlow/PyTorch']),
-             json.dumps([]),
-             json.dumps({'创新能力': 5, '学习能力': 5, '逻辑思维': 5, '抗压能力': 4, '沟通能力': 3})),
-            ('项目经理类', '📋', '负责项目规划、进度控制和团队协调',
-             json.dumps(['项目管理', '敏捷开发', 'JIRA', '风险管理']),
-             json.dumps(['PMP', 'PRINCE2']),
-             json.dumps({'沟通能力': 5, '抗压能力': 5, '团队协作': 5, '领导力': 5, '创新能力': 4})),
-            ('销售/市场类', '💼', '负责产品推广、客户开发和市场分析',
-             json.dumps(['销售技巧', '客户沟通', '市场调研', 'PPT']),
-             json.dumps([]),
-             json.dumps({'沟通能力': 5, '抗压能力': 5, '创新能力': 4, '学习能力': 4, '团队协作': 4})),
-            ('技术支持类', '🛠️', '负责产品技术支持和客户问题解决',
-             json.dumps(['技术知识', '沟通技巧', '故障排查', '文档撰写']),
-             json.dumps([]),
-             json.dumps({'沟通能力': 5, '学习能力': 4, '抗压能力': 4, '团队协作': 4, '创新能力': 3})),
-        ]
-        for cat in categories:
-            cursor.execute('''
-                INSERT INTO job_categories (name, icon, description, skills, certificates, soft_abilities)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', cat)
-
-    # 插入岗位标签示例（每个大类下细分）
-    cursor.execute("SELECT count(*) as cnt FROM job_tags")
-    if cursor.fetchone()['cnt'] == 0:
-        tags = [
-            (1, 'Vue', 0.8, '前端核心框架'),
-            (1, 'React', 0.7, '前端核心框架'),
-            (1, 'TypeScript', 0.5, '类型安全'),
-            (2, 'Java', 0.9, '后端主流语言'),
-            (2, 'Spring Boot', 0.8, 'Java框架'),
-            (2, '高并发', 0.4, '大厂常见要求'),
-            (3, 'Axure', 0.8, '原型设计工具'),
-            (3, '数据分析', 0.6, '数据驱动决策'),
-        ]
-        cursor.executemany('''
-            INSERT INTO job_tags (category_id, tag_name, frequency, description)
-            VALUES (?, ?, ?, ?)
-        ''', tags)
-
-    # 插入岗位关联图谱数据（满足至少5个岗位，每个岗位2条换岗路径）
-    cursor.execute("SELECT count(*) as cnt FROM job_relations")
-    if cursor.fetchone()['cnt'] == 0:
-        relations = [
-            ('前端开发工程师', '后端开发工程师', 'transition', '学习Java/Go和数据库'),
-            ('前端开发工程师', '移动端开发工程师', 'transition', '学习iOS/Android开发'),
-            ('前端开发工程师', '全栈开发工程师', 'transition', '补充后端和数据库知识'),
-            ('后端开发工程师', '架构师', 'promotion', '深入理解分布式系统'),
-            ('后端开发工程师', '技术经理', 'promotion', '培养团队管理能力'),
-            ('后端开发工程师', '大数据开发工程师', 'transition', '学习Hadoop/Spark'),
-            ('产品经理', '高级产品经理', 'promotion', '主导产品线，提升商业思维'),
-            ('产品经理', '运营总监', 'transition', '学习用户增长和数据分析'),
-            ('产品经理', '项目经理', 'transition', '学习项目管理方法论'),
-            ('UI设计师', '资深UI设计师', 'promotion', '建立设计规范，提升视觉表现'),
-            ('UI设计师', '交互设计师', 'transition', '深入学习交互设计'),
-            ('数据分析师', '高级数据分析师', 'promotion', '掌握复杂模型，深入业务'),
-            ('数据分析师', '数据产品经理', 'transition', '培养产品思维'),
-        ]
-        cursor.executemany('''
-            INSERT INTO job_relations (from_job, to_job, relation_type, description)
-            VALUES (?, ?, ?, ?)
-        ''', relations)
-
-    # ---------- 插入预定义数据 ----------
-    # 兴趣选项
+    # 插入基础兴趣选项（系统通用数据，保留）
     cursor.execute("SELECT count(*) as cnt FROM interests")
     if cursor.fetchone()['cnt'] == 0:
         cursor.executemany('INSERT INTO interests (name, sort_order) VALUES (?, ?)', [
@@ -575,7 +465,7 @@ def init_db():
             ('教育培训', 5), ('金融投资', 6), ('行政办公', 7), ('创业管理', 8)
         ])
 
-    # 能力维度
+    # 插入基础能力维度
     cursor.execute("SELECT count(*) as cnt FROM ability_dimensions")
     if cursor.fetchone()['cnt'] == 0:
         cursor.executemany('INSERT INTO ability_dimensions (name, code, sort_order) VALUES (?, ?, ?)', [
@@ -590,6 +480,5 @@ def init_db():
     conn.close()
     print("数据库初始化完成，文件位置：", SQLITE_DB_PATH)
 
-    # 确保上传目录存在
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER)
