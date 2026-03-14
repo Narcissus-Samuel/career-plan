@@ -2,6 +2,7 @@ import sqlite3
 import os
 import re
 import json
+# 注意：确保 config.py 文件中定义了 SQLITE_DB_PATH 和 UPLOAD_FOLDER
 from config import SQLITE_DB_PATH, UPLOAD_FOLDER
 
 try:
@@ -57,18 +58,8 @@ def init_db():
         sanitized = sanitize_columns(df.columns.tolist())
         df.columns = sanitized
 
-        pk = None
-        if 'job_code' in df.columns:
-            pk = 'job_code'
-        else:
-            for col in df.columns:
-                if df[col].is_unique:
-                    pk = col
-                    break
-
-        col_defs = []
-        if pk is None:
-            col_defs.append('id INTEGER PRIMARY KEY AUTOINCREMENT')
+        # 核心修改1：不再将 job_code 设为主键，强制使用自增 id 作为主键
+        col_defs = ['id INTEGER PRIMARY KEY AUTOINCREMENT']  # 固定自增主键
         for col in df.columns:
             dtype = str(df[col].dtype)
             if 'int' in dtype:
@@ -77,20 +68,39 @@ def init_db():
                 typ = 'REAL'
             else:
                 typ = 'TEXT'
-            if col == pk:
-                col_defs.append(f"{col} {typ} PRIMARY KEY")
-            else:
-                col_defs.append(f"{col} {typ}")
-        cursor.execute(f"CREATE TABLE IF NOT EXISTS job ({', '.join(col_defs)})")
+            # 所有字段都作为普通字段，不设置主键约束
+            col_defs.append(f"{col} {typ}")
+        
+        # 重建 job 表（先删除旧表，确保结构生效；如果需要保留旧数据，可注释掉 DROP TABLE）
+        cursor.execute("DROP TABLE IF EXISTS job")
+        cursor.execute(f"CREATE TABLE job ({', '.join(col_defs)})")
 
-        for _, row in df.iterrows():
-            values = [None if pd.isna(x) else x for x in row.tolist()]
-            cols = df.columns.tolist()
-            placeholders = ','.join('?' for _ in values)
-            cursor.execute(
-                f"INSERT OR IGNORE INTO job ({','.join(cols)}) VALUES ({placeholders})",
-                values,
-            )
+        # 批量导入数据，统计导入数量
+        import_count = 0
+        fail_count = 0
+        fail_records = []
+        
+        for idx, row in df.iterrows():
+            try:
+                values = [None if pd.isna(x) else x for x in row.tolist()]
+                cols = df.columns.tolist()
+                placeholders = ','.join('?' for _ in values)
+                # 核心修改2：移除 OR IGNORE，确保所有数据都尝试插入
+                cursor.execute(
+                    f"INSERT INTO job ({','.join(cols)}) VALUES ({placeholders})",
+                    values,
+                )
+                import_count += 1
+            except Exception as e:
+                fail_count += 1
+                fail_records.append(f"第{idx+1}行导入失败: {str(e)}")
+        
+        # 打印导入结果，方便排查问题
+        print(f"Excel数据导入完成：成功{import_count}条，失败{fail_count}条")
+        if fail_records:
+            print("失败记录详情：")
+            for record in fail_records[:10]:  # 只打印前10条失败记录，避免刷屏
+                print(record)
         conn.commit()
     else:
         # 备用 job 表结构（如果你没有 Excel 文件，会创建这个）
