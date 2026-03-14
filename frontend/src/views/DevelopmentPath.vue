@@ -1,1346 +1,1127 @@
 <template>
-  <div class="development-path">
-    <!-- 页面头部 -->
-    <div class="page-header">
-      <h1 class="page-title">发展路径规划</h1>
-      <p class="page-desc">根据你的职业目标和能力现状，定制个性化的成长路径，清晰规划每一步</p>
-      <div class="header-actions">
-        <button class="btn-new" @click="createNewPath">➕ 新建规划路径</button>
-        <button class="btn-save" @click="savePath">💾 保存当前规划</button>
-        <button class="btn-share" @click="sharePath">📤 分享规划路径</button>
-      </div>
-    </div>
+  <div class="career-home">
+    <!-- 1. 顶部导航（整合搜索框）- 固定在顶部 -->
+    <header class="top-nav">
+      <div class="nav-wrap">
+        <div class="nav-left">
+          <div class="logo">
+            <span class="logo-icon">🎯</span>
+            <span class="logo-text">大学生职业规划系统</span>
+          </div>
+          <ul class="nav-menu">
+            <li class="menu-item active" @click="$router.push('/')">首页</li>
+            <li class="menu-item" @click="$router.push('/job-portrait')">岗位画像</li>
+            <li class="menu-item" @click="$router.push('/career-planning')">职业规划</li>
+            <li class="menu-item" @click="$router.push('/resource-library')">资源库</li>
+            <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
+            <li class="menu-item dropdown">
+              核心功能 ▼
+              <ul class="dropdown-menu">
+                <li class="dropdown-item" @click="goToFeature('测评')">
+                  <span class="color-dot red"></span> 职业兴趣测评
+                </li>
+                <li class="dropdown-item" @click="goToFeature('分析')">
+                  <span class="color-dot orange"></span> 能力短板分析
+                </li>
+                <li class="dropdown-item" @click="goToFeature('规划')">
+                  <span class="color-dot green"></span> 发展路径规划
+                </li>
+                <li class="dropdown-item" @click="goToFeature('导出')">
+                  <span class="color-dot blue"></span> 规划报告导出
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </div>
 
-    <!-- 路径选择区 -->
-    <div class="path-select-section">
-      <div class="select-header">
-        <h3 class="section-subtitle">选择职业发展方向</h3>
-        <button class="btn-edit" @click="editPathType">✏️ 编辑</button>
-      </div>
-      <div class="path-type-cards">
-        <div 
-          class="path-type-card" 
-          v-for="(item, index) in pathTypes" 
-          :key="index"
-          :class="{ active: item.id === activePathId }"
-          @click="selectPathType(item.id)"
-        >
-          <div class="card-icon" :style="{ backgroundColor: item.color }">{{ item.icon }}</div>
-          <div class="card-content">
-            <h4 class="card-title">{{ item.name }}</h4>
-            <p class="card-desc">{{ item.description }}</p>
-            <div class="card-progress" v-if="item.progress">
-              <div class="progress-bar">
-                <div class="progress-fill" :style="{ width: `${item.progress}%` }"></div>
-              </div>
-              <span class="progress-text">{{ item.progress }}% 完成</span>
-            </div>
+        <!-- 导航栏右侧：搜索框 + 原有功能 -->
+        <div class="nav-right">
+          <!-- 导航栏内的搜索框 -->
+          <div class="nav-search-wrap">
+            <input 
+              type="text" 
+              class="nav-search-input" 
+              placeholder="搜索职业方向、专业、院校、岗位类型"
+              v-model="searchKeyword"
+              @keyup.enter="handleSearch"
+            >
+            <button class="nav-search-btn" @click="handleSearch">搜索</button>
+          </div>
+
+          <button class="btn-toggle-theme" @click="toggleTheme">🌙</button>
+          
+          <!-- 未登录：显示登录/注册按钮 -->
+          <button class="btn-login" @click="$router.push('/login')" v-if="!isLogin">登录</button>
+          <button class="btn-register" @click="$router.push('/register')" v-if="!isLogin">注册</button>
+          
+          <!-- 已登录：显示用户头像 + 下拉菜单 -->
+          <div class="user-profile" v-if="isLogin">
+            <img 
+              :src="userAvatar" 
+              alt="用户头像" 
+              class="avatar"
+              @click="toggleUserMenu"
+            >
+            <ul class="user-menu" v-show="showUserMenu">
+              <li @click="$router.push('/profile')">个人中心</li>
+              <li @click="$router.push('/my-plan')">我的规划</li>
+              <li @click="logout">退出登录</li>
+            </ul>
           </div>
         </div>
       </div>
-    </div>
+    </header>
 
-    <!-- 核心规划区 -->
-    <div class="core-plan-section" v-if="activePath">
-      <!-- 路径基本信息 -->
-      <div class="path-info-card">
-        <div class="info-header">
-          <h3 class="info-title">{{ activePath.name }} - 规划详情</h3>
-          <div class="info-meta">
-            <span class="meta-item">创建时间：{{ activePath.createTime }}</span>
-            <span class="meta-item">目标达成时间：{{ activePath.targetTime }}</span>
+    <!-- 2. 首页核心内容区 -->
+    <main class="home-content">
+      <!-- 2.1 英雄区（Banner） -->
+      <section class="hero-section">
+        <div class="hero-bg"></div>
+        <div class="hero-content">
+          <h1 class="hero-title">
+            精准规划<span class="highlight">职业方向</span>，<br>
+            开启<span class="highlight">未来无限</span>可能
+          </h1>
+          <p class="hero-desc">
+            基于大数据和AI的大学生职业规划平台，为你匹配最适合的职业路径
+          </p>
+          <div class="hero-actions">
+            <button class="btn-primary" @click="$router.push('/career-assessment')">
+              立即测评
+            </button>
+            <button class="btn-secondary" @click="$router.push('/job-library')">
+              浏览岗位库
+            </button>
           </div>
         </div>
-        <div class="info-content">
-          <div class="info-item">
-            <label class="info-label">核心目标：</label>
-            <p class="info-value">{{ activePath.coreGoal }}</p>
+      </section>
+
+      <!-- 2.2 核心功能区 -->
+      <section class="features-section">
+        <div class="section-header">
+          <h2 class="section-title">核心功能</h2>
+          <p class="section-desc">全方位助力你的职业规划</p>
+        </div>
+        <div class="features-grid">
+          <div class="feature-card" @click="$router.push('/career-assessment')">
+            <div class="feature-icon">📊</div>
+            <h3 class="feature-title">职业兴趣测评</h3>
+            <p class="feature-desc">基于MBTI、霍兰德等理论，精准定位你的职业兴趣</p>
           </div>
-          <div class="info-item">
-            <label class="info-label">能力基础：</label>
-            <p class="info-value">{{ activePath.abilityBase }}</p>
+          <div class="feature-card" @click="$router.push('/job-portrait')">
+            <div class="feature-icon">👤</div>
+            <h3 class="feature-title">岗位画像分析</h3>
+            <p class="feature-desc">深入了解岗位要求、技能需求、发展前景</p>
           </div>
-          <div class="info-item">
-            <label class="info-label">关键挑战：</label>
-            <p class="info-value">{{ activePath.challenges }}</p>
+          <div class="feature-card" @click="$router.push('/career-planning')">
+            <div class="feature-icon">🗺️</div>
+            <h3 class="feature-title">职业路径规划</h3>
+            <p class="feature-desc">定制个性化的职业发展路径，明确成长方向</p>
+          </div>
+          <div class="feature-card" @click="$router.push('/resource-library')">
+            <div class="feature-icon">📚</div>
+            <h3 class="feature-title">学习资源库</h3>
+            <p class="feature-desc">提供岗位相关的学习资料、证书指南、技能课程</p>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- 阶段规划时间线 -->
-      <div class="timeline-section">
-        <h3 class="section-subtitle">分阶段规划（{{ activePath.stages.length }}个阶段）</h3>
-        <div class="timeline-container">
-          <div class="timeline-track"></div>
+      <!-- 2.3 热门岗位区 -->
+      <section class="hot-jobs-section">
+        <div class="section-header">
+          <h2 class="section-title">热门岗位</h2>
+          <p class="section-desc">当前最受关注的职业方向</p>
+          <button class="btn-more" @click="$router.push('/job-library')">查看更多</button>
+        </div>
+        <div class="jobs-grid" v-if="hotJobs.length > 0">
           <div 
-            class="timeline-item" 
-            v-for="(stage, index) in activePath.stages" 
-            :key="index"
-            :class="{ current: index === currentStage }"
+            class="job-card" 
+            v-for="job in hotJobs" 
+            :key="job.id"
+            @click="$router.push(`/job-detail/${job.id}`)"
           >
-            <div class="timeline-dot" :style="{ backgroundColor: getStageColor(stage.status) }">
-              <span class="dot-icon">{{ getStageIcon(stage.status) }}</span>
+            <div class="job-header">
+              <h3 class="job-name">{{ job.job_name }}</h3>
+              <span class="salary-range">{{ job.salary_range }}</span>
             </div>
-            <div class="timeline-content">
-              <div class="stage-header">
-                <h4 class="stage-title">{{ stage.name }} <span class="stage-period">({{ stage.period }})</span></h4>
-                <span class="stage-status" :style="{ backgroundColor: getStageColor(stage.status) }">
-                  {{ getStageStatusText(stage.status) }}
-                </span>
-              </div>
-              <div class="stage-goals">
-                <h5 class="goals-title">核心目标：</h5>
-                <ul class="goals-list">
-                  <li v-for="(goal, i) in stage.goals" :key="i">
-                    <input type="checkbox" :id="`goal-${index}-${i}`" v-model="goal.completed">
-                    <label :for="`goal-${index}-${i}`" :class="{ completed: goal.completed }">{{ goal.content }}</label>
-                  </li>
-                </ul>
-              </div>
-              <div class="stage-milestones">
-                <h5 class="milestones-title">关键里程碑：</h5>
-                <div class="milestones-list">
-                  <div class="milestone-item" v-for="(milestone, i) in stage.milestones" :key="i">
-                    <span class="milestone-icon">📍</span>
-                    <div class="milestone-content">
-                      <span class="milestone-name">{{ milestone.name }}</span>
-                      <span class="milestone-date">{{ milestone.date }}</span>
-                    </div>
-                    <button class="milestone-btn" @click="editMilestone(index, i)">✏️</button>
-                  </div>
-                </div>
-              </div>
-              <div class="stage-actions">
-                <button class="btn-start" @click="startStage(index)" v-if="stage.status === 'pending'">开始阶段</button>
-                <button class="btn-complete" @click="completeStage(index)" v-if="stage.status === 'ongoing'">完成阶段</button>
-                <button class="btn-detail" @click="viewStageDetail(index)">查看详情</button>
+            <div class="job-info">
+              <span class="company">{{ job.company }}</span>
+              <span class="location">{{ job.location }}</span>
+              <span class="industry">{{ job.industry }}</span>
+            </div>
+            <div class="job-tags">
+              <span class="tag" v-for="tag in getJobTags(job)" :key="tag">{{ tag }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="empty-state" v-else>
+          <p>暂无热门岗位数据</p>
+        </div>
+      </section>
+
+      <!-- 2.4 行业趋势区 -->
+      <section class="trends-section">
+        <div class="section-header">
+          <h2 class="section-title">行业趋势</h2>
+          <p class="section-desc">了解最新的行业发展动态</p>
+        </div>
+        <div class="trends-content">
+          <div class="chart-container">
+            <canvas id="industryChart"></canvas>
+          </div>
+          <div class="trends-list">
+            <div class="trend-item" v-for="trend in industryTrends" :key="trend.industry">
+              <div class="trend-icon">{{ getIndustryIcon(trend.industry) }}</div>
+              <div class="trend-info">
+                <h4 class="industry-name">{{ trend.industry }}</h4>
+                <p class="trend-desc">{{ trend.description }}</p>
+                <span class="growth-rate">{{ trend.growth_rate }}</span>
               </div>
             </div>
           </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- 3. 页脚 -->
+    <footer class="home-footer">
+      <div class="footer-content">
+        <div class="footer-left">
+          <div class="logo footer-logo">
+            <span class="logo-icon">🎯</span>
+            <span class="logo-text">大学生职业规划系统</span>
+          </div>
+          <p class="copyright">© 2026 大学生职业规划系统 版权所有</p>
+        </div>
+        <div class="footer-right">
+          <ul class="footer-links">
+            <li><a href="/about-us">关于我们</a></li>
+            <li><a href="/contact">联系我们</a></li>
+            <li><a href="/privacy">隐私政策</a></li>
+            <li><a href="/terms">使用条款</a></li>
+          </ul>
         </div>
       </div>
-
-      <!-- 资源与支持 -->
-      <div class="resource-support-section">
-        <h3 class="section-subtitle">配套资源与支持</h3>
-        <div class="support-tabs">
-          <span class="tab-item active" @click="switchTab('learning')">学习资源</span>
-          <span class="tab-item" @click="switchTab('mentor')">导师指导</span>
-          <span class="tab-item" @click="switchTab('practice')">实践机会</span>
-        </div>
-        <div class="support-content">
-          <!-- 学习资源 -->
-          <div class="learning-resource" v-if="activeTab === 'learning'">
-            <div class="resource-item" v-for="(item, index) in learningResources" :key="index">
-              <div class="resource-icon" :style="{ backgroundColor: item.color }">{{ item.icon }}</div>
-              <div class="resource-info">
-                <h4 class="resource-title">{{ item.title }}</h4>
-                <p class="resource-desc">{{ item.description }}</p>
-                <div class="resource-meta">
-                  <span class="meta-item">预计耗时：{{ item.duration }}</span>
-                  <span class="meta-item">优先级：{{ item.priority }}</span>
-                </div>
-              </div>
-              <button class="resource-action" @click="accessResource(item.id)">立即学习</button>
-            </div>
-          </div>
-
-          <!-- 导师指导 -->
-          <div class="mentor-support" v-if="activeTab === 'mentor'">
-            <div class="mentor-item" v-for="(item, index) in mentorList" :key="index">
-              <img :src="item.avatar" alt="导师头像" class="mentor-avatar">
-              <div class="mentor-info">
-                <h4 class="mentor-name">{{ item.name }} <span class="mentor-title">{{ item.title }}</span></h4>
-                <p class="mentor-field">擅长领域：{{ item.field }}</p>
-                <p class="mentor-intro">{{ item.introduction }}</p>
-                <div class="mentor-service">
-                  <span class="service-tag" v-for="tag in item.services" :key="tag">{{ tag }}</span>
-                </div>
-              </div>
-              <button class="mentor-action" @click="consultMentor(item.id)">预约咨询</button>
-            </div>
-          </div>
-
-          <!-- 实践机会 -->
-          <div class="practice-opportunity" v-if="activeTab === 'practice'">
-            <div class="practice-item" v-for="(item, index) in practiceList" :key="index">
-              <div class="practice-tag" :style="{ backgroundColor: item.color }">{{ item.type }}</div>
-              <div class="practice-info">
-                <h4 class="practice-title">{{ item.title }}</h4>
-                <p class="practice-desc">{{ item.description }}</p>
-                <div class="practice-requirement">
-                  <label>能力要求：</label>
-                  <span class="requirement-tag" v-for="req in item.requirements" :key="req">{{ req }}</span>
-                </div>
-              </div>
-              <button class="practice-action" @click="applyPractice(item.id)">立即申请</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 进度跟踪 -->
-      <div class="progress-tracking-section">
-        <h3 class="section-subtitle">整体进度跟踪</h3>
-        <div class="progress-overview">
-          <div class="progress-chart">
-            <canvas id="progressChart"></canvas>
-          </div>
-          <div class="progress-stats">
-            <div class="stat-item">
-              <div class="stat-value">{{ completedStages }}/{{ totalStages }}</div>
-              <div class="stat-label">已完成阶段</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-value">{{ completedGoals }}/{{ totalGoals }}</div>
-              <div class="stat-label">已完成目标</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-value">{{ delayedMilestones }}</div>
-              <div class="stat-label">逾期里程碑</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-value">{{ overallProgress }}%</div>
-              <div class="stat-label">整体完成度</div>
-            </div>
-          </div>
-        </div>
-        <div class="progress-tips">
-          <span class="tips-icon">💡</span>
-          <span class="tips-content">你的{{ activePath.name }}路径整体进度正常，建议加快「{{ delayedMilestoneName }}」的推进，避免影响后续阶段。</span>
-        </div>
-      </div>
-    </div>
+    </footer>
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import Chart from 'chart.js/auto'
+<script>
+import axios from 'axios';
+import { ref, onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
+import Chart from 'chart.js/auto';
 
-// 初始化路由实例
-const router = useRouter()
-
-// 页面核心数据
-const pathTypes = ref([
-  {
-    id: 1,
-    icon: '👨💼',
-    name: '互联网产品经理',
-    description: '从产品助理到资深产品经理的完整成长路径',
-    color: '#1890ff',
-    progress: 35,
-    createTime: '2026-01-15',
-    targetTime: '2028-01-15'
-  },
-  {
-    id: 2,
-    icon: '🎓',
-    name: '计算机考研深造',
-    description: '从基础复习到复试录取的全流程规划',
-    color: '#52c41a',
-    progress: 60,
-    createTime: '2026-02-01',
-    targetTime: '2027-12-31'
-  },
-  {
-    id: 3,
-    icon: '💼',
-    name: '国企行政岗',
-    description: '从校招准备到职场晋升的发展规划',
-    color: '#faad14',
-    progress: 15,
-    createTime: '2026-02-10',
-    targetTime: '2029-02-10'
+// 全局取消axios的token参数（避免自动拼接）
+axios.interceptors.request.use(config => {
+  // 移除所有token相关参数
+  if (config.params && config.params.token) {
+    delete config.params.token;
   }
-])
-
-// 激活的路径ID和详情
-const activePathId = ref(1)
-const activePath = ref(pathTypes.value[0])
-
-// 阶段数据（以产品经理路径为例）
-const stageData = ref([
-  {
-    name: '基础积累期',
-    period: '2026.01-2026.06',
-    status: 'completed', // pending/ongoing/completed
-    goals: [
-      { content: '掌握产品经理基础理论知识', completed: true },
-      { content: '学习Axure、Figma等产品工具', completed: true },
-      { content: '完成2个产品原型设计练习', completed: false },
-      { content: '阅读5本产品经理经典书籍', completed: true }
-    ],
-    milestones: [
-      { name: '产品工具认证考试', date: '2026-03-15' },
-      { name: '完成第一个完整产品原型', date: '2026-05-20' }
-    ]
-  },
-  {
-    name: '实践提升期',
-    period: '2026.07-2027.01',
-    status: 'ongoing',
-    goals: [
-      { content: '找到产品助理实习岗位', completed: true },
-      { content: '参与1个完整的产品迭代周期', completed: false },
-      { content: '独立完成1个小功能的需求文档', completed: false },
-      { content: '积累10个用户访谈经验', completed: false }
-    ],
-    milestones: [
-      { name: '转正为正式产品助理', date: '2026-10-01' },
-      { name: '完成首次独立需求交付', date: '2026-12-15' }
-    ]
-  },
-  {
-    name: '能力进阶期',
-    period: '2027.02-2027.08',
-    status: 'pending',
-    goals: [
-      { content: '负责1个核心模块的产品规划', completed: false },
-      { content: '主导1次产品版本迭代', completed: false },
-      { content: '建立产品数据监控体系', completed: false },
-      { content: '考取PMP项目管理证书', completed: false }
-    ],
-    milestones: [
-      { name: '晋升为初级产品经理', date: '2027-05-01' },
-      { name: 'PMP证书考试通过', date: '2027-07-20' }
-    ]
-  },
-  {
-    name: '资深发展期',
-    period: '2027.09-2028.01',
-    status: 'pending',
-    goals: [
-      { content: '独立负责1个产品线', completed: false },
-      { content: '制定产品年度规划', completed: false },
-      { content: '搭建产品团队协作体系', completed: false },
-      { content: '形成个人产品方法论', completed: false }
-    ],
-    milestones: [
-      { name: '晋升为资深产品经理', date: '2028-01-01' },
-      { name: '完成年度产品目标', date: '2028-01-15' }
-    ]
+  // 移除Authorization头（如果有）
+  if (config.headers && config.headers.Authorization) {
+    delete config.headers.Authorization;
   }
-])
+  return config;
+});
 
-// 初始化激活路径的阶段数据
-activePath.value.stages = stageData.value
-
-// 当前阶段索引
-const currentStage = ref(1)
-
-// 标签页切换
-const activeTab = ref('learning')
-
-// 学习资源数据
-const learningResources = ref([
-  {
-    id: 1,
-    icon: '📚',
-    color: '#1890ff',
-    title: '产品经理入门到精通',
-    description: '系统学习产品经理核心技能，包含需求分析、原型设计、项目管理等',
-    duration: '3个月',
-    priority: '高'
-  },
-  {
-    id: 2,
-    icon: '🎥',
-    color: '#52c41a',
-    title: 'Axure原型设计实战课',
-    description: '从零基础到独立完成复杂产品原型，包含交互设计、组件复用等技巧',
-    duration: '1个月',
-    priority: '高'
-  },
-  {
-    id: 3,
-    icon: '📝',
-    color: '#faad14',
-    title: 'PRD需求文档写作指南',
-    description: '学习专业的需求文档撰写规范，提升需求表达和沟通效率',
-    duration: '2周',
-    priority: '中'
-  },
-  {
-    id: 4,
-    icon: '📊',
-    color: '#ff7a45',
-    title: '产品数据分析实战',
-    description: '掌握产品数据监控、分析方法，用数据驱动产品决策',
-    duration: '1.5个月',
-    priority: '中'
-  }
-])
-
-// 导师列表数据
-const mentorList = ref([
-  {
-    id: 1,
-    avatar: 'https://picsum.photos/seed/mentor1/64/64',
-    name: '张经理',
-    title: '资深产品经理',
-    field: '互联网产品、电商产品、用户增长',
-    introduction: '10年产品经理经验，曾主导多个千万级用户产品的规划与落地',
-    services: ['1v1咨询', '简历指导', '模拟面试', '职业规划']
-  },
-  {
-    id: 2,
-    avatar: 'https://picsum.photos/seed/mentor2/64/64',
-    name: '李总监',
-    title: '产品总监',
-    field: 'ToB产品、企业服务、SaaS产品',
-    introduction: '8年ToB产品经验，擅长产品商业化和生态搭建',
-    services: ['1v1咨询', '项目指导', '行业分析', '资源对接']
-  }
-])
-
-// 实践机会数据
-const practiceList = ref([
-  {
-    id: 1,
-    type: '实习',
-    color: '#1890ff',
-    title: '互联网大厂产品助理实习',
-    description: '参与电商产品的需求分析、原型设计和用户调研工作，有导师带教',
-    requirements: ['产品基础', 'Axure', '沟通能力', '每周4天']
-  },
-  {
-    id: 2,
-    type: '项目',
-    color: '#52c41a',
-    title: '校园产品创新大赛',
-    description: '组队参与产品创新大赛，从0到1设计一款校园产品，有行业评委点评',
-    requirements: ['创新思维', '团队协作', '原型设计', '路演能力']
-  },
-  {
-    id: 3,
-    type: '兼职',
-    color: '#faad14',
-    title: '初创公司产品顾问',
-    description: '为初创公司提供产品规划建议，参与产品需求评审和迭代决策',
-    requirements: ['产品思维', '行业认知', '独立思考', '时间灵活']
-  }
-])
-
-// 进度统计数据
-const completedStages = ref(1)
-const totalStages = ref(4)
-const completedGoals = ref(3)
-const totalGoals = ref(16)
-const delayedMilestones = ref(1)
-const overallProgress = ref(35)
-const delayedMilestoneName = ref('完成第一个完整产品原型')
-
-// 选择发展路径
-const selectPathType = (id) => {
-  activePathId.value = id
-  const selectedPath = pathTypes.value.find(item => item.id === id)
-  activePath.value = selectedPath
-  
-  // 模拟不同路径的阶段数据（实际项目中可从接口获取）
-  if (id === 2) {
-    activePath.value.stages = [
-      {
-        name: '基础复习期',
-        period: '2026.02-2026.06',
-        status: 'completed',
-        goals: [{ content: '完成数学一轮复习', completed: true }, { content: '英语单词背诵完毕', completed: true }],
-        milestones: [{ name: '基础阶段测试', date: '2026-06-30' }]
-      },
-      {
-        name: '强化提升期',
-        period: '2026.07-2026.10',
-        status: 'ongoing',
-        goals: [{ content: '专业课一轮复习', completed: false }, { content: '真题刷题训练', completed: false }],
-        milestones: [{ name: '强化阶段模考', date: '2026-10-31' }]
-      },
-      {
-        name: '冲刺备考期',
-        period: '2026.11-2026.12',
-        status: 'pending',
-        goals: [{ content: '全真模拟考试', completed: false }, { content: '查漏补缺', completed: false }],
-        milestones: [{ name: '考研初试', date: '2026-12-24' }]
-      },
-      {
-        name: '复试准备期',
-        period: '2027.02-2027.03',
-        status: 'pending',
-        goals: [{ content: '复试专业课复习', completed: false }, { content: '面试模拟训练', completed: false }],
-        milestones: [{ name: '考研复试', date: '2027-03-15' }]
-      }
-    ]
-  } else if (id === 3) {
-    activePath.value.stages = [
-      {
-        name: '备考准备期',
-        period: '2026.02-2026.06',
-        status: 'pending',
-        goals: [{ content: '了解考公政策和岗位', completed: false }, { content: '购买备考资料', completed: true }],
-        milestones: [{ name: '确定报考岗位', date: '2026-06-30' }]
-      },
-      {
-        name: '基础学习期',
-        period: '2026.07-2026.10',
-        status: 'pending',
-        goals: [{ content: '行测基础学习', completed: false }, { content: '申论基础学习', completed: false }],
-        milestones: [{ name: '基础阶段测试', date: '2026-10-31' }]
-      },
-      {
-        name: '强化刷题期',
-        period: '2026.11-2027.02',
-        status: 'pending',
-        goals: [{ content: '行测真题刷题', completed: false }, { content: '申论写作训练', completed: false }],
-        milestones: [{ name: '强化阶段模考', date: '2027-02-28' }]
-      },
-      {
-        name: '冲刺备考期',
-        period: '2027.03-2027.11',
-        status: 'pending',
-        goals: [{ content: '全真模拟考试', completed: false }, { content: '查漏补缺', completed: false }],
-        milestones: [{ name: '公务员考试', date: '2027-11-26' }]
-      }
-    ]
-  } else {
-    activePath.value.stages = stageData.value
-  }
-  
-  // 更新进度数据
-  updateProgressStats()
-}
-
-// 更新进度统计
-const updateProgressStats = () => {
-  let completed = 0
-  let total = 0
-  let goalCompleted = 0
-  let goalTotal = 0
-  
-  activePath.value.stages.forEach(stage => {
-    if (stage.status === 'completed') completed++
-    total++
+export default {
+  name: 'Home',
+  setup() {
+    const router = useRouter();
     
-    stage.goals.forEach(goal => {
-      if (goal.completed) goalCompleted++
-      goalTotal++
-    })
-  })
-  
-  completedStages.value = completed
-  totalStages.value = total
-  completedGoals.value = goalCompleted
-  totalGoals.value = goalTotal
-  overallProgress.value = Math.round((completed / total) * 100)
-  
-  // 重新初始化进度图表
-  initProgressChart()
-}
+    // 响应式数据
+    const isLogin = ref(true); // 模拟已登录
+    const userAvatar = ref('https://picsum.photos/200/200?random=1');
+    const showUserMenu = ref(false);
+    const searchKeyword = ref('');
+    const hotJobs = ref([]);
+    const industryTrends = ref([]);
+    const industryChart = ref(null);
+    const theme = ref('light');
 
-// 获取阶段状态颜色
-const getStageColor = (status) => {
-  switch(status) {
-    case 'completed': return '#52c41a'
-    case 'ongoing': return '#1890ff'
-    case 'pending': return '#d9d9d9'
-    default: return '#d9d9d9'
-  }
-}
+    // 模拟行业趋势数据（如果接口调用失败则使用）
+    const mockIndustryTrends = [
+      { industry: '人工智能', description: '人才需求持续增长，算法工程师缺口最大', growth_rate: '+25%' },
+      { industry: '大数据', description: '数据分析师、数据工程师需求激增', growth_rate: '+20%' },
+      { industry: '云计算', description: '云原生工程师成为热门岗位', growth_rate: '+18%' },
+      { industry: '新能源', description: '光伏、储能领域人才需求翻倍', growth_rate: '+30%' },
+      { industry: '生物医药', description: '研发岗位需求持续上升', growth_rate: '+15%' }
+    ];
 
-// 获取阶段状态图标
-const getStageIcon = (status) => {
-  switch(status) {
-    case 'completed': return '✓'
-    case 'ongoing': return '▶'
-    case 'pending': return '○'
-    default: return '○'
-  }
-}
+    // 模拟热门岗位数据（如果接口调用失败则使用）
+    const mockHotJobs = [
+      { id: 1, job_name: '算法工程师', salary_range: '20K-40K', company: '字节跳动', location: '北京', industry: '人工智能', company_size: '10000+' },
+      { id: 2, job_name: '数据分析师', salary_range: '15K-25K', company: '阿里巴巴', location: '杭州', industry: '大数据', company_size: '10000+' },
+      { id: 3, job_name: '前端开发工程师', salary_range: '18K-30K', company: '腾讯', location: '深圳', industry: '互联网', company_size: '10000+' },
+      { id: 4, job_name: '新能源工程师', salary_range: '16K-28K', company: '宁德时代', location: '宁德', industry: '新能源', company_size: '10000+' },
+      { id: 5, job_name: '产品经理', salary_range: '18K-35K', company: '美团', location: '北京', industry: '互联网', company_size: '10000+' },
+      { id: 6, job_name: '生物医药研发', salary_range: '15K-30K', company: '恒瑞医药', location: '上海', industry: '生物医药', company_size: '5000-10000' }
+    ];
 
-// 获取阶段状态文本
-const getStageStatusText = (status) => {
-  switch(status) {
-    case 'completed': return '已完成'
-    case 'ongoing': return '进行中'
-    case 'pending': return '未开始'
-    default: return '未开始'
-  }
-}
-
-// 切换标签页
-const switchTab = (tab) => {
-  activeTab.value = tab
-}
-
-// 开始阶段
-const startStage = (index) => {
-  activePath.value.stages[index].status = 'ongoing'
-  currentStage.value = index
-  updateProgressStats()
-  alert(`已开始「${activePath.value.stages[index].name}」阶段！`)
-}
-
-// 完成阶段
-const completeStage = (index) => {
-  activePath.value.stages[index].status = 'completed'
-  updateProgressStats()
-  alert(`已完成「${activePath.value.stages[index].name}」阶段！`)
-  
-  // 自动切换到下一个未开始的阶段
-  const nextStage = activePath.value.stages.findIndex((stage, i) => i > index && stage.status === 'pending')
-  if (nextStage > -1) {
-    currentStage.value = nextStage
-  }
-}
-
-// 查看阶段详情
-const viewStageDetail = (index) => {
-  router.push({
-    path: '/detail',
-    query: { 
-      type: 'stage',
-      pathId: activePathId.value,
-      stageIndex: index
-    }
-  })
-}
-
-// 编辑里程碑
-const editMilestone = (stageIndex, milestoneIndex) => {
-  const newDate = prompt('请输入新的里程碑日期（格式：YYYY-MM-DD）：', activePath.value.stages[stageIndex].milestones[milestoneIndex].date)
-  if (newDate) {
-    activePath.value.stages[stageIndex].milestones[milestoneIndex].date = newDate
-    alert('里程碑日期已更新！')
-  }
-}
-
-// 访问学习资源
-const accessResource = (id) => {
-  router.push({
-    path: '/resource-library',
-    query: { id, type: 'learning' }
-  })
-}
-
-// 咨询导师
-const consultMentor = (id) => {
-  router.push({
-    path: '/detail',
-    query: { id, type: 'mentor' }
-  })
-}
-
-// 申请实践机会
-const applyPractice = (id) => {
-  router.push({
-    path: '/detail',
-    query: { id, type: 'practice' }
-  })
-}
-
-// 新建规划路径
-const createNewPath = () => {
-  const pathName = prompt('请输入新的发展路径名称：')
-  if (pathName) {
-    const newId = pathTypes.value.length + 1
-    pathTypes.value.push({
-      id: newId,
-      icon: '🎯',
-      name: pathName,
-      description: '自定义的职业发展路径',
-      color: '#722ed1',
-      progress: 0,
-      createTime: new Date().toISOString().split('T')[0],
-      targetTime: new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0]
-    })
-    selectPathType(newId)
-    alert(`已创建新的发展路径「${pathName}」！`)
-  }
-}
-
-// 保存规划路径
-const savePath = () => {
-  // 模拟保存到后端
-  alert(`「${activePath.value.name}」路径规划已保存成功！`)
-}
-
-// 分享规划路径
-const sharePath = () => {
-  const shareType = prompt('请选择分享方式：1-链接 2-图片 3-PDF', '1')
-  switch(shareType) {
-    case '1':
-      alert(`分享链接：https://career-plan.com/share/${activePathId.value}`)
-      break
-    case '2':
-    case '3':
-      alert(`正在生成${shareType === '2' ? '图片' : 'PDF'}格式的规划路径，稍后发送到你的邮箱！`)
-      break
-    default:
-      alert('分享方式选择错误！')
-  }
-}
-
-// 编辑路径类型
-const editPathType = () => {
-  const newName = prompt('请输入新的路径名称：', activePath.value.name)
-  if (newName) {
-    activePath.value.name = newName
-    const index = pathTypes.value.findIndex(item => item.id === activePathId.value)
-    pathTypes.value[index].name = newName
-    alert('路径名称已更新！')
-  }
-}
-
-// 初始化进度图表
-const initProgressChart = () => {
-  const ctx = document.getElementById('progressChart')
-  if (ctx) {
-    // 销毁已存在的图表
-    if (window.progressChartInstance) {
-      window.progressChartInstance.destroy()
-    }
-    
-    // 提取阶段数据
-    const labels = activePath.value.stages.map(stage => stage.name)
-    const completedGoals = activePath.value.stages.map(stage => {
-      return stage.goals.filter(goal => goal.completed).length
-    })
-    const totalGoals = activePath.value.stages.map(stage => stage.goals.length)
-    
-    // 创建图表
-    window.progressChartInstance = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: labels,
-        datasets: [
-          {
-            label: '已完成目标',
-            data: completedGoals,
-            backgroundColor: 'rgba(82, 196, 26, 0.7)',
-            borderColor: 'rgba(82, 196, 26, 1)',
-            borderWidth: 1
-          },
-          {
-            label: '总目标数',
-            data: totalGoals,
-            backgroundColor: 'rgba(201, 203, 207, 0.7)',
-            borderColor: 'rgba(201, 203, 207, 1)',
-            borderWidth: 1
+    // 方法：获取热门岗位（彻底移除token参数）
+    const fetchHotJobs = async () => {
+      try {
+        console.log('开始请求热门岗位数据，路径：/api/jobs/simple_search');
+        // 纯请求，不带任何token参数
+        const response = await axios.get('http://localhost:5000/api/jobs/simple_search', {
+          params: {
+            page: 1,
+            size: 6
           }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            beginAtZero: true,
-            title: {
-              display: true,
-              text: '目标数量'
+        });
+        hotJobs.value = response.data;
+        console.log('热门岗位数据获取成功:', hotJobs.value);
+      } catch (error) {
+        console.error('获取热门岗位失败:', error.message);
+        // 强制使用模拟数据，避免接口错误影响页面
+        hotJobs.value = mockHotJobs;
+      }
+    };
+
+    // 方法：获取行业趋势（彻底移除token参数）
+    const fetchIndustryTrends = async () => {
+      try {
+        console.log('开始请求行业数据，路径：/api/jobs/industries');
+        const response = await axios.get('http://localhost:5000/api/jobs/industries');
+        const industries = response.data;
+        
+        // 生成趋势数据
+        industryTrends.value = industries.slice(0, 5).map(industry => ({
+          industry,
+          description: `${industry}行业人才需求持续增长`,
+          growth_rate: `+${Math.floor(Math.random() * 20 + 10)}%`
+        }));
+      } catch (error) {
+        console.error('获取行业趋势失败:', error.message);
+        // 强制使用模拟数据
+        industryTrends.value = mockIndustryTrends;
+      }
+    };
+
+    // 方法：初始化行业图表
+    const initIndustryChart = () => {
+      const ctx = document.getElementById('industryChart');
+      if (ctx) {
+        const labels = industryTrends.value.map(item => item.industry);
+        const growthRates = industryTrends.value.map(item => 
+          parseInt(item.growth_rate.replace(/\+|%/g, ''))
+        );
+
+        // 销毁旧图表（避免重复初始化）
+        if (industryChart.value) {
+          industryChart.value.destroy();
+        }
+
+        industryChart.value = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: '行业增长率',
+              data: growthRates,
+              backgroundColor: [
+                'rgba(255, 99, 132, 0.7)',
+                'rgba(54, 162, 235, 0.7)',
+                'rgba(255, 206, 86, 0.7)',
+                'rgba(75, 192, 192, 0.7)',
+                'rgba(153, 102, 255, 0.7)'
+              ],
+              borderColor: [
+                'rgba(255, 99, 132, 1)',
+                'rgba(54, 162, 235, 1)',
+                'rgba(255, 206, 86, 1)',
+                'rgba(75, 192, 192, 1)',
+                'rgba(153, 102, 255, 1)'
+              ],
+              borderWidth: 1
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  callback: function(value) {
+                    return value + '%';
+                  }
+                }
+              }
             }
           }
-        }
+        });
       }
-    })
-  }
-}
+    };
 
-// 页面挂载时初始化图表
-onMounted(() => {
-  updateProgressStats()
-  initProgressChart()
-})
+    // 方法：处理搜索（调用你的 /api/jobs/search 接口）
+    const handleSearch = () => {
+      if (!searchKeyword.value.trim()) {
+        alert('请输入搜索关键词');
+        return;
+      }
+      // 跳转到搜索结果页并传递参数（不带token）
+      router.push({
+        path: '/job-search',
+        query: {
+          keyword: searchKeyword.value
+        }
+      });
+    };
+
+    // 辅助方法：获取岗位标签
+    const getJobTags = (job) => {
+      const tags = [];
+      if (job.company_size) tags.push(job.company_size);
+      if (job.industry) tags.push(job.industry);
+      return tags;
+    };
+
+    // 辅助方法：获取行业图标
+    const getIndustryIcon = (industry) => {
+      const icons = {
+        '人工智能': '🤖',
+        '大数据': '📊',
+        '云计算': '☁️',
+        '新能源': '⚡',
+        '生物医药': '💊',
+        '互联网': '🌐'
+      };
+      return icons[industry] || '🏢';
+    };
+
+    // 方法：切换用户菜单
+    const toggleUserMenu = () => {
+      showUserMenu.value = !showUserMenu.value;
+    };
+
+    // 方法：退出登录
+    const logout = () => {
+      isLogin.value = false;
+      showUserMenu.value = false;
+      // 清空本地存储
+      localStorage.removeItem('token');
+      router.push('/login');
+    };
+
+    // 方法：切换主题
+    const toggleTheme = () => {
+      theme.value = theme.value === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', theme.value);
+      // 更新按钮图标
+      const btn = document.querySelector('.btn-toggle-theme');
+      btn.textContent = theme.value === 'light' ? '🌙' : '☀️';
+    };
+
+    // 方法：跳转到功能页面
+    const goToFeature = (feature) => {
+      const routes = {
+        '测评': '/career-assessment',
+        '分析': '/job-portrait',
+        '规划': '/career-planning',
+        '导出': '/report-export'
+      };
+      router.push(routes[feature] || '/');
+    };
+
+    // 生命周期：挂载时
+    onMounted(async () => {
+      // 初始化主题
+      document.documentElement.setAttribute('data-theme', theme.value);
+      
+      // 获取数据（使用Promise.all确保并行请求）
+      await Promise.all([
+        fetchHotJobs(),
+        fetchIndustryTrends()
+      ]);
+      
+      // 初始化图表
+      initIndustryChart();
+
+      // 点击外部关闭用户菜单
+      document.addEventListener('click', (e) => {
+        const profile = document.querySelector('.user-profile');
+        if (profile && !profile.contains(e.target)) {
+          showUserMenu.value = false;
+        }
+      });
+    });
+
+    // 生命周期：卸载时
+    onUnmounted(() => {
+      // 销毁图表
+      if (industryChart.value) {
+        industryChart.value.destroy();
+      }
+    });
+
+    return {
+      isLogin,
+      userAvatar,
+      showUserMenu,
+      searchKeyword,
+      hotJobs,
+      industryTrends,
+      handleSearch,
+      getJobTags,
+      getIndustryIcon,
+      toggleUserMenu,
+      logout,
+      toggleTheme,
+      goToFeature
+    };
+  }
+};
 </script>
 
 <style scoped>
-/* 全局样式 */
-.development-path {
-  width: 1200px;
+/* 基础样式 */
+.career-home {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-color, #f8f9fa);
+  color: var(--text-color, #333);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* 顶部导航 */
+.top-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 70px;
+  background-color: white;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  background-color: var(--nav-bg, #ffffff);
+}
+
+.nav-wrap {
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 20px 0 50px;
-  font-family: "Microsoft Yahei", sans-serif;
-  color: #333;
-}
-
-/* 页面头部 */
-.page-header {
-  margin-bottom: 30px;
-}
-.page-title {
-  font-size: 28px;
-  margin: 0 0 8px 0;
-  color: #2f54eb;
-}
-.page-desc {
-  font-size: 16px;
-  color: #666;
-  margin: 0 0 15px 0;
-}
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-.btn-new, .btn-save, .btn-share, .btn-edit {
-  padding: 8px 15px;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-}
-.btn-new {
-  background: #2f54eb;
-  color: #fff;
-}
-.btn-save {
-  background: #52c41a;
-  color: #fff;
-}
-.btn-share {
-  background: #faad14;
-  color: #fff;
-}
-.btn-edit {
-  background: #f5f7fa;
-  color: #2f54eb;
-  padding: 4px 8px;
-  font-size: 12px;
-}
-
-/* 路径选择区 */
-.path-select-section {
-  margin-bottom: 40px;
-}
-.select-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-}
-.section-subtitle {
-  font-size: 20px;
-  margin: 0;
-  color: #333;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #e8e8e8;
-}
-.path-type-cards {
-  display: flex;
-  gap: 20px;
-}
-.path-type-card {
-  flex: 1;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  padding: 20px;
-  cursor: pointer;
-  transition: all 0.3s;
-  border: 2px solid transparent;
-}
-.path-type-card.active {
-  border-color: #2f54eb;
-  box-shadow: 0 4px 12px rgba(47,84,235,0.1);
-}
-.path-type-card:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-.card-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  color: #fff;
-  margin-bottom: 15px;
-}
-.card-title {
-  font-size: 18px;
-  margin: 0 0 8px 0;
-}
-.card-desc {
-  font-size: 14px;
-  color: #666;
-  margin: 0 0 10px 0;
-  line-height: 1.6;
-}
-.card-progress {
-  width: 100%;
-}
-.progress-bar {
-  height: 6px;
-  background: #f5f7fa;
-  border-radius: 3px;
-  overflow: hidden;
-  margin-bottom: 5px;
-}
-.progress-fill {
   height: 100%;
-  background: #52c41a;
-  border-radius: 3px;
-  transition: width 0.3s;
-}
-.progress-text {
-  font-size: 12px;
-  color: #999;
-}
-
-/* 核心规划区 */
-.core-plan-section {
-  margin-bottom: 40px;
-}
-.path-info-card {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  padding: 20px;
-  margin-bottom: 20px;
-}
-.info-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  padding: 0 20px;
 }
-.info-title {
-  font-size: 18px;
-  margin: 0;
-  color: #2f54eb;
-}
-.info-meta {
-  font-size: 12px;
-  color: #999;
+
+.nav-left {
   display: flex;
-  gap: 15px;
+  align-items: center;
 }
-.info-content {
+
+.logo {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.info-item {
-  display: flex;
-  gap: 10px;
-}
-.info-label {
+  align-items: center;
+  font-size: 1.2rem;
   font-weight: bold;
-  min-width: 80px;
-  color: #333;
-}
-.info-value {
-  flex: 1;
-  margin: 0;
-  color: #666;
-  line-height: 1.6;
+  margin-right: 40px;
 }
 
-/* 时间线样式 */
-.timeline-section {
-  margin-bottom: 40px;
+.logo-icon {
+  font-size: 1.5rem;
+  margin-right: 8px;
 }
-.timeline-container {
-  position: relative;
-  padding-left: 40px;
-}
-.timeline-track {
-  position: absolute;
-  left: 15px;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: #e8e8e8;
-}
-.timeline-item {
-  position: relative;
-  margin-bottom: 30px;
-}
-.timeline-dot {
-  position: absolute;
-  left: -40px;
-  top: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+
+.nav-menu {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 14px;
-  z-index: 1;
-}
-.timeline-content {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  padding: 20px;
-  border-left: 3px solid #1890ff;
-}
-.timeline-item.current .timeline-content {
-  border-left-color: #2f54eb;
-  box-shadow: 0 4px 12px rgba(47,84,235,0.1);
-}
-.stage-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-}
-.stage-title {
-  font-size: 18px;
-  margin: 0;
-}
-.stage-period {
-  font-size: 14px;
-  color: #999;
-  font-weight: normal;
-  margin-left: 10px;
-}
-.stage-status {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  color: #fff;
-}
-.stage-goals, .stage-milestones {
-  margin-bottom: 15px;
-}
-.goals-title, .milestones-title {
-  font-size: 14px;
-  margin: 0 0 8px 0;
-  color: #333;
-}
-.goals-list {
   list-style: none;
+  margin: 0;
   padding: 0;
+}
+
+.menu-item {
+  margin: 0 15px;
+  padding: 8px 0;
+  cursor: pointer;
+  position: relative;
+  font-size: 0.95rem;
+}
+
+.menu-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: #4096ff;
+}
+
+.menu-item.dropdown:hover .dropdown-menu {
+  display: block;
+}
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background-color: white;
+  min-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  padding: 10px 0;
+  z-index: 1001;
+  list-style: none;
   margin: 0;
 }
-.goals-list li {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 5px;
-}
-.goals-list li input {
-  margin-top: 4px;
-}
-.goals-list li label {
-  flex: 1;
-  font-size: 14px;
-  color: #666;
+
+.dropdown-item {
+  padding: 8px 20px;
   cursor: pointer;
-}
-.goals-list li label.completed {
-  text-decoration: line-through;
-  color: #999;
-}
-.milestones-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.milestone-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 14px;
 }
-.milestone-icon {
-  color: #faad14;
+
+.dropdown-item:hover {
+  background-color: #f5f7fa;
 }
-.milestone-content {
-  flex: 1;
+
+.color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+  display: inline-block;
+}
+
+.color-dot.red { background-color: #ff4d4f; }
+.color-dot.orange { background-color: #fa8c16; }
+.color-dot.green { background-color: #52c41a; }
+.color-dot.blue { background-color: #1890ff; }
+
+/* 导航右侧 */
+.nav-right {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
 }
-.milestone-name {
-  color: #333;
+
+/* 导航栏搜索框样式 */
+.nav-search-wrap {
+  display: flex;
+  align-items: center;
+  background-color: #f5f7fa;
+  border-radius: 20px;
+  padding: 0 15px;
+  height: 36px;
+  width: 300px;
 }
-.milestone-date {
-  color: #999;
-  font-size: 12px;
-}
-.milestone-btn {
+
+.nav-search-input {
+  flex: 1;
+  border: none;
   background: transparent;
-  border: none;
-  color: #999;
-  cursor: pointer;
-  font-size: 12px;
-  padding: 2px 5px;
-}
-.milestone-btn:hover {
-  color: #2f54eb;
-}
-.stage-actions {
-  display: flex;
-  gap: 10px;
-}
-.btn-start, .btn-complete, .btn-detail {
-  padding: 6px 12px;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  font-size: 12px;
-}
-.btn-start {
-  background: #e6f7ff;
-  color: #1890ff;
-}
-.btn-complete {
-  background: #f6ffed;
-  color: #52c41a;
-}
-.btn-detail {
-  background: #f5f7fa;
-  color: #666;
+  outline: none;
+  font-size: 0.9rem;
+  padding: 0 5px;
 }
 
-/* 资源与支持 */
-.resource-support-section {
-  margin-bottom: 40px;
-}
-.support-tabs {
-  display: flex;
-  gap: 0;
-  background: #f5f7fa;
-  border-radius: 8px 8px 0 0;
-  overflow: hidden;
-  margin-bottom: 0;
-}
-.tab-item {
-  padding: 10px 20px;
-  font-size: 14px;
+.nav-search-btn {
+  border: none;
+  background: transparent;
+  color: #4096ff;
   cursor: pointer;
-  border-bottom: 2px solid transparent;
-}
-.tab-item.active {
-  background: #fff;
-  color: #2f54eb;
-  border-bottom-color: #2f54eb;
-}
-.support-content {
-  background: #fff;
-  border-radius: 0 0 8px 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  padding: 20px;
+  font-size: 0.9rem;
 }
 
-/* 学习资源样式 */
-.learning-resource {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-.resource-item {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  padding: 15px;
-  background: #f8f9fa;
-  border-radius: 8px;
-}
-.resource-icon {
+.btn-toggle-theme {
+  border: none;
+  background: transparent;
+  font-size: 1.2rem;
+  cursor: pointer;
   width: 40px;
   height: 40px;
-  border-radius: 8px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
-  color: #fff;
-}
-.resource-info {
-  flex: 1;
-}
-.resource-title {
-  font-size: 16px;
-  margin: 0 0 5px 0;
-}
-.resource-desc {
-  font-size: 14px;
-  color: #666;
-  margin: 0 0 5px 0;
-  line-height: 1.6;
-}
-.resource-meta {
-  display: flex;
-  gap: 15px;
-  font-size: 12px;
-  color: #999;
-}
-.resource-action, .mentor-action, .practice-action {
-  padding: 8px 15px;
-  border-radius: 4px;
-  border: none;
-  background: #2f54eb;
-  color: #fff;
-  cursor: pointer;
-  font-size: 14px;
+  transition: background-color 0.2s;
 }
 
-/* 导师指导样式 */
-.mentor-support {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
+.btn-toggle-theme:hover {
+  background-color: #f5f7fa;
 }
-.mentor-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 15px;
-  padding: 15px;
-  background: #f8f9fa;
-  border-radius: 8px;
+
+.btn-login, .btn-register {
+  padding: 6px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
 }
-.mentor-avatar {
-  width: 64px;
-  height: 64px;
+
+.btn-login {
+  border: 1px solid #4096ff;
+  background-color: transparent;
+  color: #4096ff;
+}
+
+.btn-login:hover {
+  background-color: #e6f7ff;
+}
+
+.btn-register {
+  border: 1px solid #4096ff;
+  background-color: #4096ff;
+  color: white;
+}
+
+.btn-register:hover {
+  background-color: #1890ff;
+}
+
+.user-profile {
+  position: relative;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
+  cursor: pointer;
   object-fit: cover;
 }
-.mentor-info {
-  flex: 1;
-}
-.mentor-name {
-  font-size: 16px;
-  margin: 0 0 5px 0;
-}
-.mentor-title {
-  font-size: 12px;
-  color: #999;
-  font-weight: normal;
-  margin-left: 8px;
-}
-.mentor-field {
-  font-size: 14px;
-  color: #666;
-  margin: 0 0 5px 0;
-}
-.mentor-intro {
-  font-size: 14px;
-  color: #666;
-  margin: 0 0 8px 0;
-  line-height: 1.6;
-}
-.mentor-service {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.service-tag {
-  padding: 2px 8px;
-  background: #e6f7ff;
-  color: #1890ff;
-  border-radius: 4px;
-  font-size: 12px;
-}
 
-/* 实践机会样式 */
-.practice-opportunity {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-.practice-item {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 15px;
-  background: #f8f9fa;
-  border-radius: 8px;
-}
-.practice-tag {
-  align-self: flex-start;
-  padding: 2px 8px;
+.user-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background-color: white;
+  min-width: 120px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   border-radius: 4px;
-  color: #fff;
-  font-size: 12px;
-  font-weight: bold;
-}
-.practice-info {
-  flex: 1;
-}
-.practice-title {
-  font-size: 16px;
-  margin: 0 0 5px 0;
-}
-.practice-desc {
-  font-size: 14px;
-  color: #666;
-  margin: 0 0 8px 0;
-  line-height: 1.6;
-}
-.practice-requirement {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-.practice-requirement label {
-  font-size: 14px;
-  color: #333;
-  font-weight: bold;
-}
-.requirement-tag {
-  padding: 2px 8px;
-  background: #fffbe6;
-  color: #faad14;
-  border-radius: 4px;
-  font-size: 12px;
-}
-
-/* 进度跟踪 */
-.progress-tracking-section {
-  margin-bottom: 20px;
-}
-.progress-overview {
-  display: flex;
-  gap: 20px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  padding: 20px;
-}
-.progress-chart {
-  flex: 2;
-  height: 250px;
-}
-.progress-stats {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 20px;
-}
-.stat-item {
-  text-align: center;
-}
-.stat-value {
-  font-size: 28px;
-  font-weight: bold;
-  color: #2f54eb;
-  margin: 0 0 5px 0;
-}
-.stat-label {
-  font-size: 14px;
-  color: #666;
+  padding: 8px 0;
+  z-index: 1001;
+  list-style: none;
   margin: 0;
 }
-.progress-tips {
-  margin-top: 15px;
-  padding: 10px 15px;
-  background: #fffbe6;
-  border-radius: 4px;
+
+.user-menu li {
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.user-menu li:hover {
+  background-color: #f5f7fa;
+}
+
+/* 主内容区 */
+.home-content {
+  flex: 1;
+  margin-top: 70px;
+  padding-bottom: 60px;
+}
+
+/* 英雄区 */
+.hero-section {
+  position: relative;
+  height: 500px;
   display: flex;
   align-items: center;
+  overflow: hidden;
+}
+
+.hero-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #e6f7ff 0%, #f0f8fb 100%);
+  z-index: 1;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 2;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.hero-title {
+  font-size: 3rem;
+  font-weight: bold;
+  margin-bottom: 20px;
+  line-height: 1.3;
+}
+
+.highlight {
+  color: #4096ff;
+}
+
+.hero-desc {
+  font-size: 1.2rem;
+  color: #666;
+  margin-bottom: 40px;
+  max-width: 600px;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 20px;
+}
+
+.btn-primary, .btn-secondary {
+  padding: 12px 30px;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn-primary {
+  background-color: #4096ff;
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #1890ff;
+}
+
+.btn-secondary {
+  background-color: white;
+  color: #4096ff;
+  border: 1px solid #4096ff;
+}
+
+.btn-secondary:hover {
+  background-color: #e6f7ff;
+}
+
+/* 通用区块样式 */
+.features-section, .hot-jobs-section, .trends-section {
+  max-width: 1200px;
+  margin: 60px auto;
+  padding: 0 20px;
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 40px;
+  position: relative;
+}
+
+.hot-jobs-section .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+}
+
+.section-title {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.section-desc {
+  color: #666;
+  font-size: 1rem;
+}
+
+.btn-more {
+  padding: 8px 16px;
+  border: 1px solid #4096ff;
+  color: #4096ff;
+  background-color: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.btn-more:hover {
+  background-color: #e6f7ff;
+}
+
+/* 功能区块 */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 30px;
+}
+
+.feature-card {
+  background-color: white;
+  border-radius: 8px;
+  padding: 30px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.feature-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.feature-icon {
+  font-size: 3rem;
+  margin-bottom: 20px;
+}
+
+.feature-title {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.feature-desc {
+  color: #666;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+/* 热门岗位 */
+.jobs-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.job-card {
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition: box-shadow 0.3s;
+}
+
+.job-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.job-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.job-name {
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+.salary-range {
+  color: #ff7a45;
+  font-weight: bold;
+}
+
+.job-info {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.job-tags {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
-.tips-icon {
-  font-size: 16px;
+
+.tag {
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+  color: #666;
 }
-.tips-content {
-  font-size: 14px;
-  color: #faad14;
-  line-height: 1.6;
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}
+
+/* 行业趋势 */
+.trends-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+}
+
+.chart-container {
+  height: 300px;
+}
+
+.trends-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.trend-item {
+  display: flex;
+  gap: 15px;
+  padding: 15px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.trend-icon {
+  font-size: 2rem;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f5f7fa;
+  border-radius: 50%;
+}
+
+.trend-info {
+  flex: 1;
+}
+
+.industry-name {
+  font-size: 1.1rem;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.trend-desc {
+  color: #666;
+  font-size: 0.95rem;
+  margin-bottom: 8px;
+}
+
+.growth-rate {
+  color: #52c41a;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+/* 页脚 */
+.home-footer {
+  background-color: #f5f7fa;
+  padding: 40px 0;
+  margin-top: auto;
+}
+
+.footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.footer-logo {
+  margin-bottom: 10px;
+}
+
+.copyright {
+  color: #999;
+  font-size: 0.9rem;
+}
+
+.footer-links {
+  display: flex;
+  list-style: none;
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+}
+
+.footer-links a {
+  color: #666;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.footer-links a:hover {
+  color: #4096ff;
+}
+
+/* 暗黑模式样式 */
+[data-theme="dark"] {
+  --bg-color: #141414;
+  --text-color: #e5e5e5;
+  --nav-bg: #1f1f1f;
+}
+
+[data-theme="dark"] .feature-card,
+[data-theme="dark"] .job-card,
+[data-theme="dark"] .trend-item,
+[data-theme="dark"] .dropdown-menu,
+[data-theme="dark"] .user-menu {
+  background-color: #262626;
+  color: #e5e5e5;
+}
+
+[data-theme="dark"] .nav-search-wrap,
+[data-theme="dark"] .btn-toggle-theme:hover,
+[data-theme="dark"] .dropdown-item:hover,
+[data-theme="dark"] .user-menu li:hover {
+  background-color: #333;
+}
+
+[data-theme="dark"] .tag {
+  background-color: #333;
+  color: #e5e5e5;
+}
+
+/* 响应式样式 */
+@media (max-width: 992px) {
+  .features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .jobs-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .trends-content {
+    grid-template-columns: 1fr;
+  }
+  .hero-title {
+    font-size: 2.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .nav-menu {
+    display: none;
+  }
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
+  .jobs-grid {
+    grid-template-columns: 1fr;
+  }
+  .hero-title {
+    font-size: 2rem;
+  }
+  .nav-search-wrap {
+    width: 200px;
+  }
+}
+
+@media (max-width: 576px) {
+  .hero-section {
+    height: 400px;
+  }
+  .hero-title {
+    font-size: 1.8rem;
+  }
+  .hero-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .nav-search-wrap {
+    width: 150px;
+  }
 }
 </style>

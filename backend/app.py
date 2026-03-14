@@ -1,4 +1,3 @@
-# app.py
 import sys
 import os
 from dotenv import load_dotenv
@@ -18,7 +17,15 @@ from routes import register_blueprints
 app = Flask(__name__)
 # 设置 secret key（必须，用于 session 存储）
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-CORS(app)
+
+# ✅ 修复 1：配置 CORS 允许 credentials（保留 Cookie/Session）
+CORS(
+    app,
+    resources={r"/api/*": {
+        "origins": ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"],  # 允许前端所有可能的端口
+        "supports_credentials": True  # 核心：允许跨域传递 Cookie/Session
+    }}
+)
 
 # 初始化数据库
 with app.app_context():
@@ -45,4 +52,9 @@ def test_db():
         return jsonify({"status": "连接失败", "error": str(e)})
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # ✅ 修复 2：关闭 debug 避免多进程 + 修复 3：绑定 IPv4
+    app.run(
+        host='127.0.0.1',  # 明确绑定 IPv4，和前端代理匹配
+        port=5000,
+        debug=False  # 必须关闭 debug，避免多进程会话混乱
+    )
