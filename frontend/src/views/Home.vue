@@ -159,40 +159,22 @@
           <!-- 修改：筛选栏移到标题下方，移除重置按钮 -->
           <div class="job-filter">
             <div class="filter-tags">
+              <!-- 动态渲染岗位名称筛选标签 -->
               <span 
                 class="filter-tag" 
-                :class="{ active: filterJobType === '' }"
-                @click="filterJobType = ''; filterJobs()"
+                :class="{ active: filterJobName === '' }"
+                @click="filterJobName = ''; filterJobs()"
               >
                 全部岗位
               </span>
               <span 
                 class="filter-tag" 
-                :class="{ active: filterJobType === '技术类' }"
-                @click="filterJobType = '技术类'; filterJobs()"
+                v-for="jobName in jobNameList" 
+                :key="jobName"
+                :class="{ active: filterJobName === jobName }"
+                @click="filterJobName = jobName; filterJobs()"
               >
-                技术类
-              </span>
-              <span 
-                class="filter-tag" 
-                :class="{ active: filterJobType === '产品类' }"
-                @click="filterJobType = '产品类'; filterJobs()"
-              >
-                产品类
-              </span>
-              <span 
-                class="filter-tag" 
-                :class="{ active: filterJobType === '运营类' }"
-                @click="filterJobType = '运营类'; filterJobs()"
-              >
-                运营类
-              </span>
-              <span 
-                class="filter-tag" 
-                :class="{ active: filterJobType === '算法类' }"
-                @click="filterJobType = '算法类'; filterJobs()"
-              >
-                算法类
+                {{ jobName }}
               </span>
             </div>
           </div>
@@ -497,6 +479,7 @@ const handleImageUpload = (e) => {
 
 // ========== 招聘岗位数据（适配新的Flask接口） ==========
 const jobList = ref([])
+const jobNameList = ref([]) // 存储所有唯一的岗位名称
 const loading = ref(false) // 加载状态
 const error = ref('') // 错误信息
 
@@ -508,6 +491,7 @@ const ALL_JOBS_API_URL = `${API_BASE_URL}/api/jobs/simple_search` // 使用simpl
 const JOB_DETAIL_API_URL = `${API_BASE_URL}/api/jobs/` // 获取岗位详情
 const JOB_PROFILE_API_URL = `${API_BASE_URL}/api/jobs/` // 获取岗位画像
 const JOB_CATEGORIES_API_URL = `${API_BASE_URL}/api/jobs/categories` // 获取岗位分类
+const JOB_NAMES_API_URL = `${API_BASE_URL}/api/jobs/names` // 新增：获取所有岗位名称接口
 
 // 计算薪资中间值（用于排序）
 const calculateSalaryValue = (salaryRange) => {
@@ -522,6 +506,42 @@ const calculateSalaryValue = (salaryRange) => {
   }
   
   return 0
+}
+
+// 获取所有唯一的岗位名称
+const fetchJobNames = async () => {
+  try {
+    const response = await axios.get(JOB_NAMES_API_URL, {
+      timeout: 5000,
+      headers: { 
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      withCredentials: false,
+    })
+    
+    // 处理返回的岗位名称列表，去重并过滤空值
+    if (Array.isArray(response.data)) {
+      const uniqueNames = Array.from(new Set(response.data))
+        .filter(name => name && name.trim() && name !== '未知岗位')
+        .sort() // 按字母顺序排序
+      jobNameList.value = uniqueNames
+    } else if (response.data?.names) {
+      const uniqueNames = Array.from(new Set(response.data.names))
+        .filter(name => name && name.trim() && name !== '未知岗位')
+        .sort()
+      jobNameList.value = uniqueNames
+    }
+  } catch (err) {
+    console.error('获取岗位名称列表失败:', err)
+    // 备用方案：从已获取的岗位数据中提取名称
+    if (jobList.value.length > 0) {
+      const uniqueNames = Array.from(new Set(jobList.value.map(item => item.job_name)))
+        .filter(name => name && name.trim() && name !== '未知岗位')
+        .sort()
+      jobNameList.value = uniqueNames
+    }
+  }
 }
 
 // 跳转到岗位详情页（需要时才获取详情）
@@ -708,13 +728,9 @@ const fetchAllJobData = async () => {
       })
       
       jobList.value = jobDataWithBasicInfo
+      // 获取岗位名称列表（从已加载的数据中提取）
+      await fetchJobNames()
       initCardAnimateStates()
-      ElMessage.success(`成功加载 ${jobList.value.length} 个岗位数据（共请求${currentPage-1}页）`)
-      
-      // 提示数据量不符的情况
-      if (jobList.value.length < 10000) {
-        ElMessage.warning(`仅加载到${jobList.value.length}条数据，未达到预期的10000条，请检查后端接口`)
-      }
     } else {
       error.value = '未获取到任何岗位数据，请检查后端接口'
       ElMessage.warning('接口返回空数据')
@@ -740,18 +756,19 @@ const fetchAllJobData = async () => {
     loading.value = false
   }
 }
-// 筛选逻辑
-const filterJobType = ref('')
+
+// 筛选逻辑 - 修改为按岗位名称筛选
+const filterJobName = ref('')
 
 // 筛选并按薪资从高到低排序
 const filteredJobList = computed(() => {
   // 复制原始数据，避免修改原数组
   let filtered = [...jobList.value]
   
-  // 筛选类型
-  if (filterJobType.value && filterJobType.value !== '') {
+  // 按岗位名称筛选
+  if (filterJobName.value && filterJobName.value !== '') {
     filtered = filtered.filter(item => {
-      return item.type === filterJobType.value
+      return item.job_name === filterJobName.value
     })
   }
   
@@ -1507,11 +1524,15 @@ onUnmounted(() => {
   justify-content: flex-start; /* 左对齐 */
 }
 
-/* 修改：岗位类型单选标签样式 */
+/* 修改：岗位名称筛选标签样式（适配多标签换行） */
 .filter-tags {
   display: flex;
   gap: 10px;
   flex-wrap: wrap; /* 允许换行 */
+  max-height: 120px; /* 限制最大高度，避免标签过多 */
+  overflow-y: auto; /* 超出高度滚动 */
+  padding: 5px;
+  width: 100%;
 }
 .filter-tag {
   padding: 6px 15px;
@@ -1522,6 +1543,7 @@ onUnmounted(() => {
   color: #666;
   cursor: pointer;
   transition: all 0.2s ease;
+  white-space: nowrap; /* 防止标签文字换行 */
 }
 .filter-tag:hover {
   border-color: #2f54eb;
@@ -1745,7 +1767,7 @@ onUnmounted(() => {
   transition: all 0.2s ease;
 }
 .page-btn:hover:not(:disabled) {
-  background: #f5f7fa;
+  background: #f5f5f5;
   color: #2f54eb;
   border-color: #2f54eb;
 }

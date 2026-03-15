@@ -1,6 +1,6 @@
 <template>
   <div class="job-detail-page">
-    <!-- 1. 顶部导航（完全复用原代码，固定在顶部） -->
+    <!-- 1. 顶部导航（保留原有逻辑） -->
     <header class="top-nav">
       <div class="nav-wrap">
         <div class="nav-left">
@@ -67,104 +67,169 @@
       </div>
     </header>
 
-    <!-- 2. 岗位详情主体内容（模仿番茄小说网书籍详情页布局） -->
+    <!-- 2. 岗位详情主体内容 -->
     <main class="job-detail-main">
       <div class="detail-container">
-        <!-- 新增：面包屑导航（和图片样式一致） -->
-        <div class="breadcrumb">
-          <span @click="$router.push('/')">首页</span>
-          <span class="separator">/</span>
-          <span class="current">{{ jobDetail.jobTitle }}</span>
+        <!-- 加载中提示 -->
+        <div v-if="loading" class="loading-container">
+          <div class="loading-spinner">加载中...</div>
         </div>
-
-        <!-- 顶部信息区：左侧封面 + 右侧核心信息 -->
-        <div class="job-top-section">
-          <div class="job-cover-wrap">
-            <img 
-              :src="`https://picsum.photos/seed/${jobDetail.jobTitle}/200/260`" 
-              :alt="jobDetail.jobTitle"
-              class="job-cover"
-            />
-          </div>
-          <div class="job-info-wrap">
-            <h1 class="job-title">{{ jobDetail.jobTitle }}</h1>
-            <div class="job-tags">
-              <span class="tag status">{{ jobDetail.status }}</span>
-              <span class="tag category" v-for="tag in jobDetail.tags" :key="tag">{{ tag }}</span>
-            </div>
-            <div class="job-meta">
-              <span class="meta-item">薪资范围：{{ jobDetail.salaryRange }}</span>
-              <span class="meta-item">最近更新：{{ jobDetail.updateTime }}</span>
-            </div>
-            <div class="job-actions">
-              <button class="btn-read" @click="$router.push('/job-portrait')">查看岗位画像</button>
-              <button class="btn-app" @click="handleApply">申请该岗位</button>
-              <button class="btn-share" @click="handleShare">分享</button>
-            </div>
-          </div>
-          <div class="job-author-wrap">
-            <div class="author-avatar">
-              <img src="https://picsum.photos/seed/company/60/60" alt="企业头像" />
-            </div>
-            <div class="author-info">
-              <div class="author-name">{{ jobDetail.company }}</div>
-              <div class="author-desc">{{ jobDetail.companyBasicInfo }}</div>
-            </div>
-          </div>
+        
+        <!-- 数据加载失败提示 -->
+        <div v-else-if="error" class="error-container">
+          <div class="error-message">{{ error }}</div>
+          <button class="reload-btn" @click="initJobData">重新加载</button>
         </div>
-
-        <!-- 岗位简介区 -->
-        <section class="job-intro-section">
-          <h2 class="section-title">岗位简介</h2>
-          <div class="intro-content">
-            <p>{{ jobDetail.intro }}</p>
+        
+        <!-- 岗位详情内容 -->
+        <div v-else>
+          <!-- 面包屑导航 -->
+          <div class="breadcrumb">
+            <span @click="$router.push('/')">首页</span>
+            <span class="separator">/</span>
+            <span class="current">{{ jobDetail.job_name }}</span>
           </div>
-        </section>
 
-        <!-- 岗位目录/章节区（对应小说目录） -->
-        <section class="job-chapter-section">
-          <h2 class="section-title">岗位要求 · {{ jobDetail.requireCount }} 条</h2>
-          <div class="chapter-list">
-            <div 
-              class="chapter-item" 
-              v-for="(item, index) in jobDetail.requirements" 
-              :key="index"
-              @click="handleViewRequirement(item)"
-            >
-              第{{ index + 1 }}条 {{ item.title }}
+          <!-- 顶部信息区：移除岗位标签卡片、岗位编码 -->
+          <div class="job-top-section">
+            <div class="job-cover-wrap">
+              <img 
+                :src="`https://picsum.photos/seed/${jobDetail.job_name}/200/260`" 
+                :alt="jobDetail.job_name"
+                class="job-cover"
+              />
+              <!-- 移除：岗位标签卡片 -->
+            </div>
+            
+            <div class="job-info-wrap">
+              <div class="job-header">
+                <h1 class="job-title">{{ jobDetail.job_name }}</h1>
+                <!-- 移除：蓝色岗位编码徽章 -->
+              </div>
+              
+              <div class="job-tags">
+                <span class="tag status">热招中</span>
+                <span class="tag category">{{ jobDetail.industry }}</span>
+                <span class="tag category">{{ jobDetail.company_type }}</span>
+              </div>
+              
+              <div class="job-meta">
+                <div class="meta-group">
+                  <i class="meta-icon">💰</i>
+                  <span class="meta-item">薪资范围：{{ jobDetail.salary_range || '面议' }}</span>
+                </div>
+                <!-- 移除：岗位编码展示 -->
+                <div class="meta-group">
+                  <i class="meta-icon">📅</i>
+                  <span class="meta-item">最近更新：{{ jobDetail.updated_at || '未知' }}</span>
+                </div>
+                <div class="meta-group">
+                  <i class="meta-icon">📍</i>
+                  <span class="meta-item">工作地点：{{ jobDetail.location || '未知' }}</span>
+                </div>
+              </div>
+              
+              <div class="job-actions">
+                <button class="btn-read" @click="goToJobProfile">
+                  <i class="action-icon">📊</i> 查看岗位画像
+                </button>
+                <button class="btn-app" @click="handleApply">
+                  <i class="action-icon">📝</i> 申请该岗位
+                </button>
+                <button class="btn-share" @click="handleShare">
+                  <i class="action-icon">🔗</i> 分享
+                </button>
+              </div>
+            </div>
+            
+            <div class="job-author-wrap">
+              <div class="author-avatar">
+                <img :src="`https://picsum.photos/seed/${jobDetail.company}/60/60`" alt="企业头像" />
+              </div>
+              <div class="author-info">
+                <div class="author-name">{{ jobDetail.company || '未知公司' }}</div>
+                <div class="author-desc">{{ `${jobDetail.location || '未知地点'} | ${jobDetail.company_size || '未知规模'}` }}</div>
+                <!-- 移除：公司星级评分 -->
+              </div>
             </div>
           </div>
-        </section>
 
-        <!-- 新增：公司简介板块 -->
-        <section class="company-intro-section">
-          <h2 class="section-title">公司简介</h2>
-          <div class="company-intro-content">
-            <p>{{ jobDetail.companyIntro }}</p>
-            <div class="company-detail-list">
-              <div class="company-detail-item">
-                <span class="detail-label">公司地点：</span>
-                <span class="detail-value">{{ jobDetail.companyLocation }}</span>
+          <!-- 岗位详情和公司详情：断开卡片样式，重新布局 -->
+          <div class="job-detail-content">
+            <!-- 岗位详情：独立区域，不再是卡片式 -->
+            <div class="job-description-section">
+              <h2 class="section-title">
+                <i class="section-icon">📋</i> 岗位详情
+              </h2>
+              
+              <div class="section-content">
+                <div v-if="jobDetail.job_description" class="description-content">
+                  <!-- 保留数据库自带的1.2.3分点，处理<br>标签 -->
+                  <div v-for="(item, index) in formatJobDescription()" :key="index" class="description-item">
+                    {{ item }}
+                  </div>
+                </div>
+                <div v-else class="empty-content">
+                  <i class="empty-icon">📭</i>
+                  <span class="empty-text">暂无岗位详情信息</span>
+                </div>
               </div>
-              <div class="company-detail-item">
-                <span class="detail-label">所属行业：</span>
-                <span class="detail-value">{{ jobDetail.companyIndustry }}</span>
-              </div>
-              <div class="company-detail-item">
-                <span class="detail-label">公司规模：</span>
-                <span class="detail-value">{{ jobDetail.companyScale }}</span>
-              </div>
-              <div class="company-detail-item">
-                <span class="detail-label">公司类型：</span>
-                <span class="detail-value">{{ jobDetail.companyType }}</span>
+            </div>
+
+            <!-- 公司详情：独立区域，段落形式，首行空两格 -->
+            <div class="company-info-section">
+              <h2 class="section-title">
+                <i class="section-icon">🏢</i> 公司详情
+              </h2>
+              
+              <div class="section-content">
+                <div v-if="jobDetail.company_info" class="company-paragraph">
+                  {{ jobDetail.company_info }}
+                </div>
+                <div v-else class="empty-content">
+                  <i class="empty-icon">🏠</i>
+                  <span class="empty-text">暂无公司详情信息</span>
+                </div>
+                
+                <!-- 保留公司基本信息表格，但去掉多余样式 -->
+                <div class="company-info-table">
+                  <div class="table-row">
+                    <div class="table-label">公司名称</div>
+                    <div class="table-value">{{ jobDetail.company || '未知' }}</div>
+                  </div>
+                  <div class="table-row">
+                    <div class="table-label">所属行业</div>
+                    <div class="table-value">{{ jobDetail.industry || '未知' }}</div>
+                  </div>
+                  <div class="table-row">
+                    <div class="table-label">公司规模</div>
+                    <div class="table-value">{{ jobDetail.company_size || '未知' }}</div>
+                  </div>
+                  <div class="table-row">
+                    <div class="table-label">公司类型</div>
+                    <div class="table-value">{{ jobDetail.company_type || '未知' }}</div>
+                  </div>
+                  <div class="table-row">
+                    <div class="table-label">工作地点</div>
+                    <div class="table-value">{{ jobDetail.location || '未知' }}</div>
+                  </div>
+                  <div v-if="jobDetail.source_url" class="table-row">
+                    <div class="table-label">岗位来源</div>
+                    <div class="table-value">
+                      <a :href="jobDetail.source_url" target="_blank" class="link-text">{{ jobDetail.source_url }}</a>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </section>
+
+          <!-- 移除：职业发展路径整个模块 -->
+        </div>
       </div>
     </main>
 
-    <!-- 3. 页脚（和首页保持一致） -->
+    <!-- 3. 页脚 -->
     <footer class="footer">
       <div class="footer-wrap">
         © 2026 大学生职业规划系统 | 助力大学生精准规划职业方向
@@ -177,8 +242,9 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import axios from 'axios'
 
-// ========== 导航栏相关逻辑（完全复用） ==========
+// ========== 导航栏相关逻辑（保留原有） ==========
 const router = useRouter()
 const route = useRoute()
 
@@ -247,70 +313,191 @@ const handleSearch = () => {
   }
 }
 
-// ========== 岗位详情数据 ==========
-const jobDetail = ref({
-  jobTitle: '前端开发工程师',
-  status: '热招中',
-  tags: ['技术类', '前端', 'Vue', 'React'],
-  salaryRange: '15-30K', // 薪资范围（替换原wordCount）
-  updateTime: '2026-03-12 10:30',
-  company: '字节跳动',
-  // 公司基础信息（替换原companyDesc）
-  companyBasicInfo: '北京 | 互联网 | 10000+人 | 民营企业',
-  // 公司详细信息
-  companyLocation: '北京市海淀区北四环西路58号理想国际大厦',
-  companyIndustry: '互联网/电子商务/新媒体',
-  companyScale: '10000人以上',
-  companyType: '民营企业（独角兽企业）',
-  // 公司简介
-  companyIntro: '字节跳动成立于2012年3月，是一家全球化的互联网科技公司。公司致力于打造全球创作与交流平台，旗下拥有抖音、今日头条、西瓜视频、飞书、火山引擎等多款知名产品。字节跳动始终坚持技术驱动，通过人工智能等技术创新，为全球用户提供丰富的内容创作和消费体验，业务覆盖超过150个国家和地区，拥有数万名员工，是全球增长最快的科技公司之一。',
-  intro: '【高薪岗位+双休+五险一金】入职即享完善福利体系。本岗位负责公司核心产品Web端开发，与优秀团队共同打造亿级用户产品，从需求评审到上线发布全流程参与，经历技术选型、性能优化、工程化建设等关键环节，技术栈涵盖Vue3/React、TypeScript、工程化构建等。我们期待对前端技术有热情、追求极致体验的你加入，一起构建流畅、高效、美观的用户界面。',
-  requireCount: 6,
-  requirements: [
-    { id: 1, title: '熟练掌握HTML/CSS/JavaScript基础', content: '需深入理解DOM操作、事件机制、异步编程' },
-    { id: 2, title: '掌握至少一种主流框架', content: 'Vue3或React技术栈，有相关项目经验优先' },
-    { id: 3, title: '熟悉TypeScript', content: '能使用类型系统提升代码可维护性' },
-    { id: 4, title: '了解工程化与性能优化', content: '熟悉Webpack/Vite构建工具，有性能优化经验' },
-    { id: 5, title: '本科及以上学历', content: '计算机相关专业优先，1-3年前端开发经验' },
-    { id: 6, title: '良好的沟通与协作能力', content: '能与产品、设计、后端高效协作' }
-  ]
-})
+// ========== API 配置 ==========
+axios.defaults.baseURL = 'http://localhost:5000'
+axios.defaults.timeout = 10000
+
+// ========== 状态管理 ==========
+const jobDetail = ref({})
+const jobProfile = ref(null)
+// 移除：职业发展路径相关变量
+const loading = ref(true)
+const error = ref('')
+
+// ========== 工具函数 ==========
+// 格式化岗位详情：处理<br>标签，保留原有分点，不自动加数字
+const formatJobDescription = () => {
+  if (!jobDetail.value.job_description) return []
+  
+  let text = jobDetail.value.job_description
+  // 处理<br>标签：多个连续<br>替换为单个换行，单个<br>替换为换行
+  text = text.replace(/<br\s*\/?>+/gi, '\n')
+  // 按换行分割，保留原有分点格式
+  let items = text.split('\n').filter(item => item.trim())
+  
+  // 去除空项和多余空格
+  return items.map(item => item.trim()).filter(item => item)
+}
+
+// ========== API 调用函数 ==========
+const fetchJobDetail = async (jobId) => {
+  try {
+    const response = await axios.get(`/api/jobs/${jobId}`)
+    return response.data
+  } catch (err) {
+    throw new Error(`获取岗位详情失败：${err.message}`)
+  }
+}
+
+const fetchJobProfile = async (jobId) => {
+  try {
+    const response = await axios.get(`/api/jobs/${jobId}/profile`)
+    return response.data
+  } catch (err) {
+    console.warn('获取岗位画像失败:', err.message)
+    return null
+  }
+}
+
+// 移除：职业发展路径相关API调用函数
+
+// ========== 初始化数据 ==========
+const initJobData = async () => {
+  loading.value = true
+  error.value = ''
+  
+  try {
+    const jobId = route.params.id || route.query.id
+    
+    if (!jobId) {
+      throw new Error('未指定岗位ID')
+    }
+    
+    // 1. 获取岗位基本详情
+    const jobData = await fetchJobDetail(jobId)
+    jobDetail.value = jobData
+    
+    // 2. 仅获取岗位画像，移除职业发展路径获取
+    const profileData = await fetchJobProfile(jobId)
+    if (profileData) {
+      jobProfile.value = profileData
+    }
+    
+  } catch (err) {
+    error.value = err.message
+    console.error('数据加载失败:', err)
+  } finally {
+    loading.value = false
+  }
+}
 
 // ========== 交互方法 ==========
+const goToJobProfile = () => {
+  if (jobDetail.value.id) {
+    router.push(`/job-portrait?jobId=${jobDetail.value.id}&jobName=${encodeURIComponent(jobDetail.value.job_name)}`)
+    ElMessage.info('即将跳转到岗位画像详情页')
+  } else {
+    ElMessage.warning('岗位数据未加载完成')
+  }
+}
+
 const handleApply = () => {
-  ElMessage.success('已成功申请该岗位！')
+  if (jobDetail.value.job_name) {
+    ElMessage.success(`已成功申请【${jobDetail.value.job_name}】岗位！`)
+  } else {
+    ElMessage.warning('岗位数据未加载完成，暂无法申请')
+  }
 }
 
 const handleShare = () => {
-  ElMessage.info('分享功能开发中，敬请期待')
+  if (jobDetail.value.source_url) {
+    navigator.clipboard.writeText(jobDetail.value.source_url)
+      .then(() => ElMessage.success('岗位链接已复制到剪贴板'))
+      .catch(() => ElMessage.info(`岗位来源：${jobDetail.value.source_url}`))
+  } else {
+    const shareUrl = `${window.location.origin}/job-detail?id=${jobDetail.value.id}`
+    navigator.clipboard.writeText(shareUrl)
+      .then(() => ElMessage.success('岗位详情链接已复制到剪贴板'))
+      .catch(() => ElMessage.info(`分享链接：${shareUrl}`))
+  }
 }
 
-const handleViewRequirement = (item) => {
-  ElMessage.info(`查看要求：${item.title}\n${item.content}`)
-}
-
+// ========== 生命周期 ==========
 onMounted(() => {
   applyTheme()
+  initJobData()
+  
+  watch(
+    () => [route.params.id, route.query.id],
+    () => {
+      initJobData()
+    },
+    { deep: true }
+  )
 })
 </script>
 
 <style scoped>
-/* 全局容器：顶部padding=导航栏高度，避免内容被遮挡 */
+/* 全局容器 */
 .job-detail-page {
   width: 100%;
   min-height: 100vh;
   font-family: "Microsoft Yahei", sans-serif;
   color: #333;
-  background: #fff;
+  background: #f5f7fa;
   margin: 0;
   padding: 60px 0 0 0;
 }
 
-/* ========== 顶部导航样式（完全复用原代码，保持固定） ========== */
+/* 加载中和错误提示样式 */
+.loading-container, .error-container {
+  text-align: center;
+  padding: 80px 0;
+  background: #fff;
+  border-radius: 12px;
+  margin: 20px 0;
+}
+
+.loading-spinner {
+  font-size: 20px;
+  color: #2f54eb;
+  animation: spin 1.5s ease-in-out infinite;
+  display: inline-block;
+}
+
+.error-message {
+  font-size: 18px;
+  color: #ff4d4f;
+  margin-bottom: 24px;
+}
+
+.reload-btn {
+  padding: 10px 24px;
+  background: #2f54eb;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.3s ease;
+}
+
+.reload-btn:hover {
+  background: #1d39c4;
+  transform: translateY(-2px);
+}
+
+@keyframes spin {
+  0% { opacity: 0.5; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 0.5; transform: scale(0.9); }
+}
+
+/* ========== 顶部导航样式（保留原有） ========== */
 .top-nav {
   height: 60px;
   background: #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
   width: 100%;
   position: fixed;
   top: 0;
@@ -356,10 +543,13 @@ onMounted(() => {
   height: 60px;
   line-height: 60px;
   color: #000;
+  transition: color 0.3s ease;
 }
-/* 激活状态样式：蓝色下划线 */
+.menu-item:hover {
+  color: #2f54eb;
+}
 .menu-item.active {
-  color: #2f54eb; /* 文字也改为蓝色，增强视觉效果 */
+  color: #2f54eb;
 }
 .menu-item.active::after {
   content: '';
@@ -367,8 +557,9 @@ onMounted(() => {
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 2px;
-  background: #2f54eb; /* 蓝色下划线 */
+  height: 3px;
+  background: #2f54eb;
+  border-radius: 3px 3px 0 0;
 }
 .dropdown {
   position: relative;
@@ -379,8 +570,8 @@ onMounted(() => {
   left: 0;
   width: 200px;
   background: #fff;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  border-radius: 8px;
   list-style: none;
   padding: 8px 0;
   margin: 0;
@@ -389,9 +580,10 @@ onMounted(() => {
 }
 .dropdown:hover .dropdown-menu {
   display: block;
+  animation: fadeIn 0.3s ease;
 }
 .dropdown-item {
-  padding: 10px 15px;
+  padding: 12px 20px;
   font-size: 14px;
   cursor: pointer;
   display: flex;
@@ -399,10 +591,11 @@ onMounted(() => {
   gap: 8px;
   height: auto;
   line-height: normal;
-  color: #000;
+  color: #333;
+  transition: background 0.3s ease;
 }
 .dropdown-item:hover {
-  background: #f5f7fa;
+  background: #f0f7ff;
 }
 .color-dot {
   width: 8px;
@@ -419,31 +612,39 @@ onMounted(() => {
   gap: 15px;
   align-items: center;
 }
-/* 搜索框缩小至原尺寸的2/3：原宽度300px → 200px，原高度36px → 24px */
 .nav-search-wrap {
   display: flex;
-  width: 200px; /* 300 * 2/3 = 200 */
-  height: 24px; /* 36 * 2/3 = 24 */
+  width: 200px;
+  height: 24px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e8e8e8;
+  transition: border 0.3s ease;
+}
+.nav-search-wrap:focus-within {
+  border-color: #2f54eb;
 }
 .nav-search-input {
   flex: 1;
   height: 100%;
-  padding: 0 10px; /* 内边距同步缩小 */
-  border: 1px solid #e8e8e8;
-  border-radius: 4px 0 0 4px;
+  padding: 0 12px;
+  border: none;
   outline: none;
-  font-size: 12px; /* 字体同步缩小 */
+  font-size: 12px;
+  background: transparent;
 }
-/* 搜索按钮缩小至原尺寸的2/3：原宽度80px → 约53px，原高度36px → 24px */
 .nav-search-btn {
-  width: 53px; /* 80 * 2/3 ≈ 53 */
+  width: 53px;
   height: 100%;
   background: #2f54eb;
   color: #fff;
   border: none;
-  border-radius: 0 4px 4px 0;
   cursor: pointer;
-  font-size: 12px; /* 字体同步缩小 */
+  font-size: 12px;
+  transition: background 0.3s ease;
+}
+.nav-search-btn:hover {
+  background: #1d39c4;
 }
 .btn-toggle-theme {
   padding: 6px 10px;
@@ -452,14 +653,22 @@ onMounted(() => {
   border-radius: 4px;
   cursor: pointer;
   color: #000;
+  transition: all 0.3s ease;
+}
+.btn-toggle-theme:hover {
+  background: #e8e8e8;
 }
 .btn-login {
   padding: 6px 15px;
   border: 1px solid #2f54eb;
-  color: #000;
+  color: #2f54eb;
   background: #fff;
   border-radius: 4px;
   cursor: pointer;
+  transition: all 0.3s ease;
+}
+.btn-login:hover {
+  background: #f0f7ff;
 }
 .btn-register {
   padding: 6px 15px;
@@ -468,6 +677,10 @@ onMounted(() => {
   background: #2f54eb;
   border-radius: 4px;
   cursor: pointer;
+  transition: all 0.3s ease;
+}
+.btn-register:hover {
+  background: #1d39c4;
 }
 .user-profile {
   position: relative;
@@ -480,6 +693,10 @@ onMounted(() => {
   border-radius: 50%;
   cursor: pointer;
   border: 2px solid #f0f0f0;
+  transition: border 0.3s ease;
+}
+.avatar:hover {
+  border-color: #2f54eb;
 }
 .user-menu {
   position: absolute;
@@ -487,254 +704,438 @@ onMounted(() => {
   right: 0;
   width: 120px;
   background: #fff;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  border-radius: 8px;
   z-index: 9999;
+  animation: fadeIn 0.3s ease;
 }
 .user-menu .menu-item {
-  padding: 8px 15px;
+  padding: 10px 15px;
   font-size: 14px;
   cursor: pointer;
   height: auto;
   line-height: normal;
   margin: 0;
-  color: #000;
+  color: #333;
+  transition: background 0.3s ease;
 }
 .user-menu .menu-item:hover {
-  background: #f5f7fa;
+  background: #f0f7ff;
+  color: #333;
 }
 .user-menu .logout {
   color: #ff4d4f;
-  border-top: 1px solid #e8e8e8;
+  border-top: 1px solid #f0f0f0;
 }
 
-/* ========== 面包屑导航样式（和岗位介绍字体一致） ========== */
+/* ========== 面包屑导航样式 ========== */
 .breadcrumb {
-  font-size: 14px; /* 和岗位介绍字体大小一致 */
-  line-height: 1.8; /* 和岗位介绍行高一致 */
-  margin-bottom: 20px;
+  font-size: 14px;
+  line-height: 1.8;
+  margin-bottom: 24px;
   display: flex;
   align-items: center;
-  gap: 8px; /* 缩小间距更协调 */
+  gap: 8px;
+  color: #666;
 }
 .breadcrumb span {
   cursor: pointer;
-  color: #999; /* 浅灰色，和岗位meta信息颜色一致 */
-  text-shadow: none; /* 移除阴影 */
+  transition: color 0.3s ease;
+}
+.breadcrumb span:hover {
+  color: #2f54eb;
 }
 .breadcrumb .separator {
-  color: #999; /* 浅灰色 */
+  color: #999;
   cursor: default;
 }
 .breadcrumb .current {
-  color: #999; /* 浅灰色，取消蓝色高亮 */
+  color: #333;
+  font-weight: 600;
   cursor: default;
-  text-shadow: none; /* 移除阴影 */
 }
 
 /* ========== 岗位详情主体样式 ========== */
 .job-detail-main {
   width: 100%;
-  padding: 20px 0;
-  background: #f8f9fa;
+  padding: 30px 0;
+  background: #f5f7fa;
 }
 .detail-container {
   width: 1200px;
   margin: 0 auto;
   background: #fff;
   padding: 30px;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
 }
+
+/* 顶部信息区样式 */
 .job-top-section {
   display: flex;
   gap: 30px;
   margin-bottom: 40px;
+  padding-bottom: 30px;
+  border-bottom: 1px solid #f0f0f0;
 }
+
 .job-cover-wrap {
   width: 200px;
   flex-shrink: 0;
+  position: relative;
 }
+
 .job-cover {
   width: 100%;
   height: 260px;
   object-fit: cover;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border-radius: 12px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+  transition: transform 0.3s ease;
 }
+
+.job-cover:hover {
+  transform: translateY(-5px);
+}
+
+/* 岗位信息区域 */
 .job-info-wrap {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
 }
+
+.job-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
 .job-title {
   font-size: 28px;
-  font-weight: bold;
-  color: #222;
-  margin: 0 0 15px 0;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
 }
+
 .job-tags {
   display: flex;
   gap: 10px;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
 }
+
 .tag {
-  padding: 4px 12px;
+  padding: 6px 14px;
   border-radius: 20px;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.3s ease;
 }
+
 .tag.status {
-  background: #f0f9ff;
+  background: #e8f4ff;
   color: #1890ff;
   border: 1px solid #b3ddff;
 }
+
+.tag.status:hover {
+  background: #d6e9ff;
+}
+
 .tag.category {
   background: #f6f7f9;
   color: #666;
   border: 1px solid #e8e8e8;
 }
+
+.tag.category:hover {
+  background: #e8e8e8;
+}
+
 .job-meta {
   display: flex;
-  gap: 20px;
-  font-size: 14px;
-  color: #999;
-  margin-bottom: 20px;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
 }
+
+.meta-group {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: #666;
+}
+
+.meta-icon {
+  font-size: 16px;
+  margin-right: 8px;
+  width: 20px;
+  text-align: center;
+}
+
+.meta-item {
+  color: #444;
+}
+
 .job-actions {
   display: flex;
-  gap: 15px;
+  gap: 16px;
 }
-.btn-read {
-  padding: 10px 30px;
-  background: #ff6b35;
-  color: #fff;
+
+.btn-read, .btn-app, .btn-share {
+  padding: 12px 24px;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.action-icon {
   font-size: 16px;
 }
+
+.btn-read {
+  background: #ff7a45;
+  color: #fff;
+}
+
+.btn-read:hover {
+  background: #ff5a1f;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 122, 69, 0.2);
+}
+
 .btn-app {
-  padding: 10px 30px;
   background: #2f54eb;
   color: #fff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 16px;
 }
+
+.btn-app:hover {
+  background: #1d39c4;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(47, 84, 235, 0.2);
+}
+
 .btn-share {
-  padding: 10px 20px;
   background: #fff;
   color: #666;
   border: 1px solid #e8e8e8;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
 }
+
+.btn-share:hover {
+  background: #f8f9fa;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+/* 公司信息区域 */
 .job-author-wrap {
-  width: 200px;
+  width: 220px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 15px;
-  border-left: 1px solid #e8e8e8;
+  border-left: 1px solid #f0f0f0;
   padding-left: 30px;
 }
+
 .author-avatar img {
-  width: 60px;
-  height: 60px;
+  width: 70px;
+  height: 70px;
   border-radius: 50%;
   object-fit: cover;
+  border: 3px solid #f8f9fa;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
+
+.author-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .author-name {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: #222;
-  margin-bottom: 4px;
+  margin: 0;
 }
+
 .author-desc {
-  font-size: 12px;
-  color: #999;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.4;
 }
+
+/* 重新设计的详情内容区域（断开卡片样式） */
+.job-detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+/* 岗位详情区域样式 */
+.job-description-section, .company-info-section {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+
 .section-title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
-  color: #222;
-  margin: 0 0 15px 0;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #e8e8e8;
+  color: #1f2937;
+  margin: 0 0 20px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.job-intro-section {
-  margin-bottom: 40px;
-}
-.intro-content {
-  font-size: 14px;
-  line-height: 1.8;
-  color: #333;
-}
-.job-chapter-section {
-  margin-bottom: 40px;
-}
-.chapter-list {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 15px;
-}
-.chapter-item {
-  padding: 12px 15px;
-  background: #f8f9fa;
-  border-radius: 4px;
-  font-size: 14px;
-  color: #333;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-.chapter-item:hover {
-  background: #e8f4ff;
+
+.section-icon {
+  font-size: 20px;
   color: #2f54eb;
 }
 
-/* 新增：公司简介样式 */
-.company-intro-section {
-  margin-bottom: 40px;
-}
-.company-intro-content {
-  font-size: 14px;
+.section-content {
+  font-size: 15px;
   line-height: 1.8;
   color: #333;
 }
-.company-detail-list {
-  margin-top: 20px;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 15px;
-}
-.company-detail-item {
+
+/* 岗位详情项样式：保留原有分点，不加额外数字 */
+.description-content {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 16px;
 }
-.detail-label {
-  font-weight: 600;
-  color: #666;
-  width: 80px;
-  flex-shrink: 0;
-}
-.detail-value {
+
+.description-item {
+  line-height: 1.8;
+  font-size: 15px;
   color: #333;
 }
 
-/* ========== 页脚样式（和首页保持一致） ========== */
-.footer {
-  background: #fff;
-  padding: 20px 0;
-  border-top: 1px solid #e8e8e8;
+/* 公司详情段落样式：首行空两格 */
+.company-paragraph {
+  text-indent: 2em;
+  line-height: 1.8;
+  font-size: 15px;
+  color: #333;
+  margin: 0;
+}
+
+/* 空内容提示 */
+.empty-content {
   text-align: center;
+  padding: 40px 0;
+  color: #999;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  display: block;
+  opacity: 0.5;
+}
+
+.empty-text {
+  font-size: 16px;
+}
+
+/* 公司信息表格 */
+.company-info-table {
+  width: 100%;
+  border-top: 1px solid #f0f0f0;
+  padding-top: 20px;
+  margin-top: 20px;
+}
+
+.table-row {
+  display: flex;
+  padding: 12px 0;
+  border-bottom: 1px solid #f8f9fa;
+}
+
+.table-row:last-child {
+  border-bottom: none;
+}
+
+.table-label {
+  width: 120px;
+  font-weight: 600;
   color: #666;
   font-size: 14px;
 }
+
+.table-value {
+  flex: 1;
+  color: #333;
+  font-size: 14px;
+}
+
+.link-text {
+  color: #2f54eb;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.link-text:hover {
+  color: #1d39c4;
+  text-decoration: underline;
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ========== 页脚样式 ========== */
+.footer {
+  background: #fff;
+  padding: 30px 0;
+  border-top: 1px solid #f0f0f0;
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+  margin-top: 40px;
+}
+
 .footer-wrap {
   width: 1200px;
   margin: 0 auto;
+}
+
+/* 响应式适配 */
+@media (max-width: 1200px) {
+  .nav-wrap, .detail-container, .footer-wrap {
+    width: 95%;
+    padding: 0 20px;
+  }
+  
+  .job-top-section {
+    flex-direction: column;
+    gap: 20px;
+  }
+  
+  .job-cover-wrap, .job-author-wrap {
+    width: 100%;
+  }
+  
+  .job-author-wrap {
+    border-left: none;
+    padding-left: 0;
+    border-top: 1px solid #f0f0f0;
+    padding-top: 20px;
+  }
 }
 </style>
