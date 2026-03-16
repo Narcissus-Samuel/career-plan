@@ -70,115 +70,175 @@
   
     <!-- 岗位画像内容容器（适配固定导航栏，避免遮挡） -->
     <div class="job-portrait-container">
-      <!-- 面包屑导航（移除Back按钮） -->
-      <div class="breadcrumb">
-        <span class="breadcrumb-item" @click="$router.push('/')">首页</span>
-        <span class="separator">/</span>
-        <span class="breadcrumb-item">{{ currentJob.jobName }}</span>
-        <span class="separator">/</span>
-        <span class="breadcrumb-item current">岗位画像详情</span>
+      <!-- 面包屑导航 + 岗位标题区域 -->
+      <div class="page-header">
+        <div class="breadcrumb">
+          <span class="breadcrumb-item" @click="$router.push('/')">首页</span>
+          <span class="separator">/</span>
+          <span class="breadcrumb-item">{{ currentJob.jobName }}</span>
+          <span class="separator">/</span>
+          <span class="breadcrumb-item current">岗位画像详情</span>
+        </div>
+        
+        <!-- 岗位标题卡片 -->
+        <div class="job-header-card">
+          <h1 class="job-title">{{ currentJob.jobName }}</h1>
+          <div class="job-tag-container">
+            <el-tag 
+              v-for="tag in getCoreTags()" 
+              :key="tag" 
+              size="medium" 
+              class="job-tag"
+            >{{ tag }}</el-tag>
+          </div>
+          <div class="job-score-card">
+            <div class="score-label">综合能力评分</div>
+            <div class="score-value">{{ totalScore }}分</div>
+            <!-- 修改后的星星评分展示 - 支持半星 -->
+            <div class="star-rating">
+              <div 
+                v-for="(star, index) in 5" 
+                :key="index" 
+                class="star-wrapper"
+              >
+                <!-- 背景星星（灰色） -->
+                <span class="star background">★</span>
+                <!-- 前景星星（黄色）- 通过裁剪控制显示 -->
+                <span 
+                  class="star foreground"
+                  :style="{clipPath: getStarClipPath(index)}"
+                >★</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       
-      <!-- 岗位画像核心信息卡片 -->
-      <el-row :gutter="20" style="margin: 20px 0;">
-        <!-- 岗位基本信息 -->
-        <el-col :span="8">
-          <el-card header="岗位基本信息" shadow="hover">
-            <el-descriptions :column="1" border>
-              <el-descriptions-item label="岗位名称">
-                <span class="job-name">{{ currentJob.jobName }}</span>
-              </el-descriptions-item>
-              <el-descriptions-item label="核心标签">
-                <el-tag v-for="tag in getCoreTags()" :key="tag" size="small">{{ tag }}</el-tag>
-              </el-descriptions-item>
-              <el-descriptions-item label="综合能力评分">
-                <el-rate 
-                  v-model="totalScore" 
-                  disabled 
-                  max="100" 
-                  show-score 
-                  text-color="#ff9900"
-                  score-template="{value}分"
-                ></el-rate>
-              </el-descriptions-item>
-            </el-descriptions>
-          </el-card>
-        </el-col>
-        
-        <!-- 专业技能 -->
-        <el-col :span="8">
-          <el-card header="专业技能要求" shadow="hover">
-            <div class="skill-list">
+      <!-- 核心信息区域 - 重新布局 -->
+      <div class="core-info-section">
+        <!-- 左侧：技能和证书 -->
+        <div class="left-panel">
+          <el-card 
+            header="专业技能要求" 
+            shadow="hover" 
+            class="info-card skills-card"
+          >
+            <div class="skill-grid">
               <div 
-                v-for="skill in currentJob.skills" 
+                v-for="(skill, index) in currentJob.skills" 
                 :key="skill" 
-                class="skill-item"
+                class="skill-card"
+                :style="{animationDelay: `${index * 0.1}s`}"
               >
-                <i class="el-icon-s-tools"></i> {{ skill }}
+                <i class="el-icon-s-tools skill-icon"></i> 
+                <span class="skill-text">{{ skill }}</span>
               </div>
             </div>
           </el-card>
-        </el-col>
-        
-        <!-- 证书要求 -->
-        <el-col :span="8">
-          <el-card header="证书资质要求" shadow="hover">
-            <div class="cert-list">
+          
+          <el-card 
+            header="证书资质要求" 
+            shadow="hover" 
+            class="info-card certs-card"
+          >
+            <div class="cert-grid">
               <div 
-                v-for="cert in currentJob.certificates" 
+                v-for="(cert, index) in currentJob.certificates" 
                 :key="cert" 
-                class="cert-item"
+                class="cert-card"
+                :style="{animationDelay: `${index * 0.1}s`}"
               >
-                <i class="el-icon-trophy"></i> {{ cert }}
+                <i class="el-icon-trophy cert-icon"></i> 
+                <span class="cert-text">{{ cert }}</span>
               </div>
             </div>
           </el-card>
-        </el-col>
-      </el-row>
-      
-      <!-- 综合能力雷达图 -->
-      <el-card header="综合能力评估雷达图" shadow="hover" style="margin: 20px 0;">
-        <div ref="radarChartRef" style="width: 100%; height: 400px;"></div>
-      </el-card>
-      
-      <!-- 岗位发展路径 -->
-      <el-card header="岗位发展路径规划" shadow="hover" style="margin: 20px 0;">
-        <el-button 
-          type="primary" 
-          icon="el-icon-map-location" 
-          @click="openGraphDialog"
-          style="margin-bottom: 20px;"
-        >
-          查看岗位发展路径图谱
-        </el-button>
+        </div>
         
-        <!-- 路径说明 -->
-        <el-collapse>
-          <el-collapse-item title="垂直晋升路径" name="1">
-            <div class="path-list">
-              <div v-for="(item, index) in jobGraphConfig.vertical" :key="index" class="path-item">
-                <span class="step">{{ index + 1 }}.</span> {{ item }}
+        <!-- 右侧：能力雷达图 -->
+        <div class="right-panel">
+          <el-card 
+            header="综合能力评估" 
+            shadow="hover" 
+            class="info-card radar-card"
+          >
+            <div ref="radarChartRef" class="radar-chart-container"></div>
+          </el-card>
+        </div>
+      </div>
+      
+      <!-- 岗位发展路径区域 -->
+      <div class="career-path-section">
+        <el-card 
+          header="岗位发展路径规划" 
+          shadow="hover" 
+          class="info-card path-card"
+        >
+          <div class="path-header">
+            <el-button 
+              type="primary" 
+              icon="el-icon-map-location" 
+              @click="openGraphDialog"
+              class="graph-btn"
+            >
+              查看岗位发展路径图谱
+            </el-button>
+            <p class="path-desc">清晰的职业发展路径，助力你的职业规划</p>
+          </div>
+          
+          <!-- 路径展示 - 双列布局 -->
+          <div class="path-content">
+            <div class="path-column">
+              <h3 class="path-column-title">
+                <i class="el-icon-arrow-up"></i> 垂直晋升路径
+              </h3>
+              <div class="path-timeline">
+                <div 
+                  v-for="(item, index) in jobGraphConfig.vertical" 
+                  :key="index" 
+                  class="timeline-item"
+                >
+                  <div class="timeline-dot" :style="{backgroundColor: getStepColor(index)}"></div>
+                  <div class="timeline-content">
+                    <div class="timeline-step">第{{ index + 1 }}阶段</div>
+                    <div class="timeline-position">{{ item }}</div>
+                  </div>
+                </div>
               </div>
             </div>
-          </el-collapse-item>
-          <el-collapse-item title="换岗发展路径" name="2">
-            <div class="path-list">
-              <div v-for="(item, index) in jobGraphConfig.switch" :key="index" class="path-item">
-                <span class="step">{{ index + 1 }}.</span> {{ item }}
+            
+            <div class="path-column">
+              <h3 class="path-column-title">
+                <i class="el-icon-switch"></i> 换岗发展路径
+              </h3>
+              <div class="path-grid">
+                <div 
+                  v-for="(item, index) in jobGraphConfig.switch" 
+                  :key="index" 
+                  class="switch-card"
+                >
+                  <div class="switch-icon">
+                    <i class="el-icon-refresh"></i>
+                  </div>
+                  <div class="switch-position">{{ item }}</div>
+                </div>
               </div>
             </div>
-          </el-collapse-item>
-        </el-collapse>
-      </el-card>
+          </div>
+        </el-card>
+      </div>
       
       <!-- 岗位图谱弹窗 -->
       <el-dialog 
         v-model="graphVisible" 
-        :title="`${currentJob.jobName} - 垂直晋升+换岗路径图谱`" 
-        width="80%"
-        top="80px"
+        :title="`${currentJob.jobName} - 职业发展路径图谱`" 
+        width="90%"
+        top="50px"
+        class="graph-dialog"
+        custom-class="custom-dialog"
+        append-to-body
       >
-        <div ref="graphChartRef" style="width: 100%; height: 600px;"></div>
+        <div ref="graphChartRef" class="graph-chart-container"></div>
       </el-dialog>
     </div>
   </div>
@@ -268,7 +328,13 @@ const abilityMap = {
   learning: '学习能力',
   pressure: '抗压能力',
   communication: '沟通能力',
-  internship: '实习能力'
+  internship: '实践能力'
+}
+
+// 获取步骤颜色
+const getStepColor = (index) => {
+  const colors = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#909399']
+  return colors[index % colors.length]
 }
 
 // 所有岗位数据
@@ -423,6 +489,30 @@ const totalScore = computed(() => {
   return Math.round(sum / Object.keys(abilities).length)
 })
 
+// 计算精确的星星数（支持小数）
+const starCount = computed(() => {
+  // 总分/100*5 得到精确的星星数
+  return (totalScore.value / 100) * 5
+})
+
+// 获取星星的裁剪路径，实现半星效果
+const getStarClipPath = (index) => {
+  const starNumber = index + 1
+  const starValue = starCount.value
+  
+  if (starValue >= starNumber) {
+    // 完整星星
+    return 'inset(0 0 0 0)'
+  } else if (starValue > index) {
+    // 半星 - 计算显示的比例
+    const percentage = ((starValue - index) * 100).toFixed(2) + '%'
+    return `inset(0 ${100 - parseFloat(percentage)}% 0 0)`
+  } else {
+    // 空星星 - 完全裁剪掉前景
+    return 'inset(0 100% 0 0)'
+  }
+}
+
 // 获取核心标签
 const getCoreTags = () => {
   return currentJob.value.coreTags || ['暂无标签']
@@ -453,27 +543,38 @@ const initRadarChart = () => {
   }))
   
   const option = {
-    title: { text: '综合能力评估', left: 'center' },
-    tooltip: { trigger: 'item' },
+    backgroundColor: 'transparent',
+    tooltip: { 
+      trigger: 'item',
+      backgroundColor: 'rgba(255,255,255,0.95)',
+      borderColor: '#e4e7ed',
+      borderWidth: 1,
+      textStyle: { color: '#303133' },
+      padding: 12,
+      borderRadius: 8
+    },
     radar: {
       indicator: radarData.map(item => ({ name: item.name, max: 100 })),
-      shape: 'polygon',
+      shape: 'circle',
       splitNumber: 5,
+      radius: '80%',
       name: {
-        textStyle: { color: '#333' }
+        textStyle: { color: '#606266', fontSize: 14 }
       },
-      splitLine: { lineStyle: { color: '#e0e0e0' } },
-      splitArea: { areaStyle: { color: ['#f9f9f9', '#ffffff'] } },
-      axisLine: { lineStyle: { color: '#333' } }
+      splitLine: { lineStyle: { color: '#e4e7ed', width: 1 } },
+      splitArea: { areaStyle: { color: ['#f8f9fa', '#ffffff'], opacity: 0.8 } },
+      axisLine: { lineStyle: { color: '#c0c4cc' } }
     },
     series: [{
       type: 'radar',
       data: [{
         value: radarData.map(item => item.value),
         name: '能力评分',
-        areaStyle: { color: 'rgba(64, 158, 255, 0.2)' },
-        lineStyle: { color: '#409EFF', width: 2 },
-        itemStyle: { color: '#409EFF' }
+        areaStyle: { color: 'rgba(64, 158, 255, 0.25)', opacity: 0.8 },
+        lineStyle: { color: '#409EFF', width: 3 },
+        itemStyle: { color: '#409EFF', borderWidth: 2, borderColor: '#ffffff' },
+        symbol: 'circle',
+        symbolSize: 8
       }]
     }]
   }
@@ -510,14 +611,33 @@ const initJobGraph = () => {
       name: item, 
       category: 0, 
       symbolSize: 50 + (index * 5),
-      itemStyle: { color: '#409EFF' }
+      itemStyle: { 
+        color: '#409EFF',
+        borderColor: '#ffffff',
+        borderWidth: 2,
+        shadowColor: 'rgba(64, 158, 255, 0.5)',
+        shadowBlur: 10
+      }
     })
     if (index > 0) {
       links.push({ 
         source: config.vertical[index-1], 
         target: item, 
-        lineStyle: { color: '#409EFF', width: 2 },
-        label: { show: true, formatter: '晋升' }
+        lineStyle: { 
+          color: '#409EFF', 
+          width: 3,
+          shadowColor: 'rgba(64, 158, 255, 0.2)',
+          shadowBlur: 5
+        },
+        label: { 
+          show: true, 
+          formatter: '晋升',
+          fontSize: 12,
+          color: '#606266',
+          backgroundColor: 'rgba(255,255,255,0.8)',
+          borderRadius: 4,
+          padding: [2, 6]
+        }
       })
     }
   })
@@ -528,24 +648,55 @@ const initJobGraph = () => {
       name: item, 
       category: 1, 
       symbolSize: 45,
-      itemStyle: { color: '#67C23A' }
+      itemStyle: { 
+        color: '#67C23A',
+        borderColor: '#ffffff',
+        borderWidth: 2,
+        shadowColor: 'rgba(103, 194, 58, 0.5)',
+        shadowBlur: 10
+      }
     })
     links.push({ 
       source: config.vertical[2], 
       target: item, 
-      lineStyle: { color: '#67C23A', width: 2, type: 'dashed' },
-      label: { show: true, formatter: '换岗' }
+      lineStyle: { 
+        color: '#67C23A', 
+        width: 2, 
+        type: 'dashed',
+        shadowColor: 'rgba(103, 194, 58, 0.2)',
+        shadowBlur: 5
+      },
+      label: { 
+        show: true, 
+        formatter: '换岗',
+        fontSize: 12,
+        color: '#606266',
+        backgroundColor: 'rgba(255,255,255,0.8)',
+        borderRadius: 4,
+        padding: [2, 6]
+      }
     })
   })
   
   const option = {
+    backgroundColor: '#ffffff',
     title: { 
-      text: `${currentJob.value.jobName} - 垂直晋升+换岗路径图谱`,
+      text: `${currentJob.value.jobName} - 职业发展路径图谱`,
       left: 'center',
-      textStyle: { fontSize: 16 }
+      textStyle: { fontSize: 18, fontWeight: 600, color: '#303133' }
     },
-    tooltip: { trigger: 'item' },
-    legend: [{ data: ['垂直晋升', '换岗路径'], top: 'bottom' }],
+    tooltip: { 
+      trigger: 'item',
+      backgroundColor: 'rgba(255,255,255,0.95)',
+      borderColor: '#e4e7ed',
+      borderWidth: 1,
+      textStyle: { color: '#303133' }
+    },
+    legend: [{ 
+      data: ['垂直晋升', '换岗路径'], 
+      top: 'bottom',
+      textStyle: { color: '#606266' }
+    }],
     series: [
       {
         type: 'graph',
@@ -558,12 +709,14 @@ const initJobGraph = () => {
           show: true,
           fontSize: 14,
           color: '#fff',
-          fontWeight: 'bold'
+          fontWeight: 'bold',
+          shadowColor: 'rgba(0,0,0,0.2)',
+          shadowBlur: 2
         },
         force: {
-          repulsion: 2500,
-          edgeLength: 200,
-          gravity: 0.1
+          repulsion: 2800,
+          edgeLength: 220,
+          gravity: 0.15
         }
       }
     ]
@@ -632,14 +785,15 @@ onMounted(() => {
 .job-portrait-page {
   width: 100%;
   min-height: 100vh;
-  font-family: "Microsoft Yahei", sans-serif;
-  color: #333;
-  background: #f5f7fa;
+  font-family: "Microsoft Yahei", "PingFang SC", sans-serif;
+  color: #303133;
+  /* 修改为偏白色的背景 - 浅灰白色调 */
+  background: #fafbfc;
   margin: 0;
   padding: 0;
 }
 
-/* ========== 导航栏样式（使用:deep()穿透scoped，保证固定定位生效） ========== */
+/* ========== 导航栏样式（保留原有样式） ========== */
 :deep(.top-nav) {
   height: 60px;
   background: #fff;
@@ -704,17 +858,6 @@ onMounted(() => {
 
 :deep(.menu-item.active) {
   color: #2f54eb;
-}
-
-:deep(.menu-item.active::after) {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 3px;
-  background: #2f54eb;
-  border-radius: 3px 3px 0 0;
 }
 
 :deep(.dropdown) {
@@ -909,108 +1052,514 @@ onMounted(() => {
   border-top: 1px solid #f0f0f0;
 }
 
-/* ========== 面包屑导航样式 ========== */
-.breadcrumb {
-  font-size: 14px;
-  line-height: 1.8;
-  margin-bottom: 24px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #666;
-}
-.breadcrumb span {
-  cursor: pointer;
-  transition: color 0.3s ease;
-}
-.breadcrumb span:hover {
-  color: #2f54eb; /* 鼠标悬浮时变蓝色 */
-}
-.breadcrumb .separator {
-  color: #999;
-  cursor: default; /* 分隔符不可点击 */
-}
-.breadcrumb .current {
-  color: #333;
-  font-weight: 600; /* 岗位名称加粗 */
-  cursor: default; /* 岗位名称不可点击 */
-}
-
-/* ========== 岗位画像内容容器样式 ========== */
+/* ========== 重新设计的页面内容样式 ========== */
 .job-portrait-container {
   width: 1200px;
   margin: 0 auto;
-  padding: 80px 20px 40px; /* 顶部留出导航栏高度+20px间距，避免被遮挡 */
-  background-color: #f5f7fa;
+  padding: 80px 20px 60px;
   min-height: calc(100vh - 60px);
+  /* 内容容器使用纯白色背景 */
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
 }
 
-/* 岗位画像内容样式 */
-.job-name {
-  font-size: 18px;
-  font-weight: bold;
+/* 页面头部 - 面包屑 + 岗位标题 */
+.page-header {
+  padding: 24px 32px;
+  /* 添加背景色并设置高优先级 */
+  background: #fff !important;
+}
+
+.breadcrumb {
+  font-size: 14px;
+  line-height: 1.8;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #606266;
+}
+
+.breadcrumb-item {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.breadcrumb-item:hover {
   color: #409EFF;
+  transform: translateY(-1px);
 }
 
-.skill-list {
+.separator {
+  color: #909399;
+  cursor: default;
+}
+
+.current {
+  color: #303133;
+  font-weight: 600;
+  cursor: default;
+}
+
+/* 岗位标题卡片 */
+.job-header-card {
+  padding: 0 0 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.job-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 20px 0 0;
+  background: linear-gradient(135deg, #409EFF 0%, #67C23A 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.job-tag-container {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  margin: 0 20px;
 }
 
-.skill-item {
-  padding: 8px 12px;
-  background-color: #e8f4f8;
-  border-radius: 6px;
+.job-tag {
+  background: rgba(64, 158, 255, 0.1);
+  border-color: rgba(64, 158, 255, 0.2);
+  color: #409EFF;
+  font-size: 14px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  transition: all 0.3s ease;
+}
+
+.job-tag:hover {
+  background: #409EFF;
+  color: #ffffff;
+  transform: scale(1.05);
+}
+
+.job-score-card {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
+  background: #f8f9fa;
+  padding: 12px 20px;
+  border-radius: 12px;
+}
+
+.score-label {
+  font-size: 14px;
+  color: #606266;
+  white-space: nowrap;
+}
+
+.score-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #409EFF;
+  margin: 0 8px;
+  white-space: nowrap;
+}
+
+/* 修复星星评分样式 - 支持半星 */
+.star-rating {
+  display: flex;
+  gap: 2px;
+  line-height: 1;
+  align-items: center;
+}
+
+.star-wrapper {
+  position: relative;
+  display: inline-block;
+  height: 20px;
+  width: 20px;
+  line-height: 1;
+}
+
+.star {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-size: 20px;
+  width: 100%;
+  height: 100%;
+  display: inline-block;
+  line-height: 1;
+}
+
+/* 背景星星 - 灰色 */
+.star.background {
+  color: #dcdfe6; /* 未激活星星颜色 - 灰色 */
+  z-index: 1;
+}
+
+/* 前景星星 - 黄色 */
+.star.foreground {
+  color: #E6A23C; /* 激活星星的黄色 */
+  z-index: 2;
+  transition: clip-path 0.3s ease;
+}
+
+/* 通用卡片样式 */
+:deep(.info-card) {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  margin-bottom: 0;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+:deep(.info-card:last-child) {
+  border-bottom: none;
+}
+
+:deep(.info-card .el-card__header) {
+  background: #f9fafc;
+  border-bottom: 1px solid #f0f2f5;
+  padding: 16px 20px;
+  font-weight: 600;
+  font-size: 16px;
+  color: #1f2937;
+  border-radius: 0;
+}
+
+:deep(.info-card .el-card__body) {
+  padding: 20px;
+}
+
+/* 核心信息区域 */
+.core-info-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.left-panel, .right-panel {
+  border-right: 1px solid #f0f2f5;
+}
+
+.right-panel {
+  border-right: none;
+}
+
+/* 技能卡片样式 */
+.skill-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+.skill-card {
+  background: linear-gradient(135deg, #e8f4f8 0%, #f0f9ff 100%);
+  border-radius: 10px;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border: 1px solid rgba(64, 158, 255, 0.1);
+  transition: all 0.4s ease;
+  animation: fadeInUp 0.6s ease forwards;
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.skill-card:hover {
+  transform: translateY(-5px) scale(1.02);
+  box-shadow: 0 8px 16px rgba(64, 158, 255, 0.15);
+  background: linear-gradient(135deg, #f0f9ff 0%, #e6f7ff 100%);
+}
+
+.skill-icon {
+  font-size: 24px;
+  color: #409EFF;
+  margin-bottom: 8px;
+}
+
+.skill-text {
+  font-size: 14px;
+  font-weight: 500;
   color: #1989fa;
 }
 
-.cert-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+/* 证书卡片样式 */
+.cert-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
 }
 
-.cert-item {
-  padding: 8px 12px;
-  background-color: #f0f9ff;
-  border-radius: 6px;
+.cert-card {
+  background: linear-gradient(135deg, #fef7fb 0%, #fef0c7 100%);
+  border-radius: 10px;
+  padding: 16px 12px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  color: #0a6ed1;
+  justify-content: center;
+  text-align: center;
+  border: 1px solid rgba(230, 162, 60, 0.1);
+  transition: all 0.4s ease;
+  animation: fadeInUp 0.6s ease forwards;
+  opacity: 0;
+  transform: translateY(10px);
 }
 
-.path-list {
-  padding: 10px 20px;
+.cert-card:hover {
+  transform: translateY(-5px) scale(1.02);
+  box-shadow: 0 8px 16px rgba(230, 162, 60, 0.15);
+  background: linear-gradient(135deg, #fef0c7 0%, #fde68a 100%);
 }
 
-.path-item {
-  display: flex;
-  align-items: center;
-  margin: 8px 0;
+.cert-icon {
+  font-size: 24px;
+  color: #E6A23C;
+  margin-bottom: 8px;
+}
+
+.cert-text {
   font-size: 14px;
+  font-weight: 500;
+  color: #d48806;
 }
 
-.step {
-  display: inline-block;
+/* 雷达图样式 */
+.radar-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.radar-chart-container {
+  width: 100%;
+  height: 400px;
+  flex: 1;
+}
+
+/* 职业发展路径区域 */
+.career-path-section {
+  margin-bottom: 0;
+}
+
+.path-card {
+  height: 100%;
+}
+
+.path-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.graph-btn {
+  background: linear-gradient(135deg, #409EFF 0%, #67C23A 100%);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.graph-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+  background: linear-gradient(135deg, #3399ff 0%, #52c41a 100%);
+}
+
+.path-desc {
+  color: #606266;
+  font-size: 14px;
+  margin: 0;
+}
+
+.path-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.path-column {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.path-column-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 20px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.path-column-title i {
+  color: #409EFF;
+  font-size: 18px;
+}
+
+/* 时间线样式 */
+.path-timeline {
+  position: relative;
+  padding-left: 30px;
+}
+
+.path-timeline::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, #409EFF 0%, #67C23A 100%);
+  border-radius: 1px;
+}
+
+.timeline-item {
+  position: relative;
+  margin-bottom: 24px;
+  padding-bottom: 8px;
+}
+
+.timeline-item:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: -30px;
+  top: 4px;
   width: 20px;
   height: 20px;
-  line-height: 20px;
-  text-align: center;
-  background-color: #409EFF;
-  color: #fff;
   border-radius: 50%;
-  margin-right: 10px;
+  box-shadow: 0 0 0 4px rgba(64, 158, 255, 0.1);
+  z-index: 1;
+}
+
+.timeline-content {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.timeline-content:hover {
+  transform: translateX(5px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.timeline-step {
   font-size: 12px;
+  color: #909399;
+  margin-bottom: 4px;
+}
+
+.timeline-position {
+  font-size: 15px;
+  font-weight: 500;
+  color: #303133;
+}
+
+/* 换岗路径网格 */
+.path-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.switch-card {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(103, 194, 58, 0.1);
+  transition: all 0.3s ease;
+}
+
+.switch-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.15);
+}
+
+.switch-icon {
+  font-size: 24px;
+  color: #67C23A;
+  margin-bottom: 8px;
+}
+
+.switch-position {
+  font-size: 14px;
+  font-weight: 500;
+  color: #52c41a;
+}
+
+/* 图谱弹窗样式 - 核心修改：去掉黑条，改为白色背景 */
+:deep(.custom-dialog) {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* 弹窗头部：彻底覆盖 Element Plus 默认的 #2A2A2A 黑色背景，改为纯白色 */
+:deep(.custom-dialog .el-dialog__header) {
+  background: #ffffff !important;
+  border-bottom: 1px solid #f0f2f5;
+  padding: 20px 24px;
+}
+
+:deep(.custom-dialog .el-dialog__title) {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 18px;
+}
+
+/* 关闭按钮颜色适配白色背景 */
+:deep(.custom-dialog .el-dialog__headerbtn .el-dialog__close) {
+  color: #606266 !important;
+}
+:deep(.custom-dialog .el-dialog__headerbtn .el-dialog__close:hover) {
+  color: #409EFF !important;
+}
+
+:deep(.custom-dialog .el-dialog__body) {
+  padding: 24px;
+  background: #ffffff !important;
+}
+
+.graph-chart-container {
+  width: 100%;
+  height: 600px;
+  background: #ffffff !important;
 }
 
 /* 动画效果 */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(15px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -1020,6 +1569,57 @@ onMounted(() => {
     width: 95%;
     padding-left: 20px;
     padding-right: 20px;
+  }
+  
+  .core-info-section {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .left-panel {
+    border-right: none;
+    border-bottom: 1px solid #f0f2f5;
+  }
+  
+  .radar-chart-container {
+    height: 350px;
+  }
+  
+  .graph-chart-container {
+    height: 500px;
+  }
+}
+
+@media (max-width: 768px) {
+  .job-header-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .path-content {
+    grid-template-columns: 1fr;
+  }
+  
+  .radar-chart-container {
+    height: 300px;
+  }
+  
+  .graph-chart-container {
+    height: 400px;
+  }
+  
+  .skill-grid, .cert-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .skill-grid, .cert-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .path-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
