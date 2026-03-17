@@ -12,6 +12,8 @@ import Login from '../views/Login.vue'
 import Register from '../views/Register.vue'
 import AdminLogin from '../views/AdminLogin.vue'
 import AdminDashboard from '../views/AdminDashboard.vue'
+// 新增：导入个人中心组件（核心添加）
+import ProfilePage from '../views/ProfilePage.vue'
 
 // 新增：导入其他功能页面组件（未创建的组件先用Home占位）
 import CareerPlanning from '../views/CareerPlanning.vue'
@@ -34,7 +36,6 @@ import DevelopmentPath from '../views/DevelopmentPath.vue'
 import ReportExport from '../views/ReportExport.vue'
 const Search = () => import('../views/Home.vue') // 临时占位
 // 移除原有Detail占位，改用JobDetail
-
 
 const routes = [
   { 
@@ -63,6 +64,16 @@ const routes = [
     path: '/register', 
     name: 'Register',
     component: Register 
+  },
+  // 新增：个人中心路由（核心添加）
+  { 
+    path: '/profile', 
+    name: 'ProfilePage',
+    component: ProfilePage,
+    // 可选：添加路由元信息，标记需要登录才能访问
+    meta: { 
+      requireAuth: true 
+    }
   },
   // 原有功能页面路由
   {
@@ -195,18 +206,18 @@ const router = createRouter({
 })
 
 // 可选：添加路由守卫（如需登录后才能访问其他页面，可取消注释）
-// router.beforeEach((to, from, next) => {
-//   // 排除登录、注册、首页（可根据需求调整）
-//   const whiteList = ['/login', '/register', '/', '/job-detail']
-//   // 从localStorage获取token（登录成功后存储）
-//   const hasToken = localStorage.getItem('token')
+router.beforeEach((to, from, next) => {
+  // 排除登录、注册、首页（可根据需求调整）
+  const whiteList = ['/login', '/register', '/', '/job-detail']
+  // 从localStorage获取token（登录成功后存储）
+  const hasToken = localStorage.getItem('token')
   
-//   if (whiteList.includes(to.path) || to.path.startsWith('/job-detail')) {
-//     next()
-//   } else {
-//     // 无token则跳转到登录页
-//     hasToken ? next() : next('/login')
-//   }
-// })
+  // 如果路由需要认证且不在白名单，检查token
+  if (to.meta.requireAuth && !whiteList.includes(to.path)) {
+    hasToken ? next() : next('/login')
+  } else {
+    next()
+  }
+})
 
 export default router
