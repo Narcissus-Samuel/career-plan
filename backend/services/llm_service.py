@@ -601,12 +601,91 @@ def generate_dynamic_job_profile(job_name: str) -> Optional[Dict[str, Any]]:
     conn.close()
     return None
 
-# ========== 岗位图谱构建相关（修改部分以满足要求） ==========
+# ========== 岗位图谱构建模块 ==========
+import json
 import re
 from collections import defaultdict
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any, Optional
 
-# 级别关键词及顺序（值越大级别越高）
+from db import get_db
+
+# -------------------- 辅助函数（从画像中获取各类信息） --------------------
+def get_job_description(job_name: str) -> str:
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT job_description FROM job WHERE job_name = ? LIMIT 1", (job_name,))
+    row = cursor.fetchone()
+    conn.close()
+    return row['job_description'].strip() if row and row['job_description'] else ""
+
+def get_job_skills(job_name: str) -> List[str]:
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT skills FROM job_profile WHERE job_name = ?", (job_name,))
+    row = cursor.fetchone()
+    conn.close()
+    if row and row['skills']:
+        try:
+            return json.loads(row['skills'])
+        except:
+            return []
+    return []
+
+def get_job_certificates(job_name: str) -> List[str]:
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT certificates FROM job_profile WHERE job_name = ?", (job_name,))
+    row = cursor.fetchone()
+    conn.close()
+    if row and row['certificates']:
+        try:
+            return json.loads(row['certificates'])
+        except:
+            return []
+    return []
+
+def get_job_soft_abilities(job_name: str) -> Dict[str, Dict[str, Any]]:
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT soft_abilities FROM job_profile WHERE job_name = ?", (job_name,))
+    row = cursor.fetchone()
+    conn.close()
+    if row and row['soft_abilities']:
+        try:
+            return json.loads(row['soft_abilities'])
+        except:
+            return {}
+    return {}
+
+def get_job_category(job_name: str) -> str:
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT c.name FROM job_categories c
+        JOIN job j ON j.category_id = c.id
+        WHERE j.job_name = ?
+    """, (job_name,))
+    row = cursor.fetchone()
+    conn.close()
+    return row['name'] if row else ""
+
+def get_all_job_names() -> List[str]:
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT job_name FROM job")
+    rows = cursor.fetchall()
+    conn.close()
+    return [row['job_name'] for row in rows]
+
+def get_jobs_with_profile() -> List[str]:
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT job_name FROM job_profile")
+    rows = cursor.fetchall()
+    conn.close()
+    return [row['job_name'] for row in rows]
+
+# -------------------- 级别关键词处理（用于规则兜底） --------------------
 LEVEL_KEYWORDS = {
     "实习": 0,
     "初级": 1,
@@ -621,7 +700,6 @@ LEVEL_KEYWORDS = {
 }
 
 def extract_level(job_title: str) -> int:
-    """从岗位名称中提取级别分数，返回最高匹配级别（0表示无级别）"""
     title_lower = job_title.lower()
     max_level = 0
     for kw, level in LEVEL_KEYWORDS.items():
@@ -631,265 +709,285 @@ def extract_level(job_title: str) -> int:
     return max_level
 
 def extract_base_job(job_title: str) -> str:
-    """去除岗位名称中的级别关键词，返回基础职位名（用于分组）"""
     base = job_title
     for kw in LEVEL_KEYWORDS.keys():
         base = base.replace(kw, "").strip()
-    # 去除多余空格
     base = re.sub(r'\s+', ' ', base).strip()
     return base
 
+# -------------------- 相似度计算 --------------------
 def get_skill_similarity(job1: str, job2: str) -> float:
-    """
-    计算两个岗位的技能相似度（基于 job_profile 或 job_categories 中的技能列表）
-    返回 0-1 之间的分数
-    """
-    from db import get_db
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    # 尝试从 job_profile 获取技能（更精确）
-    cursor.execute("SELECT skills FROM job_profile WHERE job_name = ?", (job1,))
-    row1 = cursor.fetchone()
-    cursor.execute("SELECT skills FROM job_profile WHERE job_name = ?", (job2,))
-    row2 = cursor.fetchone()
-    
-    # 如果都没有单独画像，尝试从所属大类获取技能
-    if not row1 or not row2:
-        # 获取岗位的 category_id
-        cursor.execute("SELECT category_id FROM job WHERE job_name = ? LIMIT 1", (job1,))
-        cat1 = cursor.fetchone()
-        cursor.execute("SELECT category_id FROM job WHERE job_name = ? LIMIT 1", (job2,))
-        cat2 = cursor.fetchone()
-        if cat1 and cat1['category_id'] and cat2 and cat2['category_id']:
-            cursor.execute("SELECT skills FROM job_categories WHERE id = ?", (cat1['category_id'],))
-            row1 = cursor.fetchone()
-            cursor.execute("SELECT skills FROM job_categories WHERE id = ?", (cat2['category_id'],))
-            row2 = cursor.fetchone()
-    
-    conn.close()
-    
-    if not row1 or not row2:
-        return 0.0
-    
-    try:
-        skills1 = set(json.loads(row1['skills']) if row1['skills'] else [])
-        skills2 = set(json.loads(row2['skills']) if row2['skills'] else [])
-    except:
-        return 0.0
-    
+    skills1 = set(get_job_skills(job1))
+    skills2 = set(get_job_skills(job2))
     if not skills1 or not skills2:
         return 0.0
-    
     intersection = skills1 & skills2
     union = skills1 | skills2
     return len(intersection) / len(union)
 
-def get_job_skills(job_name: str) -> List[str]:
-    """
-    根据岗位名称获取技能列表（优先从 job_profile 获取，若没有则从所属大类获取）
-    """
-    from db import get_db
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    # 尝试从 job_profile 获取
-    cursor.execute("SELECT skills FROM job_profile WHERE job_name = ?", (job_name,))
-    row = cursor.fetchone()
-    if row and row['skills']:
-        try:
-            skills = json.loads(row['skills'])
-            conn.close()
-            return skills if isinstance(skills, list) else []
-        except:
-            pass
-    
-    # 如果没有单独画像，获取所属大类
-    cursor.execute("SELECT category_id FROM job WHERE job_name = ? LIMIT 1", (job_name,))
-    cat_row = cursor.fetchone()
-    if cat_row and cat_row['category_id']:
-        cursor.execute("SELECT skills FROM job_categories WHERE id = ?", (cat_row['category_id'],))
-        cat_skills = cursor.fetchone()
-        if cat_skills and cat_skills['skills']:
-            try:
-                skills = json.loads(cat_skills['skills'])
-                conn.close()
-                return skills if isinstance(skills, list) else []
-            except:
-                pass
-    conn.close()
-    return []
+def get_soft_ability_similarity(job1: str, job2: str) -> float:
+    soft1 = get_job_soft_abilities(job1)
+    soft2 = get_job_soft_abilities(job2)
+    if not soft1 or not soft2:
+        return 0.0
+    all_dims = set(soft1.keys()) | set(soft2.keys())
+    if not all_dims:
+        return 0.0
+    v1 = [soft1.get(dim, {}).get('score', 0) for dim in all_dims]
+    v2 = [soft2.get(dim, {}).get('score', 0) for dim in all_dims]
+    dot = sum(a*b for a,b in zip(v1, v2))
+    norm1 = sum(a*a for a in v1)**0.5
+    norm2 = sum(b*b for b in v2)**0.5
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+    return dot / (norm1 * norm2)
 
-# ---------- 垂直路径生成（基于级别分组，并添加具体技能描述） ----------
+def get_certificate_similarity(job1: str, job2: str) -> float:
+    certs1 = set(get_job_certificates(job1))
+    certs2 = set(get_job_certificates(job2))
+    if not certs1 or not certs2:
+        return 0.0
+    intersection = certs1 & certs2
+    union = certs1 | certs2
+    return len(intersection) / len(union)
+
+def get_comprehensive_similarity(job1: str, job2: str, weights=(0.6, 0.3, 0.1)) -> float:
+    skill_sim = get_skill_similarity(job1, job2)
+    soft_sim = get_soft_ability_similarity(job1, job2)
+    cert_sim = get_certificate_similarity(job1, job2)
+    return weights[0]*skill_sim + weights[1]*soft_sim + weights[2]*cert_sim
+
+# -------------------- 垂直路径生成 --------------------
 def build_vertical_paths() -> List[Tuple[str, str, str, str]]:
-    """
-    构建垂直晋升路径（基于岗位名称中的级别关键词），每个路径描述包含目标岗位所需技能。
-    """
     from db import get_db
     conn = get_db()
     cursor = conn.cursor()
-    
-    cursor.execute("SELECT DISTINCT job_name FROM job")
-    rows = cursor.fetchall()
-    all_jobs = [row['job_name'] for row in rows]
-    
-    groups = defaultdict(list)
-    for job in all_jobs:
-        base = extract_base_job(job)
-        level = extract_level(job)
-        groups[base].append((job, level))
-    
-    relations = []
-    for base, jobs_with_level in groups.items():
-        if len(jobs_with_level) < 2:
-            continue
-        sorted_jobs = sorted(jobs_with_level, key=lambda x: x[1])
-        for i in range(len(sorted_jobs)-1):
-            from_job = sorted_jobs[i][0]
-            to_job = sorted_jobs[i+1][0]
-            if sorted_jobs[i][1] == sorted_jobs[i+1][1]:
-                continue
-            # 获取目标岗位技能
-            skills = get_job_skills(to_job)
-            skills_desc = "、".join(skills[:5]) if skills else ""
-            if skills_desc:
-                desc = f"晋升路径：从 {from_job} 到 {to_job}，需要掌握 {skills_desc} 等核心技能。"
-            else:
-                desc = f"晋升路径：从 {from_job} 到 {to_job}，需要提升技术深度和管理能力。"
-            relations.append((from_job, to_job, 'promotion', desc))
-    
-    conn.close()
-    return relations
 
-# ---------- 垂直路径生成（使用大模型，并添加具体技能描述） ----------
-def build_vertical_paths_using_llm() -> List[Tuple[str, str, str, str]]:
-    """
-    使用大模型为部分核心岗位生成晋升路径，每条路径描述包含目标岗位所需技能。
-    """
-    from db import get_db
-    conn = get_db()
-    cursor = conn.cursor()
+    profile_jobs = get_jobs_with_profile()
+    if not profile_jobs:
+        print("警告：没有有画像的岗位，无法生成垂直路径")
+        return []
+
+    # 固定取 18 个岗位
     cursor.execute("""
         SELECT job_name, COUNT(*) as cnt FROM job 
+        WHERE job_name IN ({}) 
         GROUP BY job_name 
         ORDER BY cnt DESC 
-        LIMIT 15
-    """)
+        LIMIT 18
+    """.format(','.join(['?']*len(profile_jobs))), profile_jobs)
+    
     core_jobs = [row['job_name'] for row in cursor.fetchall()]
     conn.close()
 
     relations = []
+
     for job in core_jobs:
-        prompt = f"请根据行业常识，列举{job}可能的职业晋升路径（直接上级岗位名称），最多3个，以JSON数组形式返回，如['高级{job}', '{job}经理', '技术总监']。只返回数组，不要其他文字。"
+        prompt = f"""
+        你是职业规划专家。请根据行业常识，为【{job}】生成标准晋升路径。
+        要求：
+        1. 只输出连续的上级岗位名称，最多3个；
+        2. 必须是真实存在、同领域岗位；
+        3. 只返回干净JSON数组，不要任何多余文字、解释、标点。
+        示例：["高级工程师","技术主管","技术经理"]
+        """
         result = _call_zhipu(prompt, temperature=0.3, max_tokens=200)
         if not result:
             continue
+
         try:
-            import re
             json_match = re.search(r'```json\n(.*?)\n```', result, re.DOTALL)
             if json_match:
                 result = json_match.group(1)
             targets = json.loads(result)
-            if isinstance(targets, list):
+            if isinstance(targets, list) and targets:
+                prev = job
                 for target in targets:
-                    # 获取目标岗位技能
-                    skills = get_job_skills(target)
-                    skills_desc = "、".join(skills[:5]) if skills else ""
-                    if skills_desc:
-                        desc = f"晋升路径：从 {job} 到 {target}，需要掌握 {skills_desc} 等核心技能。"
-                    else:
-                        desc = f"晋升路径：从 {job} 到 {target}，需要提升技术深度和管理能力。"
-                    relations.append((job, target, 'promotion', desc))
+                    from_skills = get_job_skills(prev)
+                    from_certs = get_job_certificates(prev)
+                    desc_parts = [f"【{prev}】"]
+
+                    if from_skills:
+                        skills_desc = "、".join(from_skills[:5])
+                        if len(from_skills) > 5:
+                            skills_desc += "等"
+                        desc_parts.append(f"所需技能：{skills_desc}")
+
+                    if from_certs:
+                        certs_desc = "、".join(from_certs[:3])
+                        if len(from_certs) > 3:
+                            certs_desc += "等"
+                        desc_parts.append(f"所需证书：{certs_desc}")
+
+                    desc_parts.append(f"可晋升至【{target}】,需提升技能和管理能力")
+                    desc = " ".join(desc_parts)
+                    relations.append((prev, target, 'promotion', desc))
+                    prev = target
         except Exception as e:
-            print(f"解析晋升路径失败 for {job}: {e}")
+            print(f"晋升路径解析失败 {job}: {e}")
+
     return relations
 
-# ---------- 横向路径生成（基于技能相似度，描述包含需要补充的技能） ----------
-def build_lateral_paths(top_n: int = 25, min_paths: int = 2, similarity_threshold: float = 0.15) -> List[Tuple[str, str, str, str]]:
+
+# -------------------- 横向路径生成（大类内匹配 + 画像兜底） --------------------
+def build_lateral_paths(
+    source_jobs: List[str] = None,
+    min_paths: int = 3,
+    similarity_threshold: float = 0.2  # 温和阈值，保证有结果
+) -> List[Tuple[str, str, str, str]]:
     """
-    构建横向换岗路径：
-    - 只考虑相似度 >= similarity_threshold 的岗位。
-    - 为每个核心岗位选取相似度最高的 min_paths 条路径（如果不足则只返回实际数量）。
-    - 路径描述中列出需要补充的具体技能（目标岗位有而源岗位没有的技能）。
+    横向路径生成逻辑：
+    1. 只在同一大类内匹配岗位
+    2. 优先使用岗位独立画像，无独立画像则用大类通用画像
+    3. 按技能+软能力+证书相似度排序，取TOP3
     """
-    from db import get_db
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT job_name, COUNT(*) as cnt FROM job 
-        GROUP BY job_name 
-        ORDER BY cnt DESC 
-        LIMIT ?
-    """, (top_n,))
-    core_jobs = [row['job_name'] for row in cursor.fetchall()]
-    
-    cursor.execute("SELECT DISTINCT job_name FROM job")
-    all_jobs = [row['job_name'] for row in cursor.fetchall()]
-    conn.close()
-    
+    if source_jobs is None:
+        source_jobs = get_jobs_with_profile()
+    target_jobs = get_all_job_names()
+
+    # 辅助函数：获取岗位/大类画像（兜底逻辑）
+    def _get_profile_data(job_name: str, data_type: str) -> Any:
+        """
+        data_type: skills/certificates/soft_abilities
+        优先取岗位独立画像，无则取所属大类画像
+        """
+        # 1. 尝试取独立画像
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT {data_type} FROM job_profile WHERE job_name = ?", (job_name,))
+        row = cursor.fetchone()
+        if row and row[data_type]:
+            conn.close()
+            try:
+                return json.loads(row[data_type])
+            except:
+                pass
+        
+        # 2. 取所属大类画像兜底
+        cursor.execute("""
+            SELECT c.{0} FROM job_categories c
+            JOIN job j ON j.category_id = c.id
+            WHERE j.job_name = ? LIMIT 1
+        """.format(data_type), (job_name,))
+        row = cursor.fetchone()
+        conn.close()
+        if row and row[data_type]:
+            try:
+                return json.loads(row[data_type])
+            except:
+                pass
+        
+        # 3. 兜底空值
+        if data_type == "soft_abilities":
+            return {}
+        return []
+
+    # 重写相似度计算（兼容画像兜底）
+    def _calc_similarity(job1: str, job2: str) -> float:
+        # 技能相似度
+        skills1 = set(_get_profile_data(job1, "skills"))
+        skills2 = set(_get_profile_data(job2, "skills"))
+        skill_sim = len(skills1 & skills2) / len(skills1 | skills2) if (skills1 or skills2) else 0.0
+        
+        # 软能力相似度（余弦相似度）
+        soft1 = _get_profile_data(job1, "soft_abilities")
+        soft2 = _get_profile_data(job2, "soft_abilities")
+        all_dims = set(soft1.keys()) | set(soft2.keys())
+        v1 = [soft1.get(dim, {}).get("score", 0) for dim in all_dims]
+        v2 = [soft2.get(dim, {}).get("score", 0) for dim in all_dims]
+        dot = sum(a*b for a,b in zip(v1, v2))
+        norm1 = sum(a*a for a in v1)**0.5
+        norm2 = sum(b*b for b in v2)**0.5
+        soft_sim = dot / (norm1 * norm2) if (norm1 and norm2) else 0.0
+        
+        # 证书相似度
+        certs1 = set(_get_profile_data(job1, "certificates"))
+        certs2 = set(_get_profile_data(job2, "certificates"))
+        cert_sim = len(certs1 & certs2) / len(certs1 | certs2) if (certs1 or certs2) else 0.0
+        
+        # 权重分配（技能为主，软能力为辅，证书补充）
+        return 0.6 * skill_sim + 0.3 * soft_sim + 0.1 * cert_sim
+
     relations = []
-    for job in core_jobs:
+    for job in source_jobs:
         similarities = []
-        for other in all_jobs:
+        job_category = get_job_category(job)  # 获取当前岗位大类
+        
+        # 遍历所有目标岗位，只匹配同大类
+        for other in target_jobs:
             if other == job:
                 continue
-            sim = get_skill_similarity(job, other)
+            other_category = get_job_category(other)
+            # 只在同一大类内匹配
+            if job_category and other_category and job_category != other_category:
+                continue
+            
+            # 计算相似度（兼容画像兜底）
+            sim = _calc_similarity(job, other)
             if sim >= similarity_threshold:
                 similarities.append((other, sim))
         
+        # 按相似度排序，取TOP3
         similarities.sort(key=lambda x: x[1], reverse=True)
         selected = similarities[:min_paths]
         
+        # 生成横向路径描述
         for to_job, sim in selected:
-            # 获取源岗位和目标岗位的技能集合
-            from_skills = set(get_job_skills(job))
-            to_skills = set(get_job_skills(to_job))
+            # 获取技能/软能力/证书（兜底逻辑）
+            from_skills = set(_get_profile_data(job, "skills"))
+            to_skills = set(_get_profile_data(to_job, "skills"))
+            from_soft = _get_profile_data(job, "soft_abilities")
+            to_soft = _get_profile_data(to_job, "soft_abilities")
+            from_certs = set(_get_profile_data(job, "certificates"))
+            to_certs = set(_get_profile_data(to_job, "certificates"))
             
-            # 需要补充的技能 = 目标岗位有而源岗位没有
+            # 计算需补充的能力
             need_skills = to_skills - from_skills
+            need_soft = []
+            for dim, val in to_soft.items():
+                from_score = from_soft.get(dim, {}).get('score', 0)
+                to_score = val.get('score', 0)
+                if to_score > from_score + 1:
+                    need_soft.append(dim)
+            need_certs = to_certs - from_certs
             
+            # 拼接描述
+            desc_parts = [f"【{job}】可换岗至【{to_job}】"]
             if need_skills:
-                skills_list = list(need_skills)[:5]
-                skills_desc = "、".join(skills_list)
-                if len(need_skills) > 5:
-                    skills_desc += "等"
-                desc = f"可考虑换岗至 {to_job}，需补充 {skills_desc} 技能。"
-            else:
-                desc = f"可考虑换岗至 {to_job}，技能匹配度高，建议深入了解岗位实际需求。"
+                desc_parts.append(f"需补充技能：{'、'.join(list(need_skills)[:5])}")
+            if need_soft:
+                desc_parts.append(f"需提升软能力：{'、'.join(need_soft[:3])}")
+            if need_certs:
+                desc_parts.append(f"建议证书：{'、'.join(list(need_certs)[:3])}")
             
+            desc = "；".join(desc_parts)
             relations.append((job, to_job, 'transition', desc))
-    
+
     return relations
 
-# ---------- 重建岗位图谱 ----------
+# -------------------- 重建图谱：固定 18 个岗位 --------------------
 def rebuild_job_graph() -> Tuple[int, int]:
-    """
-    重建岗位图谱：清空 job_relations，然后重新插入垂直晋升和横向换岗路径。
-    返回 (垂直路径数量, 横向路径数量)
-    """
     from db import get_db
     conn = get_db()
     cursor = conn.cursor()
-    
     cursor.execute("DELETE FROM job_relations")
-    
-    # 使用大模型生成垂直路径（也可以使用基于级别的 build_vertical_paths，但大模型更灵活）
-    vertical = build_vertical_paths_using_llm()
+
+    # 生成垂直路径（18个岗位）
+    vertical = build_vertical_paths()
     for rel in vertical:
-        cursor.execute("""
-            INSERT INTO job_relations (from_job, to_job, relation_type, description)
-            VALUES (?, ?, ?, ?)
-        """, rel)
-    
-    # 构建横向路径：阈值0.3，确保每个核心岗位至少2条（如果不足则只取实际数量）
-    lateral = build_lateral_paths(top_n=25, min_paths=2, similarity_threshold=0.15)
-    for rel in lateral:
-        cursor.execute("""
-            INSERT INTO job_relations (from_job, to_job, relation_type, description)
-            VALUES (?, ?, ?, ?)
-        """, rel)
-    
+        cursor.execute("INSERT INTO job_relations (from_job, to_job, relation_type, description) VALUES (?, ?, ?, ?)", rel)
+
+    # 横向也用 18 个岗位，每个 3 条路径
+    profile_jobs = get_jobs_with_profile()
+    source_jobs = profile_jobs[:18] 
+
+    lateral = build_lateral_paths(source_jobs=source_jobs, min_paths=3, similarity_threshold=0.2)
+
+    if lateral:
+        for rel in lateral:
+            cursor.execute("INSERT INTO job_relations (from_job, to_job, relation_type, description) VALUES (?, ?, ?, ?)", rel)
+
     conn.commit()
     conn.close()
+    print(f"图谱构建完成：18个岗位，垂直路径 {len(vertical)} 条，横向路径 {len(lateral)} 条")
     return len(vertical), len(lateral)
