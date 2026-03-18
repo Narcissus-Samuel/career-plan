@@ -2,7 +2,6 @@ import sqlite3
 import os
 import re
 import json
-# 注意：确保 config.py 文件中定义了 SQLITE_DB_PATH 和 UPLOAD_FOLDER
 from config import SQLITE_DB_PATH, UPLOAD_FOLDER
 
 try:
@@ -118,7 +117,8 @@ def init_db():
             )
         ''')
 
-    # 学生表
+    # ---------- 学生表 ----------
+    # 原有 student 表创建（保留所有字段）
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS student (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -135,6 +135,31 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    
+    # ========== 新增字段（用于存储更详细的能力画像） ==========
+    # 获取现有字段列表
+    cursor.execute("PRAGMA table_info(student)")
+    existing_columns = [row['name'] for row in cursor.fetchall()]
+    
+    # 需要添加的字段及其类型
+    new_columns = [
+        ('phone', 'TEXT'),
+        ('email', 'TEXT'),
+        ('education_text', 'TEXT'),
+        ('work_text', 'TEXT'),
+        ('project_text', 'TEXT'),
+        ('skills_certs_text', 'TEXT'),
+        ('summary', 'TEXT'),
+        ('soft_abilities', 'TEXT'),
+        ('interest_scores', 'TEXT')
+    ]
+    
+    for col_name, col_type in new_columns:
+        if col_name not in existing_columns:
+            cursor.execute(f"ALTER TABLE student ADD COLUMN {col_name} {col_type}")
+            print(f"已添加字段 {col_name} 到 student 表")
+    
+    # 原有 user_id 字段检查（保留）
     cursor.execute("PRAGMA table_info(student)")
     cols = [row['name'] for row in cursor.fetchall()]
     if 'user_id' not in cols:
@@ -418,7 +443,7 @@ def init_db():
         )
     ''')
 
-    # 测评结果表
+    # 测评结果表（用于存储兴趣测评结果）
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS assessment_results (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
