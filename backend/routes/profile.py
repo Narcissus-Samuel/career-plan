@@ -208,7 +208,6 @@ def upload_resume():
 
 @profile_bp.route('/<int:student_id>', methods=['GET'])
 def get_profile(student_id):
-    """获取学生能力画像"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
@@ -218,11 +217,23 @@ def get_profile(student_id):
         FROM student WHERE id = ?
     ''', (student_id,))
     row = cursor.fetchone()
-    conn.close()
     if not row:
+        conn.close()
         return jsonify({'error': '学生不存在'}), 404
+    
     profile = dict(row)
     profile['skills'] = json.loads(profile['skills']) if profile['skills'] else []
     profile['certificates'] = json.loads(profile['certificates']) if profile['certificates'] else []
     profile['soft_abilities'] = json.loads(profile['soft_abilities']) if profile['soft_abilities'] else {}
+    
+    # 获取该学生关联用户的最新兴趣测评得分
+    if profile['user_id']:
+        cursor.execute('''
+            SELECT dimension_scores FROM assessment_results
+            WHERE user_id = ? ORDER BY id DESC LIMIT 1
+        ''', (profile['user_id'],))
+        interest_row = cursor.fetchone()
+        if interest_row:
+            profile['interest'] = json.loads(interest_row['dimension_scores'])
+    conn.close()
     return jsonify(profile)

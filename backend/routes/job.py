@@ -308,3 +308,15 @@ def get_lateral_path(job_name):
     rows = cursor.fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
+
+@job_bp.route('/names', methods=['GET'])
+def get_all_job_names():
+    """返回所有去重后的岗位名称列表，用于前端筛选标签"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT job_name FROM job WHERE job_name IS NOT NULL AND job_name != '' ORDER BY job_name")
+    rows = cursor.fetchall()
+    conn.close()
+    # 提取名称列表
+    job_names = [row['job_name'] for row in rows]
+    return jsonify(job_names)

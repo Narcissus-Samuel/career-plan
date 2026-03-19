@@ -55,8 +55,8 @@
     <!-- 主体内容 -->
     <main class="main-content">
       <div class="content-container">
-        <!-- 步骤指示器 -->
-        <div class="step-indicator">
+        <!-- 步骤指示器（优化为玻璃态卡片） -->
+        <div class="step-indicator glass-panel">
           <div
             v-for="(step, index) in steps"
             :key="index"
@@ -69,17 +69,17 @@
         </div>
 
         <!-- 第一步：个人信息与简历信息 -->
-        <div v-if="activeStep === 0" class="step-content">
+        <div v-if="activeStep === 0" class="step-content glass-panel">
           <h2 class="section-title">📋 个人信息</h2>
           <div class="personal-info">
-            <el-input v-model="personalInfo.name" placeholder="姓名" size="large" class="info-input" />
-            <el-input v-model="personalInfo.phone" placeholder="手机号" size="large" class="info-input" />
-            <el-input v-model="personalInfo.email" placeholder="邮箱" size="large" class="info-input" />
+            <el-input v-model="personalInfo.name" placeholder="姓名" size="large" class="info-input" clearable />
+            <el-input v-model="personalInfo.phone" placeholder="手机号" size="large" class="info-input" clearable />
+            <el-input v-model="personalInfo.email" placeholder="邮箱" size="large" class="info-input" clearable />
           </div>
 
           <h2 class="section-title" style="margin-top: 32px;">📄 简历信息</h2>
-          <div class="resume-score" v-if="resumeScore">
-            <span class="score-label">简历完成度</span>
+          <div v-if="studentId" class="resume-score">
+            <span class="score-label">简历完整度</span>
             <span class="score-value">{{ resumeScore }}%</span>
             <div class="score-bar"><div class="bar-fill" :style="{ width: resumeScore + '%' }"></div></div>
           </div>
@@ -105,6 +105,9 @@
               <span class="file-name">{{ uploadedFile.name }}</span>
               <span class="file-size">{{ (uploadedFile.size / 1024).toFixed(1) }} KB</span>
               <el-button type="text" @click="removeFile">移除</el-button>
+            </div>
+            <div class="step-actions" style="margin-top: 20px;">
+              <el-button type="primary" size="large" @click="submitUpload" :loading="uploading">开始解析</el-button>
             </div>
           </div>
 
@@ -138,20 +141,33 @@
             </div>
           </div>
 
-          <div class="step-actions">
-            <el-button type="primary" size="large" @click="nextStep">保存并下一步</el-button>
+          <div class="step-actions" v-if="inputMode === 'manual'">
+            <el-button type="primary" size="large" @click="submitManual" :loading="submitting">保存并下一步</el-button>
           </div>
         </div>
 
-        <!-- 第二步：兴趣探索 -->
-        <div v-if="activeStep === 1" class="step-content">
+      <!-- 第二步：兴趣探索（真实测评） -->
+        <div v-if="activeStep === 1" class="step-content glass-panel">
           <h2 class="section-title">🎯 兴趣探索</h2>
           <div class="interest-box">
             <p>通过兴趣测试，你可以发现更适合自己的职业方向。你也可以选择跳过，直接基于能力进行匹配。</p>
             <el-checkbox v-model="skipInterest">跳过兴趣探索</el-checkbox>
             <div v-if="!skipInterest" class="interest-test">
-              <p>（此处可嵌入霍兰德职业兴趣测试题目）</p>
-              <el-button type="primary" @click="finishInterestTest">完成测试</el-button>
+              <div v-if="loadingQuestions" class="loading">加载题目中...</div>
+              <div v-else>
+                <div v-for="(question, idx) in questions" :key="question.id" class="question-item">
+                  <p>{{ idx + 1 }}. {{ question.question }}</p>
+                  <el-slider
+                    v-model="answers[question.id]"
+                    :min="1"
+                    :max="5"
+                    :step="1"
+                    show-stops
+                    :marks="marks"
+                  />
+                </div>
+                <el-button type="primary" @click="submitInterestTest" :loading="submittingTest">提交测评</el-button>
+              </div>
             </div>
           </div>
           <div class="step-actions">
@@ -161,13 +177,11 @@
         </div>
 
         <!-- 第三步：AI能力画像生成 -->
-        <div v-if="activeStep === 2" class="step-content">
-          <h2 class="section-title">🤖 AI能力画像生成</h2>
+        <div v-if="activeStep === 2" class="step-content glass-panel">
+          <h2 class="section-title">🤖 AI能力画像</h2>
           <div v-if="!profileGenerated" class="generate-area">
-            <p>点击下方按钮，AI将根据你填写的信息生成能力画像。</p>
-            <el-button type="primary" size="large" @click="generateProfile" :loading="generating">
-              {{ generating ? '生成中...' : '生成能力画像' }}
-            </el-button>
+            <p>点击下方按钮，获取AI生成的能力画像。</p>
+            <el-button type="primary" size="large" @click="fetchProfile" :loading="fetchingProfile">获取能力画像</el-button>
           </div>
           <div v-else class="profile-result">
             <div class="result-card">
@@ -205,15 +219,15 @@
           </div>
         </div>
 
-        <!-- 第四步：人岗匹配（查看列表，无需选择） -->
-        <div v-if="activeStep === 3" class="step-content">
+        <!-- 第四步：人岗匹配 -->
+        <div v-if="activeStep === 3" class="step-content glass-panel">
           <h2 class="section-title">🎯 人岗匹配</h2>
           <div v-if="!matchStarted" class="match-start">
             <p>点击“立即匹配”，AI将分析你的能力与岗位的契合度，并推荐最适合的岗位。</p>
-            <el-button type="primary" size="large" @click="startMatch">立即匹配</el-button>
+            <el-button type="primary" size="large" @click="fetchMatchList" :loading="matching">立即匹配</el-button>
           </div>
           <div v-else class="match-result">
-            <el-table :data="matchList" style="width: 100%">
+            <el-table :data="matchList" style="width: 100%" stripe>
               <el-table-column prop="job_name" label="岗位名称" width="180" />
               <el-table-column prop="overall_score" label="匹配度" width="100">
                 <template #default="{ row }">{{ row.overall_score }}%</template>
@@ -233,8 +247,8 @@
           </div>
         </div>
 
-        <!-- 第五步：职业发展报告（可编辑、润色、导出） -->
-        <div v-if="activeStep === 4" class="step-content">
+        <!-- 第五步：职业发展报告 -->
+        <div v-if="activeStep === 4" class="step-content glass-panel">
           <h2 class="section-title">📄 职业发展报告</h2>
           <div class="report-area">
             <el-input
@@ -263,37 +277,26 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElLoading } from 'element-plus'
+import axios from 'axios'
 
-// 导航栏相关（与之前相同）
 const router = useRouter()
 const isLogin = ref(!!localStorage.getItem('token'))
 const userAvatar = ref(localStorage.getItem('avatar') || '')
 const isUserMenuOpen = ref(false)
 const darkMode = ref(localStorage.getItem('darkMode') === 'true')
+const token = localStorage.getItem('token')
+const userId = 3   // 临时写死，测试用
 
-const toggleUserMenu = () => { isUserMenuOpen.value = !isUserMenuOpen.value }
-const handleLogout = () => {
-  localStorage.clear()
-  isLogin.value = false
-  router.push('/')
-}
-const toggleTheme = () => {
-  darkMode.value = !darkMode.value
-  localStorage.setItem('darkMode', darkMode.value)
-}
-const goToFeature = (type) => {
-  const map = { '测评': '/interest-test', '分析': '/ability-analysis', '规划': '/development-path', '导出': '/report-export' }
-  router.push(map[type] || '/')
-}
-const handleSearch = () => {
-  const input = document.querySelector('.nav-search-input')
-  if (input.value.trim()) router.push(`/search?keyword=${encodeURIComponent(input.value.trim())}`)
-}
+// Axios 实例
+const api = axios.create({
+  baseURL: 'http://127.0.0.1:5000/api',
+  headers: { Authorization: token ? `Bearer ${token}` : '' }
+})
 
-// 步骤配置
+// 步骤定义
 const steps = ['填写信息', '兴趣探索', '能力画像', '人岗匹配', '生成报告']
 const activeStep = ref(0)
 
@@ -309,24 +312,21 @@ const resumeText = reactive({
   skillsCerts: '',
   summary: ''
 })
-const resumeScore = computed(() => {
-  let filled = 0
-  if (personalInfo.name) filled++
-  if (personalInfo.phone) filled++
-  if (personalInfo.email) filled++
-  if (resumeText.education) filled++
-  if (resumeText.work) filled++
-  if (resumeText.project) filled++
-  if (resumeText.skillsCerts) filled++
-  if (resumeText.summary) filled++
-  return Math.min(100, Math.round((filled / 8) * 100))
-})
+const studentId = ref(null)
+const resumeScore = computed(() => profile.value.completeness || 0)
+const uploading = ref(false)
+const submitting = ref(false)
 
 // 第二步数据
 const skipInterest = ref(false)
+const questions = ref([])
+const answers = ref({})
+const loadingQuestions = ref(false)
+const submittingTest = ref(false)
+const marks = { 1: '1', 2: '2', 3: '3', 4: '4', 5: '5' }
 
 // 第三步数据
-const generating = ref(false)
+const fetchingProfile = ref(false)
 const profileGenerated = ref(false)
 const profile = reactive({
   completeness: 0,
@@ -337,6 +337,7 @@ const profile = reactive({
 })
 
 // 第四步数据
+const matching = ref(false)
 const matchStarted = ref(false)
 const matchList = ref([])
 
@@ -344,17 +345,55 @@ const matchList = ref([])
 const reportContent = ref('')
 const polishing = ref(false)
 const exporting = ref(false)
+const reportId = ref(null)
 
-// 文件上传方法
+// ========== 导航栏方法 ==========
+const toggleUserMenu = () => {
+  isUserMenuOpen.value = !isUserMenuOpen.value
+}
+
+const handleLogout = () => {
+  localStorage.clear()
+  isLogin.value = false
+  router.push('/')
+}
+
+const toggleTheme = () => {
+  darkMode.value = !darkMode.value
+  localStorage.setItem('darkMode', darkMode.value)
+  // 可添加实际主题切换逻辑（如添加类名到 body）
+}
+
+const goToFeature = (type) => {
+  const map = {
+    '测评': '/interest-test',
+    '分析': '/ability-analysis',
+    '规划': '/development-path',
+    '导出': '/report-export'
+  }
+  router.push(map[type] || '/')
+}
+
+const handleSearch = () => {
+  const input = document.querySelector('.nav-search-input')
+  if (input.value.trim()) {
+    router.push(`/search?keyword=${encodeURIComponent(input.value.trim())}`)
+  }
+}
+
+// ========== 文件上传方法 ==========
 const triggerFileUpload = () => { fileInput.value.click() }
+
 const handleFileSelect = (e) => {
   const file = e.target.files[0]
   if (file) validateAndSetFile(file)
 }
+
 const handleFileDrop = (e) => {
   const file = e.dataTransfer.files[0]
   if (file) validateAndSetFile(file)
 }
+
 const validateAndSetFile = (file) => {
   const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
   if (!allowedTypes.includes(file.type)) {
@@ -367,90 +406,213 @@ const validateAndSetFile = (file) => {
   }
   uploadedFile.value = file
 }
+
 const removeFile = () => { uploadedFile.value = null }
 
-// 生成能力画像（模拟）
-const generateProfile = async () => {
-  generating.value = true
-  const loading = ElLoading.service({ lock: true, text: 'AI 正在分析...', background: 'rgba(0,0,0,0.7)' })
+// ========== 手动提交 ==========
+const submitManual = async () => {
+  if (!personalInfo.name || !personalInfo.phone || !personalInfo.email) {
+    ElMessage.warning('请填写完整的个人信息')
+    return
+  }
+  if (!userId) {
+    ElMessage.warning('请先登录')
+    return
+  }
+  submitting.value = true
   try {
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    profile.completeness = 85
-    profile.competitiveness = 78
-    profile.dimensions = { '专业技能': 82, '创新能力': 70, '学习能力': 88, '抗压能力': 75, '沟通能力': 80, '实习能力': 65 }
-    profile.skills = ['Python', 'Java', 'SQL', 'Vue']
-    profile.certificates = ['英语六级', '计算机二级']
+    const payload = {
+      user_id: parseInt(userId),
+      name: personalInfo.name,
+      phone: personalInfo.phone,
+      email: personalInfo.email,
+      education: resumeText.education,
+      work: resumeText.work,
+      project: resumeText.project,
+      skills_certs: resumeText.skillsCerts,
+      summary: resumeText.summary
+    }
+    const res = await api.post('/profile/submit', payload)
+    studentId.value = res.data.student_id
+    profile.completeness = res.data.completeness
+    profile.skills = res.data.skills
+    profile.certificates = res.data.certificates
+    const soft = res.data.soft_abilities
+    profile.dimensions = Object.fromEntries(Object.entries(soft).map(([k, v]) => [k, v.score]))
     profileGenerated.value = true
-    ElMessage.success('能力画像生成成功！')
+    activeStep.value++
+    ElMessage.success('信息提交成功')
+  } catch (err) {
+    ElMessage.error('提交失败：' + (err.response?.data?.error || err.message))
   } finally {
-    generating.value = false
-    loading.close()
+    submitting.value = false
   }
 }
 
-// 兴趣探索完成
-const finishInterestTest = () => {
-  ElMessage.success('兴趣测试完成！')
+// ========== 上传文件并解析 ==========
+const submitUpload = async () => {
+  if (!uploadedFile.value) {
+    ElMessage.warning('请先选择文件')
+    return
+  }
+  if (!userId) {
+    ElMessage.warning('请先登录')
+    return
+  }
+  uploading.value = true
+  const formData = new FormData()
+  formData.append('file', uploadedFile.value)
+  formData.append('user_id', parseInt(userId))
+  try {
+    const res = await api.post('/profile/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+    studentId.value = res.data.student_id
+    profile.skills = res.data.skills
+    profile.certificates = res.data.certificates
+    const soft = res.data.soft_abilities
+    profile.dimensions = Object.fromEntries(Object.entries(soft).map(([k, v]) => [k, v.score]))
+    profile.completeness = 80
+    profileGenerated.value = true
+    activeStep.value++
+    ElMessage.success('文件解析成功')
+  } catch (err) {
+    ElMessage.error('上传失败：' + (err.response?.data?.error || err.message))
+  } finally {
+    uploading.value = false
+  }
 }
 
-// 开始匹配
-const startMatch = async () => {
-  matchStarted.value = true
-  // 模拟获取匹配结果（包含详细分析）
-  matchList.value = [
-    { job_name: 'Java开发工程师', overall_score: 92, skill_fit: 88, soft_gap: 15 },
-    { job_name: '前端开发工程师', overall_score: 88, skill_fit: 85, soft_gap: 18 },
-    { job_name: '数据分析师', overall_score: 85, skill_fit: 80, soft_gap: 20 },
-    { job_name: '产品经理', overall_score: 82, skill_fit: 70, soft_gap: 25 },
-  ]
-  // 自动生成报告（基于匹配度最高的岗位）
-  generateReport(matchList.value[0])
+// ========== 获取能力画像 ==========
+const fetchProfile = async () => {
+  if (!studentId.value) {
+    ElMessage.warning('尚无学生信息，请先完成第一步')
+    return
+  }
+  fetchingProfile.value = true
+  try {
+    const res = await api.get(`/profile/${studentId.value}`)
+    const data = res.data
+    profile.skills = data.skills || []
+    profile.certificates = data.certificates || []
+    const soft = data.soft_abilities || {}
+    profile.dimensions = Object.fromEntries(Object.entries(soft).map(([k, v]) => [k, v.score]))
+    profile.completeness = data.completeness || 0
+    profile.competitiveness = data.competitiveness || 70
+    profileGenerated.value = true
+  } catch (err) {
+    ElMessage.error('获取画像失败：' + err.message)
+  } finally {
+    fetchingProfile.value = false
+  }
 }
 
-// 生成报告（基于给定岗位）
-const generateReport = (job) => {
-  reportContent.value = `# 职业生涯发展报告
-
-## 1. 人岗匹配分析
-根据您的能力画像，与您匹配度最高的岗位是 **${job.job_name}**，综合匹配度为 **${job.overall_score}%**。
-- **专业技能契合度**：${job.skill_fit}%，您在 ${profile.skills.join('、')} 等技能上与岗位要求匹配良好，建议进一步补充框架知识。
-- **通用素质差距**：${job.soft_gap}%，主要差距体现在创新能力和抗压能力上，建议通过参与项目锻炼。
-
-## 2. 职业目标设定
-结合您的兴趣和能力，建议将 **高级${job.job_name}** 作为中期目标，最终向架构师/技术专家方向发展。
-
-## 3. 职业发展路径
-参考岗位图谱，您的可能晋升路径为：
-- ${job.job_name} → 高级${job.job_name} → 技术主管 → 架构师
-
-## 4. 分阶段行动计划
-- **短期（0-6个月）**：深入学习Spring Boot/微服务架构，完成一个完整项目；考取相关证书。
-- **中期（6-12个月）**：参与开源项目或实习，积累实战经验；提升沟通与团队协作能力。
-
-## 5. 评估与调整
-建议每季度进行一次能力复盘，根据行业变化动态调整学习计划。`
+// ========== 获取测评题目 ==========
+const fetchQuestions = async () => {
+  loadingQuestions.value = true
+  try {
+    const res = await api.get('/assessment/questions')
+    questions.value = res.data
+    answers.value = {}
+    questions.value.forEach(q => { answers.value[q.id] = 3 })
+  } catch (err) {
+    ElMessage.error('获取题目失败：' + err.message)
+  } finally {
+    loadingQuestions.value = false
+  }
 }
 
-// 报告操作
+// ========== 提交兴趣测试 ==========
+const submitInterestTest = async () => {
+  if (!userId) {
+    ElMessage.warning('请先登录')
+    return
+  }
+  const answerList = Object.entries(answers.value).map(([question_id, score]) => ({
+    question_id: parseInt(question_id),
+    score
+  }))
+  submittingTest.value = true
+  try {
+    await api.post('/assessment/submit', {
+      user_id: parseInt(userId),
+      answers: answerList,
+      test_mode: false
+    })
+    ElMessage.success('兴趣测试提交成功')
+  } catch (err) {
+    ElMessage.error('提交失败：' + (err.response?.data?.error || err.message))
+  } finally {
+    submittingTest.value = false
+  }
+}
+
+// ========== 人岗匹配 ==========
+const fetchMatchList = async () => {
+  if (!studentId.value) {
+    ElMessage.warning('尚无学生信息')
+    return
+  }
+  matching.value = true
+  try {
+    const res = await api.get(`/match/recommend?student_id=${studentId.value}&limit=10`)
+    matchList.value = res.data
+    matchStarted.value = true
+    if (matchList.value.length > 0) {
+      generateReport(matchList.value[0])
+    }
+  } catch (err) {
+    ElMessage.error('匹配失败：' + err.message)
+  } finally {
+    matching.value = false
+  }
+}
+
+// ========== 生成报告 ==========
+const generateReport = async (job) => {
+  try {
+    const res = await api.post('/report/generate', { student_id: studentId.value, job_name: job.job_name })
+    reportContent.value = res.data.content
+    reportId.value = res.data.report_id
+  } catch (err) {
+    ElMessage.error('报告生成失败')
+  }
+}
+
+// ========== 润色 ==========
 const polishReport = async () => {
+  if (!reportContent.value) return
   polishing.value = true
-  ElMessage.loading({ content: '润色中...', duration: 0 })
-  await new Promise(resolve => setTimeout(resolve, 1500))
-  // 模拟润色，在末尾添加标记
-  reportContent.value = reportContent.value + '\n\n（已智能润色，表达更专业流畅）'
-  ElMessage.closeAll()
-  ElMessage.success('润色完成')
-  polishing.value = false
+  try {
+    const res = await api.post('/report/polish', { text: reportContent.value })
+    reportContent.value = res.data.polished
+  } catch (err) {
+    ElMessage.error('润色失败')
+  } finally {
+    polishing.value = false
+  }
 }
+
+// ========== 导出 PDF ==========
 const exportReport = async () => {
+  if (!reportContent.value) return
   exporting.value = true
-  ElMessage.loading({ content: '正在生成PDF...', duration: 0 })
-  await new Promise(resolve => setTimeout(resolve, 2000))
-  // 模拟导出成功
-  ElMessage.closeAll()
-  ElMessage.success('报告导出成功！文件已保存到下载目录。')
-  exporting.value = false
+  try {
+    const res = await api.post('/report/export', { markdown: reportContent.value }, { responseType: 'blob' })
+    const url = window.URL.createObjectURL(new Blob([res.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', 'career_report.pdf')
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    ElMessage.success('导出成功')
+  } catch (err) {
+    ElMessage.error('导出失败')
+  } finally {
+    exporting.value = false
+  }
 }
+
+// ========== 重置报告 ==========
 const resetReport = () => {
   if (matchList.value.length > 0) {
     generateReport(matchList.value[0])
@@ -459,22 +621,19 @@ const resetReport = () => {
   }
 }
 
-// 步骤导航
-const prevStep = () => {
-  if (activeStep.value > 0) activeStep.value--
-}
+// ========== 步骤导航 ==========
+const prevStep = () => { if (activeStep.value > 0) activeStep.value-- }
+
 const nextStep = () => {
-  if (activeStep.value === 0) {
-    if (!personalInfo.name || !personalInfo.phone || !personalInfo.email) {
-      ElMessage.warning('请填写完整的个人信息')
-      return
-    }
+  if (activeStep.value === 0 && !studentId.value) {
+    ElMessage.warning('请先提交个人信息')
+    return
   }
   if (activeStep.value === 1) {
-    // 兴趣探索可跳过，无需验证
+    // 兴趣探索可跳过
   }
   if (activeStep.value === 2 && !profileGenerated.value) {
-    ElMessage.warning('请先生成能力画像')
+    ElMessage.warning('请先获取能力画像')
     return
   }
   if (activeStep.value === 3 && !matchStarted.value) {
@@ -483,24 +642,34 @@ const nextStep = () => {
   }
   if (activeStep.value < steps.length - 1) activeStep.value++
 }
+
 const finish = () => {
   ElMessage.success('恭喜你完成了职业规划！')
   router.push('/')
 }
+
+// ========== 监听步骤变化加载题目 ==========
+watch(() => activeStep.value, (newVal) => {
+  if (newVal === 1 && !skipInterest.value && questions.value.length === 0) {
+    fetchQuestions()
+  }
+})
+
+// 组件挂载时检查登录状态（可选）
+onMounted(() => {
+  // 可在此处执行初始化操作，如检查 token 有效性
+})
 </script>
-
-
-
 <style scoped>
-/* ========== 全局样式 ========== */
+/* ========== 全局样式优化 ========== */
 .student-ability-page {
   width: 100%;
   min-height: 100vh;
-  font-family: "Microsoft Yahei", sans-serif;
-  color: #333;
-  background: linear-gradient(135deg, #f5f7fa 0%, #e4eaf5 100%);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: linear-gradient(145deg, #f9fafc 0%, #f0f3f8 100%);
   margin: 0;
   padding: 60px 0 0 0;
+  color: #1a2639;
 }
 
 /* ========== 导航栏 ========== */
@@ -559,8 +728,7 @@ const finish = () => {
 .user-menu .menu-item { padding: 10px 15px; font-size: 14px; cursor: pointer; height: auto; line-height: normal; margin: 0; color: #333; transition: background 0.3s ease; }
 .user-menu .menu-item:hover { background: #f0f7ff; color: #333; }
 .user-menu .logout { color: #ff4d4f; border-top: 1px solid #f0f0f0; }
-
-/* ========== 主体内容 ========== */
+/* 主体内容 */
 .main-content {
   padding: 40px 20px;
   display: flex;
@@ -571,13 +739,25 @@ const finish = () => {
   width: 100%;
 }
 
-/* ========== 步骤指示器 ========== */
+/* 玻璃态卡片 */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 32px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15), inset 0 1px 2px rgba(255,255,255,0.6);
+}
+
+/* 步骤指示器 */
 .step-indicator {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 40px;
-  padding: 0 20px;
+  padding: 24px 32px;
+  background: rgba(255,255,255,0.7);
+  border-radius: 60px;
 }
 .step-item {
   flex: 1;
@@ -585,267 +765,236 @@ const finish = () => {
   position: relative;
 }
 .step-number {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background: #e5e7eb;
-  color: #6b7280;
+  background: #e9ecf2;
+  color: #5a6a7a;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  margin: 0 auto 8px;
-  transition: all 0.3s;
+  margin: 0 auto 10px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.02);
 }
 .step-text {
-  font-size: 14px;
-  color: #6b7280;
+  font-size: 15px;
+  font-weight: 500;
+  color: #5a6a7a;
+  letter-spacing: 0.3px;
 }
 .step-item.active .step-number {
   background: #2563eb;
   color: white;
+  transform: scale(1.1);
+  box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.4);
 }
 .step-item.active .step-text {
   color: #2563eb;
-  font-weight: 500;
+  font-weight: 600;
 }
 .step-item.completed .step-number {
-  background: #22c55e;
+  background: #10b981;
   color: white;
 }
 .step-item.completed .step-text {
-  color: #22c55e;
+  color: #10b981;
 }
 
-/* ========== 步骤内容卡片 ========== */
+/* 步骤内容卡片 */
 .step-content {
-  background: white;
-  border-radius: 24px;
-  padding: 32px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  padding: 40px;
+  margin-top: 20px;
 }
 .section-title {
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 600;
   color: #1f2937;
   margin: 0 0 24px 0;
-  padding-bottom: 12px;
-  border-bottom: 2px solid #eef2f6;
+  padding-bottom: 16px;
+  border-bottom: 2px solid rgba(37, 99, 235, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-/* ========== 个人信息 ========== */
+/* 个人信息 */
 .personal-info {
   display: flex;
-  gap: 16px;
+  gap: 20px;
   margin-bottom: 32px;
 }
-.info-input {
-  flex: 1;
+.info-input :deep(.el-input__wrapper) {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+  border: 1px solid #edf2f7;
+  transition: all 0.2s;
+}
+.info-input :deep(.el-input__wrapper:hover) {
+  border-color: #2563eb;
+  box-shadow: 0 8px 16px -8px rgba(37,99,235,0.2);
 }
 
-/* ========== 输入模式切换 ========== */
+/* 输入模式切换 */
 .input-mode-switch {
   display: flex;
   gap: 16px;
-  margin: 20px 0;
+  margin: 24px 0;
 }
 .mode-btn {
   flex: 1;
-  padding: 12px;
+  padding: 14px 0;
   background: white;
   border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  border-radius: 40px;
   font-size: 16px;
   font-weight: 500;
   color: #64748b;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  backdrop-filter: blur(4px);
 }
 .mode-btn.active {
   background: #2563eb;
   color: white;
   border-color: #2563eb;
+  box-shadow: 0 12px 20px -10px #2563eb;
+}
+.mode-btn:hover:not(.active) {
+  background: #f8fafc;
+  border-color: #94a3b8;
 }
 
-/* ========== 上传简历区域 ========== */
-.upload-section, .manual-section {
-  margin-top: 20px;
-}
+/* 上传区域 */
 .upload-area {
   border: 2px dashed #cbd5e1;
-  border-radius: 16px;
-  padding: 40px;
+  border-radius: 32px;
+  padding: 48px 24px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s;
+  background: rgba(255,255,255,0.5);
 }
 .upload-area:hover {
   border-color: #2563eb;
-  background: #f0f9ff;
+  background: rgba(37,99,235,0.02);
+  transform: scale(1.01);
 }
-.upload-icon {
-  font-size: 48px;
-  color: #94a3b8;
-  margin-bottom: 16px;
-}
-.upload-text {
-  font-size: 18px;
-  font-weight: 500;
-  color: #1e293b;
-  margin-bottom: 8px;
-}
-.upload-tip {
-  font-size: 14px;
-  color: #64748b;
-}
-.file-info {
-  margin-top: 16px;
-  padding: 12px;
-  background: #f1f5f9;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.file-name {
-  font-weight: 500;
-  color: #1e293b;
-}
-.file-size {
-  color: #64748b;
-  font-size: 14px;
-}
+.upload-icon { font-size: 56px; color: #94a3b8; margin-bottom: 16px; }
+.upload-text { font-size: 20px; font-weight: 500; color: #1e293b; margin-bottom: 8px; }
+.upload-tip { font-size: 14px; color: #64748b; }
 
-/* ========== 手动填写简历模块 ========== */
-.resume-block {
-  margin-bottom: 24px;
-}
-.block-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #1f2937;
-  margin: 0 0 8px 0;
-}
+/* 手动填写模块 */
+.resume-block { margin-bottom: 28px; }
+.block-title { font-size: 18px; font-weight: 600; color: #1f2937; margin: 0 0 10px 0; }
 .block-textarea {
   width: 100%;
-  padding: 12px;
+  padding: 16px;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 20px;
+  font-size: 15px;
   font-family: inherit;
   resize: vertical;
-  transition: border 0.2s;
+  transition: all 0.2s;
+  background: white;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
 }
 .block-textarea:focus {
   outline: none;
   border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+  box-shadow: 0 0 0 4px rgba(37,99,235,0.1);
 }
-.block-hint {
-  font-size: 13px;
-  color: #94a3b8;
-  margin-top: 4px;
-}
+.block-hint { font-size: 13px; color: #94a3b8; margin-top: 8px; padding-left: 8px; }
 
-/* ========== 步骤操作按钮 ========== */
-.step-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 16px;
-  margin-top: 32px;
+/* 能力画像结果卡片 */
+.result-card {
+  background: rgba(255,255,255,0.7);
+  border-radius: 28px;
+  padding: 32px;
+  backdrop-filter: blur(4px);
 }
-
-/* ========== 兴趣探索 ========== */
-.interest-box {
-  padding: 20px;
-  background: #f8fafc;
-  border-radius: 12px;
-}
-.interest-test {
-  margin-top: 20px;
-  padding: 20px;
-  background: white;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-}
-
-/* ========== 能力画像结果 ========== */
-.profile-result { margin-top: 20px; }
-.result-card { background: #f9fafb; border-radius: 16px; padding: 24px; }
-.score-overview { display: flex; gap: 40px; margin-bottom: 24px; }
+.score-overview { display: flex; gap: 40px; margin-bottom: 32px; }
 .score-item { flex: 1; }
-.score-label { display: block; font-size: 14px; color: #64748b; margin-bottom: 4px; }
-.score-value { font-size: 28px; font-weight: 700; color: #1f2937; display: block; margin-bottom: 8px; }
-.score-bar { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
-.bar-fill { height: 100%; background: #2563eb; border-radius: 4px; }
-.dimension-scores { margin-bottom: 24px; }
-.dimension-grid { display: grid; gap: 12px; }
-.dimension-item { display: grid; grid-template-columns: 100px 1fr 40px; align-items: center; gap: 12px; }
-.dimension-name { color: #475569; }
-.dimension-bar { height: 8px; background: #e2e8f0; border-radius: 4px; }
-.dimension-score { font-weight: 600; color: #1e293b; }
-.skill-cert { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-.tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.tag { padding: 4px 12px; border-radius: 16px; font-size: 13px; }
+.score-label { display: block; font-size: 14px; color: #64748b; margin-bottom: 6px; }
+.score-value { font-size: 32px; font-weight: 700; color: #1f2937; display: block; margin-bottom: 8px; }
+.score-bar { height: 10px; background: #e2e8f0; border-radius: 20px; overflow: hidden; }
+.bar-fill { height: 100%; background: linear-gradient(90deg, #2563eb, #3b82f6); border-radius: 20px; }
+
+/* 维度网格 */
+.dimension-item {
+  display: grid;
+  grid-template-columns: 120px 1fr 50px;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 0;
+}
+.dimension-name { color: #475569; font-weight: 500; }
+.dimension-bar { height: 10px; background: #e2e8f0; border-radius: 20px; }
+.dimension-score { font-weight: 600; color: #1f2937; }
+
+/* 技能证书标签 */
+.tags { display: flex; flex-wrap: wrap; gap: 10px; }
+.tag {
+  padding: 6px 16px;
+  border-radius: 40px;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+}
 .skill-tag { background: #dbeafe; color: #1e40af; }
 .cert-tag { background: #dcfce7; color: #166534; }
 
-/* ========== 人岗匹配表格 ========== */
-.match-start { text-align: center; padding: 40px; }
-.match-result { margin-top: 20px; }
+/* 表格美化 */
 :deep(.el-table) {
-  --el-table-header-bg-color: #f8fafc;
-  border-radius: 12px;
+  border-radius: 24px;
   overflow: hidden;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(4px);
+}
+:deep(.el-table th) {
+  background: #f8fafc;
+  color: #1e293b;
+  font-weight: 600;
+  border-bottom: none;
+}
+:deep(.el-table tr) { background: transparent; }
+
+/* 按钮优化 */
+.el-button--primary {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  border: none;
+  border-radius: 40px;
+  padding: 12px 32px;
+  font-weight: 600;
+  box-shadow: 0 10px 20px -8px #2563eb;
+  transition: all 0.3s;
+}
+.el-button--primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 30px -10px #2563eb;
+}
+.el-button--success {
+  background: linear-gradient(135deg, #10b981, #34d399);
+  border: none;
+  border-radius: 40px;
+  padding: 12px 32px;
+  font-weight: 600;
+  box-shadow: 0 10px 20px -8px #10b981;
 }
 
-/* ========== 报告区域 ========== */
-.report-area { margin-top: 20px; }
-.report-actions { display: flex; gap: 16px; margin-top: 16px; justify-content: flex-end; }
-
-/* ========== 页脚 ========== */
-.footer {
-  background: #fff;
-  padding: 30px 0;
-  border-top: 1px solid #f0f0f0;
-  text-align: center;
-  color: #666;
-  font-size: 14px;
-  margin-top: 40px;
-}
-.footer-wrap {
-  width: 1200px;
-  margin: 0 auto;
-}
-
-/* ========== 动画 ========== */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-}
-
-/* ========== 响应式 ========== */
-@media (max-width: 1200px) {
-  .nav-wrap, .footer-wrap { width: 95%; padding: 0 20px; }
-  .content-container { width: 95%; }
-}
+/* 响应式优化 */
 @media (max-width: 768px) {
-  .nav-menu { display: none; }
   .personal-info { flex-direction: column; }
-  .input-mode-switch { flex-direction: column; }
-  .score-overview { flex-direction: column; gap: 20px; }
-  .skill-cert { grid-template-columns: 1fr; }
-  .dimension-item { grid-template-columns: 80px 1fr 30px; }
-  .step-actions { flex-direction: column; }
-  .report-actions { flex-direction: column; }
+  .step-indicator { flex-wrap: wrap; gap: 10px; }
+  .step-item { min-width: 80px; }
 }
 </style>
+
+
+
