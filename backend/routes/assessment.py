@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, session
 from db import get_db
 import json
 import random
-from services.llm_service import _call_zhipu
+from services.llm_service import call_llm
 
 assessment_bp = Blueprint('assessment', __name__, url_prefix='/api/assessment')
 
@@ -147,7 +147,7 @@ def generate_career_recommendation(dimension_scores):
 
     try:
         print(f"🔍 正在调用阿里云 LLM 生成推荐...")
-        response = _call_zhipu(prompt)
+        response = call_llm(prompt)
         if response:
             print(f"✅ LLM 调用成功，返回 {len(response)} 字符")
             return response.strip()

@@ -7,7 +7,8 @@ import subprocess
 import tempfile
 import os
 import logging
-from services.llm_service import _call_zhipu
+# 显式导入，方便测试时通过模块名拦截
+from services.llm_service import call_llm
 import markdown
 
 report_bp = Blueprint('report', __name__, url_prefix='/api/report')
@@ -19,23 +20,29 @@ if not os.path.exists(WEASYPRINT_PATH):
     logging.warning(f"WeasyPrint executable not found at {WEASYPRINT_PATH}. PDF export will fail.")
 
 def get_student_ability(student_id):
-    """获取学生能力画像，包括兴趣"""
+    """获取学生能力画像，包括兴趣和结构化履历"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT skills, certificates, soft_abilities, education_text, work_text, user_id
+        SELECT skills, certificates, soft_abilities, education_text, work_text, project_text,
+               education_json, work_json, project_json, user_id
         FROM student WHERE id = ?
     ''', (student_id,))
     row = cursor.fetchone()
     if not row:
         conn.close()
         return None
+
     student = {
         'skills': json.loads(row['skills']) if row['skills'] else [],
         'certificates': json.loads(row['certificates']) if row['certificates'] else [],
         'soft_abilities': json.loads(row['soft_abilities']) if row['soft_abilities'] else {},
         'education': row['education_text'],
         'experience': row['work_text'],
+        'project': row['project_text'],
+        'education_json': json.loads(row['education_json']) if row['education_json'] else {},
+        'work_json': json.loads(row['work_json']) if row['work_json'] else [],
+        'project_json': json.loads(row['project_json']) if row['project_json'] else [],
         'user_id': row['user_id']
     }
     if student['user_id']:
@@ -83,13 +90,18 @@ def get_path_suggestions(job_name):
 
 def generate_report_with_llm(student_ability, job_profile, job_name, path_suggestions):
     """
-    使用大模型生成完整的职业生涯发展报告（完全由大模型自由组织）
+    【正式实现】使用阿里云百炼大模型生成完整的职业生涯发展报告。
+    此函数在生产环境中会真实消耗 API 额度。
     """
     # 构建上下文：将所有原始数据转换为 JSON 字符串
     context = {
         '学生信息': {
             '教育背景': student_ability.get('education', ''),
+            '教育结构化': student_ability.get('education_json', {}),
             '实习/工作经历': student_ability.get('experience', ''),
+            '工作结构化': student_ability.get('work_json', []),
+            '项目经历': student_ability.get('project', ''),
+            '项目结构化': student_ability.get('project_json', []),
             '技能列表': student_ability['skills'],
             '证书列表': student_ability['certificates'],
             '软能力评分': student_ability['soft_abilities'],
@@ -118,24 +130,31 @@ def generate_report_with_llm(student_ability, job_profile, job_name, path_sugges
 
 请确保报告内容个性化、具体，直接基于给定的数据，避免通用模板。使用 Markdown 格式，语气专业且鼓励。
 
-以下是所有数据（JSON格式）：
+以下是所有数据（JSON 格式）：
 {context_json}
 
 请开始生成报告。
 """
     try:
-        result = _call_zhipu(prompt, temperature=0.7, max_tokens=3000)
+        # 【核心调用】此处走统一封装，可控模式（local/auto/real），并支持测试时热插拔
+        result = call_llm(prompt, temperature=0.7, max_tokens=3000)
+        
+        if not result or not result.strip():
+            logging.warning("LLM returned empty content, using fallback.")
+            return "# 职业生涯发展报告\n\n抱歉，智能生成服务暂时返回空内容，请稍后重试。"
+            
         return result.strip()
     except Exception as e:
-        print(f"大模型生成报告失败：{e}")
-        # 降级返回简单提示
-        return "# 职业生涯发展报告\n\n报告生成服务暂时不可用，请稍后再试。"
+        logging.error(f"大模型生成报告失败：{e}")
+        # 降级返回简单提示，避免程序崩溃
+        return "# 职业生涯发展报告\n\n报告生成服务暂时不可用（API 调用异常），请稍后再试。"
 
 @report_bp.route('/generate', methods=['POST'])
 def generate():
     data = request.json
     student_id = data.get('student_id')
     job_name = data.get('job_name')
+    
     if not student_id:
         return jsonify({'error': '缺少 student_id'}), 400
 
@@ -143,6 +162,7 @@ def generate():
     if not student_ability:
         return jsonify({'error': '学生不存在'}), 404
 
+    # 如果没有指定岗位，自动匹配最佳岗位
     if not job_name:
         from .match import get_student_ability as get_sa, get_job_abilities, compute_match
         conn = get_db()
@@ -150,17 +170,21 @@ def generate():
         cursor.execute("SELECT job_name FROM job_profile")
         jobs = [row['job_name'] for row in cursor.fetchall()]
         conn.close()
+        
         best_job = None
         best_score = -1
         stu_ability_set = get_sa(student_id)
+        
         if not stu_ability_set:
             return jsonify({'error': '学生能力数据异常'}), 500
+            
         for job in jobs:
             job_ability = get_job_abilities(job)
             match_detail = compute_match(stu_ability_set, job_ability)
             if match_detail['overall_score'] > best_score:
                 best_score = match_detail['overall_score']
                 best_job = job
+        
         job_name = best_job
         if not job_name:
             return jsonify({'error': '没有可匹配的岗位'}), 404
@@ -170,9 +194,11 @@ def generate():
         return jsonify({'error': '岗位画像不存在'}), 404
 
     path_suggestions = get_path_suggestions(job_name)
+    
+    # 调用 LLM 生成报告 (真实调用或测试拦截)
     report_md = generate_report_with_llm(student_ability, job_profile, job_name, path_suggestions)
 
-    # 存储报告
+    # 存储报告到数据库
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
@@ -198,7 +224,7 @@ def polish():
     if not text:
         return jsonify({'error': '请输入文本'}), 400
     prompt = f"请润色以下文本，使其更专业流畅（保持原意）：\n{text}"
-    polished = _call_zhipu(prompt, temperature=0.5, max_tokens=2000)
+    polished = call_llm(prompt, temperature=0.5, max_tokens=2000)
     return jsonify({'polished': polished})
 
 @report_bp.route('/export', methods=['POST'])
@@ -248,9 +274,23 @@ def export():
         )
     except subprocess.CalledProcessError as e:
         print(f"WeasyPrint error: {e.stderr}")
-        return jsonify({'error': f'PDF生成失败：{e.stderr}'}), 500
+        # 失败降级：返回 Markdown 文档
+        md_bytes = markdown_text.encode('utf-8')
+        return send_file(
+            io.BytesIO(md_bytes),
+            download_name='career_report.md',
+            as_attachment=True,
+            mimetype='text/markdown'
+        )
     except FileNotFoundError:
-        return jsonify({'error': 'WeasyPrint 可执行文件未找到，请检查路径'}), 500
+        # weasyprint不存在时直接返回Markdown
+        md_bytes = markdown_text.encode('utf-8')
+        return send_file(
+            io.BytesIO(md_bytes),
+            download_name='career_report.md',
+            as_attachment=True,
+            mimetype='text/markdown'
+        )
     finally:
         try:
             os.unlink(html_path)

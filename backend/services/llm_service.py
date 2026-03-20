@@ -14,8 +14,14 @@ services/llm_service.py
 """
 import os
 import json
-from typing import Dict, Any, List
+import time
+import logging
+from typing import Dict, Any, List, Optional
 from algorithms import recommend_jobs, compute_match_score
+
+# 配置日志，确保在测试中也能看到输出
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # 高级算法类（若存在则优先使用）
 try:
@@ -170,46 +176,109 @@ from typing import Optional, Dict, Any, List, Tuple
 
 # 阿里云百炼 SDK
 import dashscope
-from config import ALIYUN_API_KEY  # 需要在 config.py 中添加 ALIYUN_API_KEY
+# 确保 config.py 中定义了 ALIYUN_API_KEY，或者从环境变量直接读取
+from config import ALIYUN_API_KEY, LLM_MODE, LLM_FORCE_REAL, LLM_MAX_CALLS_PER_RUN
 
 # 设置阿里云 API Key（全局设置）
-dashscope.api_key = ALIYUN_API_KEY
+# 备注：LLM_MODE=local 时不会实际调用外部API
+if ALIYUN_API_KEY:
+    dashscope.api_key = ALIYUN_API_KEY
+else:
+    # 尝试直接从环境变量读取作为备用
+    import os
+    key = os.getenv('ALIYUN_API_KEY')
+    if key:
+        dashscope.api_key = key
 
-def _call_zhipu(prompt: str, temperature=0.3, max_tokens=2000, thinking=False, max_retries=3) -> str:
+# 内存计数器，避免一次测试/运行中无限制刷API
+_llm_call_count = 0
+
+
+def _local_llm_fallback(prompt: str) -> str:
+    """本地简易内容生成，供无API密钥或低额度场景使用"""
+    summary_lines = [l.strip() for l in prompt.split('\n') if l.strip()][:8]
+    return "# 本地生成内容（示例）\n\n" + "\n".join(summary_lines) + "\n\n（未命中外部API，属于演示内容）"
+
+
+def call_llm(prompt: str, temperature=0.3, max_tokens=2000, thinking=False, max_retries=1) -> str:
     """
-    调用阿里云百炼 qwen-plus 模型（已替换智谱）。
-    内置重试机制，遇到速率限制时自动等待后重试。
+    统一 LLM 调用入口。
+    【优化】默认 max_retries 降为 1，避免测试时长时间等待；增加详细日志。
     """
+    global _llm_call_count
+    
+    start_time = time.time()
+    logger.info(f"🚀 [LLM Call] 开始调用 | 模式：{LLM_MODE} | 强制真实：{LLM_FORCE_REAL}")
+    logger.info(f"📝 [Prompt Preview] {prompt[:100]}... (总长：{len(prompt)})")
+
+    if LLM_FORCE_REAL:
+        result = _call_zhipu(prompt, temperature, max_tokens, thinking, max_retries)
+    else:
+        _llm_call_count += 1
+        if _llm_call_count > LLM_MAX_CALLS_PER_RUN:
+            logger.warning(f"⚠️ 达到本次运行 LLM 调用上限 ({LLM_MAX_CALLS_PER_RUN})，使用本地降级。")
+            result = _local_llm_fallback(prompt)
+        elif LLM_MODE == 'local':
+            logger.info("⚠️ LLM_MODE=local，使用本地降级内容。")
+            result = _local_llm_fallback(prompt)
+        elif dashscope.api_key:
+            result = _call_zhipu(prompt, temperature, max_tokens, thinking, max_retries)
+        else:
+            logger.warning("⚠️ 未配置阿里云 API Key，使用本地降级内容。")
+            result = _local_llm_fallback(prompt)
+
+    elapsed = time.time() - start_time
+    res_len = len(result) if result else 0
+    logger.info(f"✅ [LLM Done] 耗时：{elapsed:.2f}s | 返回字符数：{res_len}")
+    
+    if res_len > 0:
+        logger.debug(f"📄 [Response Preview] {result[:200]}...")
+        
+    return result
+
+
+def _call_zhipu(prompt: str, temperature=0.3, max_tokens=2000, thinking=False, max_retries=1) -> str:
+    """
+    【真实实现】调用阿里云百炼 qwen-plus 模型。
+    【优化】增加每次重试的日志，明确失败原因。
+    """
+    if not dashscope.api_key:
+        logger.error("❌ 错误：阿里云 API Key (ALIYUN_API_KEY) 未配置，无法调用大模型。")
+        return ""
+
     for attempt in range(max_retries):
         try:
-            # 阿里云百炼的生成调用
+            logger.info(f"🔄 正在调用阿里云 API (尝试 {attempt+1}/{max_retries})...")
             response = dashscope.Generation.call(
-                model='qwen-plus',          # 使用 qwen-plus，免费额度充足
+                model='qwen-plus',
                 prompt=prompt,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 top_p=0.7,
             )
+            
             if response.status_code == 200:
-                return response.output.text
+                result = response.output.text
+                logger.info(f"✅ 阿里云调用成功，返回 {len(result)} 字符")
+                return result
             else:
-                print(f"❌ 阿里云调用失败：{response.code} - {response.message}")
-                # 如果是限流错误（429），等待后重试
+                logger.error(f"❌ 阿里云调用失败：{response.code} - {response.message}")
                 if "429" in str(response) or "throttling" in str(response).lower():
-                    wait_time = (attempt + 1) * 5
-                    print(f"⚠️ 触发限流，等待 {wait_time} 秒后重试 (尝试 {attempt+1}/{max_retries})...")
+                    wait_time = (attempt + 1) * 2  # 缩短等待时间
+                    logger.warning(f"⚠️ 触发限流，等待 {wait_time} 秒后重试...")
                     time.sleep(wait_time)
                 else:
                     return ""
         except Exception as e:
-            print(f"❌ 阿里云调用异常：{e}")
+            logger.error(f"❌ 阿里云调用异常：{e}")
             if "429" in str(e) or "rate" in str(e).lower():
-                wait_time = (attempt + 1) * 5
-                print(f"⚠️ 触发限流，等待 {wait_time} 秒后重试 (尝试 {attempt+1}/{max_retries})...")
+                wait_time = (attempt + 1) * 2
+                logger.warning(f"⚠️ 触发限流，等待 {wait_time} 秒后重试...")
                 time.sleep(wait_time)
             else:
                 return ""
-    print("❌ 阿里云调用重试耗尽，返回空字符串")
+    
+    logger.error("❌ 阿里云调用重试耗尽，返回空字符串")
     return ""
 
 # 如果你以后想切换回智谱，可以将上面的 _call_zhipu 替换为以下注释掉的代码：

@@ -15,10 +15,12 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MBa
 load_dotenv()
 
 ZHIPU_API_KEY = os.getenv('ZHIPU_API_KEY')
-if not ZHIPU_API_KEY:
-    raise ValueError("请设置 ZHIPU_API_KEY 环境变量或在 .env 文件中配置")
-
-# 阿里云 API Key（从环境变量读取）
 ALIYUN_API_KEY = os.getenv('ALIYUN_API_KEY')
-if not ALIYUN_API_KEY:
-    raise ValueError("请设置 ALIYUN_API_KEY 环境变量或在 .env 文件中配置")
+
+# 适用于调试/测试模式
+# - auto：按实际配置调用，未配置时降级本地模板
+# - real：强制调用阿里云（会消耗额度），不配置则返回空或降级
+# - local：永远不调用外部，使用简易本地模板
+LLM_MODE = os.getenv('LLM_MODE', 'auto').lower()
+LLM_FORCE_REAL = os.getenv('LLM_FORCE_REAL', '0') == '1'
+LLM_MAX_CALLS_PER_RUN = int(os.getenv('LLM_MAX_CALLS_PER_RUN', '10'))

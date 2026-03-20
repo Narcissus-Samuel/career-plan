@@ -151,7 +151,10 @@ def init_db():
         ('skills_certs_text', 'TEXT'),
         ('summary', 'TEXT'),
         ('soft_abilities', 'TEXT'),
-        ('interest_scores', 'TEXT')
+        ('interest_scores', 'TEXT'),
+        ('education_json', 'TEXT'),
+        ('work_json', 'TEXT'),
+        ('project_json', 'TEXT')
     ]
     
     for col_name, col_type in new_columns:
