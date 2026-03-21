@@ -1,14 +1,86 @@
 <template>
   <div class="career-test">
-    <!-- 1. 页面头部 -->
-    <header class="page-header">
-      <div class="header-wrap">
+    <!-- 替换为统一的顶部导航栏 -->
+    <header class="top-nav">
+      <div class="nav-wrap">
+        <div class="nav-left">
+          <div class="logo">
+            <span class="logo-icon">🎯</span>
+            <span class="logo-text">大学生职业规划系统</span>
+          </div>
+          <ul class="nav-menu">
+            <li class="menu-item" @click="$router.push('/')">首页</li>
+            <li class="menu-item" @click="$router.push('/student-ability')">岗位画像</li>
+            <!-- 添加 active 类使职业规划导航项变蓝并有下划线 -->
+            <li class="menu-item active" @click="$router.push('/career-planning-intro')">职业规划</li>
+            <li class="menu-item" @click="$router.push('/resource-library')">资源库</li>
+            <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
+            <li class="menu-item dropdown">
+              核心功能 ▼
+              <ul class="dropdown-menu">
+                <li class="dropdown-item active" @click="goToFeature('测评')">
+                  <span class="color-dot red"></span> 职业测评
+                </li>
+                <li class="dropdown-item" @click="goToFeature('分析')">
+                  <span class="color-dot orange"></span> 能力短板分析
+                </li>
+                <li class="dropdown-item" @click="goToFeature('规划')">
+                  <span class="color-dot green"></span> 发展路径规划
+                </li>
+                <li class="dropdown-item" @click="goToFeature('导出')">
+                  <span class="color-dot blue"></span> 规划报告导出
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+
+        <!-- 导航栏右侧：搜索框 + 原有功能 -->
+        <div class="nav-right">
+          <!-- 导航栏内的搜索框 -->
+          <div class="nav-search-wrap">
+            <input 
+              type="text" 
+              class="nav-search-input" 
+              placeholder="搜索职业方向、专业、院校、岗位类型"
+              @keyup.enter="handleSearch"
+            >
+            <button class="nav-search-btn" @click="handleSearch">搜索</button>
+          </div>
+
+          <button class="btn-toggle-theme" @click="toggleTheme">🌙</button>
+          
+          <!-- 未登录：显示登录/注册按钮 -->
+          <button class="btn-login" @click="$router.push('/login')" v-if="!isLogin">登录</button>
+          <button class="btn-register" @click="$router.push('/register')" v-if="!isLogin">注册</button>
+          
+          <!-- 已登录：显示用户头像 + 下拉菜单 -->
+          <div class="user-profile" v-if="isLogin">
+            <img 
+              :src="userAvatar || 'https://picsum.photos/seed/avatar/40/40'" 
+              alt="用户头像" 
+              class="avatar"
+              @click="toggleUserMenu"
+            >
+            <div class="user-menu" v-show="isUserMenuOpen">
+              <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
+              <div class="menu-item" @click="$router.push('/settings')">账号设置</div>
+              <div class="menu-item logout" @click="handleLogout">退出登录</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- 页面副标题区域（保留原有功能按钮） -->
+    <div class="test-subheader">
+      <div class="subheader-wrap">
         <div class="page-title">
           <span class="title-icon">🧭</span>
-          <h1>职业兴趣测评</h1>
+          <h1>职业测评</h1>
         </div>
         <div class="page-nav">
-          <button class="back-btn" @click="$router.push('/')">← 返回首页</button>
+          <!-- 删除了返回首页按钮 -->
           <button 
             class="report-btn" 
             @click="showReportModal = true" 
@@ -18,22 +90,22 @@
           </button>
         </div>
       </div>
-    </header>
+    </div>
 
     <!-- 2. 测评介绍（未开始答题时显示） -->
     <section class="test-intro" v-if="!testStarted && !testCompleted">
       <div class="intro-wrap">
         <div class="intro-card">
           <div class="intro-header">
-            <h2>霍兰德职业兴趣测评</h2>
-            <p class="intro-subtitle">了解你的职业兴趣倾向，找到适合的职业方向</p>
+            <h2>职业测评</h2>
+            <p class="intro-subtitle">了解你的职业倾向，找到适合的职业方向</p>
           </div>
           <div class="intro-content">
             <div class="theory-desc">
-              <h3>霍兰德职业兴趣理论</h3>
+              <h3>职业测评理论</h3>
               <p>
-                霍兰德职业兴趣测试由美国心理学家约翰·霍兰德提出，将人格分为现实型、研究型、艺术型、社会型、企业型、常规型六种类型，
-                帮助人们找到与自身兴趣相匹配的职业方向。
+                职业测评综合多种心理学理论，从多个维度评估你的职业倾向、能力特点和人格特质，
+                帮助人们找到与自身特质相匹配的职业方向。
               </p>
             </div>
             
@@ -52,7 +124,7 @@
               <ul>
                 <li>本测评共60道题目，预计耗时10-15分钟</li>
                 <li>请根据自身实际情况选择符合程度，无需过度思考</li>
-                <li>答案无对错之分，仅反映你的兴趣倾向</li>
+                <li>答案无对错之分，仅反映你的职业倾向</li>
                 <li>完成后可查看详细的测评报告和职业推荐</li>
               </ul>
             </div>
@@ -101,7 +173,7 @@
                   name="answer" 
                   :value="idx + 1" 
                   v-model="currentAnswer"
-                  @change="selectAnswer(idx + 1)"
+                  @change="selectAnswerAndNext(idx + 1)"
                 >
                 <span class="option-text">{{ option.label }} - {{ option.desc }}</span>
               </label>
@@ -131,13 +203,13 @@
     <section class="test-result" v-if="testCompleted">
       <div class="result-wrap">
         <div class="result-header">
-          <h2>你的职业兴趣测评结果</h2>
-          <p class="result-subtitle">基于你的答题情况，生成专属职业兴趣分析</p>
+          <h2>你的职业测评结果</h2>
+          <p class="result-subtitle">基于你的答题情况，生成专属职业分析</p>
         </div>
 
         <!-- 结果雷达图 -->
         <div class="result-chart">
-          <h3>职业兴趣维度得分</h3>
+          <h3>职业维度得分</h3>
           <div class="chart-container">
             <!-- 修复后的雷达图 -->
             <div class="radar-chart">
@@ -164,7 +236,7 @@
           <div class="core-card">
             <div class="core-icon">{{ topType.icon }}</div>
             <div class="core-content">
-              <h3>你的主导职业兴趣类型：{{ topType.name }}</h3>
+              <h3>你的主导职业类型：{{ topType.name }}</h3>
               <p class="core-desc">{{ topType.detailDesc }}</p>
               <div class="core-tips">
                 <h4>适合你的职业方向：</h4>
@@ -209,9 +281,9 @@
           <button class="restart-btn" @click="restartTest">重新测评</button>
           <button class="export-btn" @click="exportReport">导出测评报告</button>
           <button class="share-btn" @click="shareResult">分享测评结果</button>
-          <!-- 新增：生成职业规划报告按钮 -->
-          <button class="career-plan-btn" @click="goToCareerReport">
-            📋 生成职业规划报告
+          <!-- 修改：人岗匹配按钮 -->
+          <button class="career-plan-btn" @click="goToMatchResult">
+            📋 进行人岗匹配分析
           </button>
         </div>
       </div>
@@ -222,18 +294,18 @@
       <div class="modal-mask" @click="showReportModal = false"></div>
       <div class="modal-content">
         <div class="modal-header">
-          <h3>职业兴趣测评报告</h3>
+          <h3>职业测评报告</h3>
           <button class="close-btn" @click="showReportModal = false">×</button>
         </div>
         <div class="modal-body">
           <div class="report-header">
             <p class="report-date">测评时间：{{ testResultDate }}</p>
-            <h2>霍兰德职业兴趣测评报告</h2>
+            <h2>职业测评报告</h2>
           </div>
           
           <div class="report-section">
             <h3>一、测评结果总览</h3>
-            <p>你的主导职业兴趣类型：<strong>{{ topType.name }}({{ topType.code }})</strong></p>
+            <p>你的主导职业类型：<strong>{{ topType.name }}({{ topType.code }})</strong></p>
             <p>各维度得分：</p>
             <div class="score-table">
               <div class="table-row header">
@@ -279,11 +351,11 @@
           <div class="report-section">
             <h3>四、发展建议</h3>
             <ul class="suggestion-list">
-              <li>根据兴趣倾向选择专业课程和实践活动</li>
+              <li>根据职业倾向选择专业课程和实践活动</li>
               <li>多了解目标职业的发展前景和能力要求</li>
               <li>参加相关的实习和社会实践，积累经验</li>
               <li>持续提升自身能力，匹配目标职业要求</li>
-              <li>定期重新测评，跟踪职业兴趣变化</li>
+              <li>定期重新测评，跟踪职业倾向变化</li>
             </ul>
           </div>
         </div>
@@ -298,19 +370,100 @@
     <!-- 5. 页脚 -->
     <footer class="page-footer">
       <div class="footer-wrap">
-        © 2026 大学生职业规划系统 | 职业兴趣测评基于霍兰德职业兴趣理论开发
+        © 2026 大学生职业规划系统 | 职业测评基于多维度职业理论开发
       </div>
     </footer>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
+const route = useRoute()
 
+// ========== 导航栏相关逻辑 ==========
+// 登录状态
+const isLogin = ref(!!localStorage.getItem('token'))
+const userAvatar = ref(localStorage.getItem('avatar') || '')
+const isUserMenuOpen = ref(false)
+
+watch(
+  () => route.path,
+  () => {
+    isLogin.value = !!localStorage.getItem('token')
+    userAvatar.value = localStorage.getItem('avatar') || ''
+  },
+  { immediate: true }
+)
+
+const toggleUserMenu = () => {
+  isUserMenuOpen.value = !isUserMenuOpen.value
+}
+
+const handleLogout = () => {
+  localStorage.removeItem('token')
+  localStorage.removeItem('avatar')
+  localStorage.removeItem('nickname')
+  isLogin.value = false
+  isUserMenuOpen.value = false
+  router.push('/')
+  ElMessage.success('退出登录成功')
+}
+
+// 主题切换
+const darkMode = ref(localStorage.getItem('darkMode') === 'true')
+function applyTheme() {
+  if (darkMode.value) {
+    document.body.classList.add('dark')
+  } else {
+    document.body.classList.remove('dark')
+  }
+}
+
+function toggleTheme() {
+  darkMode.value = !darkMode.value
+  localStorage.setItem('darkMode', darkMode.value)
+  applyTheme()
+  ElMessage.success(`已切换为${darkMode.value ? '暗黑' : '明亮'}模式`)
+}
+
+// 核心功能跳转
+const goToFeature = (type) => {
+  switch(type) {
+    case '测评':
+      router.push('/interest-test')
+      break
+    case '分析':
+      router.push('/ability-analysis')
+      break
+    case '规划':
+      router.push('/development-path')
+      break
+    case '导出':
+      router.push('/report-export')
+      break
+    default:
+      break
+  }
+}
+
+// 搜索功能
+const handleSearch = () => {
+  const searchInput = document.querySelector('.nav-search-input')
+  const keyword = searchInput.value.trim()
+  if (keyword) {
+    router.push(`/search?keyword=${encodeURIComponent(keyword)}`)
+    searchInput.value = ''
+    ElMessage.success(`正在搜索：${keyword}`)
+  } else {
+    ElMessage.warning('请输入搜索关键词')
+  }
+}
+
+// ========== 测评相关逻辑 ==========
 // 暂存相关常量
 const DRAFT_STORAGE_KEY = 'careerInterestTestDraft'
 const RESULT_STORAGE_KEY = 'careerInterestTestResult'
@@ -329,7 +482,7 @@ const totalTime = 900 // 总答题时间（秒）- 15分钟
 const remainingTime = ref(totalTime)
 let timer = null
 
-// 职业兴趣类型定义
+// 职业类型定义
 const interestTypes = ref([
   {
     code: 'R',
@@ -408,7 +561,7 @@ const options = ref([
   { label: '非常符合', desc: '完全符合我的情况', score: 5 }
 ])
 
-// 测评题目（60道经典霍兰德职业兴趣测试题）
+// 测评题目（60道职业测试题）
 const testQuestions = ref([
   // 现实型(R)题目
   { content: '我喜欢动手制作东西，比如模型、家具等', type: 'R' },
@@ -587,10 +740,9 @@ const saveTestResult = () => {
   }
   localStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify(resultData))
   
-  // 保存到职业规划需要的key中 - 修改这里
+  // 保存到职业规划需要的key中
   const careerTestAnalysis = {
-    // 保留原始的兴趣类型名称
-    interestType: topType.value.name, // 如：现实型、研究型、艺术型等
+    interestType: topType.value.name,
     coreValues: ['薪资待遇', '成长空间', '职业匹配'],
     recommendJob: topType.value.careers[0],
     abilityLevel: getScoreLevel(scores.value[topType.value.code]),
@@ -631,11 +783,26 @@ const startTimer = () => {
   }, 1000)
 }
 
-// 选择答案
-const selectAnswer = (score) => {
+// 选择答案并自动跳转到下一题
+const selectAnswerAndNext = (score) => {
+  // 保存当前答案
   answers.value[currentQuestionIndex.value] = score
-  // 每次选择答案都保存暂存
+  currentAnswer.value = score
+  
+  // 保存暂存
   saveTestDraft()
+  
+  // 延迟一小段时间再跳转，让用户看到选择的效果
+  setTimeout(() => {
+    // 判断是否是最后一题
+    if (currentQuestionIndex.value < testQuestions.value.length - 1) {
+      currentQuestionIndex.value += 1
+      currentAnswer.value = answers.value[currentQuestionIndex.value] || 0
+      saveTestDraft()
+    } else {
+      completeTest()
+    }
+  }, 300)
 }
 
 // 上一题
@@ -714,7 +881,7 @@ const exportReport = () => {
 
 // 分享测评结果
 const shareResult = () => {
-  const shareText = `我的霍兰德职业兴趣测评结果：${topType.value.name}(${topType.value.code})，适合的职业方向：${topType.value.careers.slice(0, 3).join('、')}`
+  const shareText = `我的职业测评结果：${topType.value.name}(${topType.value.code})，适合的职业方向：${topType.value.careers.slice(0, 3).join('、')}`
   try {
     navigator.clipboard.writeText(shareText)
     ElMessage.success('测评结果已复制到剪贴板，可分享给好友！')
@@ -723,13 +890,13 @@ const shareResult = () => {
   }
 }
 
-// 跳转到职业规划报告页
-const goToCareerReport = () => {
+// 修改：跳转到人岗匹配分析页面
+const goToMatchResult = () => {
   // 确保结果已保存
   saveTestResult()
   
-  ElMessage.success('正在为你生成职业规划报告...')
-  router.push('/career-planning')
+  ElMessage.success('正在为你进行人岗匹配分析...')
+  router.push('/jobmatch-analysis') // 跳转到MatchResult.vue页面
 }
 
 // 打印报告
@@ -777,9 +944,10 @@ const getScoreLevel = (score) => {
   return '极低'
 }
 
-// 页面加载时加载暂存
+// 页面加载时加载暂存和应用主题
 onMounted(() => {
   loadTestDraft()
+  applyTheme()
 })
 
 // 组件卸载时保存暂存并清除计时器
@@ -798,17 +966,224 @@ onUnmounted(() => {
   color: #333;
   background: #f8f9fa;
   margin: 0;
-  padding: 0;
+  padding: 60px 0 0 0; /* 给顶部导航栏留出空间 */
 }
 
-/* 1. 页面头部 */
-.page-header {
-  height: 70px;
+/* ========== 统一导航栏样式 ========== */
+.top-nav {
+  height: 60px;
   background: #fff;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   width: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
 }
-.header-wrap {
+.nav-wrap {
+  width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
+}
+.nav-left {
+  display: flex;
+  align-items: center;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  margin-right: 40px;
+  font-size: 18px;
+  font-weight: bold;
+  color: #000;
+}
+.logo-icon {
+  font-size: 24px;
+  margin-right: 8px;
+}
+.nav-menu {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.menu-item {
+  margin: 0 15px;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 5px;
+  position: relative;
+  height: 60px;
+  line-height: 60px;
+  color: #000;
+}
+/* 修改active样式：字体变蓝 + 蓝色下划线 */
+.menu-item.active {
+  color: #2f54eb;
+}
+.menu-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: #2f54eb;
+}
+
+/* 下拉菜单样式 */
+.dropdown {
+  position: relative;
+}
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 200px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border-radius: 4px;
+  list-style: none;
+  padding: 8px 0;
+  margin: 0;
+  display: none;
+  z-index: 9999;
+}
+.dropdown:hover .dropdown-menu {
+  display: block;
+}
+.dropdown-item {
+  padding: 10px 15px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: auto;
+  line-height: normal;
+  color: #000;
+}
+.dropdown-item:hover, .dropdown-item.active {
+  background: #f5f7fa;
+  color: #2f54eb;
+}
+.color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.color-dot.red { background: #ff7a45; }
+.color-dot.orange { background: #faad14; }
+.color-dot.green { background: #52c41a; }
+.color-dot.blue { background: #1890ff; }
+
+/* 导航栏右侧 */
+.nav-right {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+.nav-search-wrap {
+  display: flex;
+  width: 200px;
+  height: 24px;
+}
+.nav-search-input {
+  flex: 1;
+  height: 100%;
+  padding: 0 10px;
+  border: 1px solid #e8e8e8;
+  border-radius: 4px 0 0 4px;
+  outline: none;
+  font-size: 12px;
+}
+.nav-search-btn {
+  width: 53px;
+  height: 100%;
+  background: #2f54eb;
+  color: #fff;
+  border: none;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.btn-toggle-theme {
+  padding: 6px 10px;
+  border: none;
+  background: #f5f7fa;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #000;
+}
+.btn-login {
+  padding: 6px 15px;
+  border: 1px solid #2f54eb;
+  color: #000;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.btn-register {
+  padding: 6px 15px;
+  border: none;
+  color: #fff;
+  background: #2f54eb;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* 用户头像和菜单样式 */
+.user-profile {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid #f0f0f0;
+}
+.user-menu {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  width: 120px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  border-radius: 4px;
+  z-index: 9999;
+}
+.user-menu .menu-item {
+  padding: 8px 15px;
+  font-size: 14px;
+  cursor: pointer;
+  height: auto;
+  line-height: normal;
+  margin: 0;
+  color: #000;
+}
+.user-menu .menu-item:hover {
+  background: #f5f7fa;
+}
+.user-menu .logout {
+  color: #ff4d4f;
+  border-top: 1px solid #e8e8e8;
+}
+
+/* ========== 测评页面副标题区域 ========== */
+.test-subheader {
+  height: 70px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e8e8e8;
+}
+.subheader-wrap {
   width: 1200px;
   margin: 0 auto;
   display: flex;
@@ -846,6 +1221,7 @@ onUnmounted(() => {
   color: #fff;
 }
 
+/* ========== 原有测评页面样式 ========== */
 /* 2. 测评介绍 */
 .test-intro {
   padding: 40px 0;

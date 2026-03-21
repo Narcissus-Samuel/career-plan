@@ -1,6 +1,6 @@
 <template>
   <div class="student-ability-page">
-    <!-- 顶部导航栏（与之前相同） -->
+    <!-- 顶部导航栏（保持不变） -->
     <header class="top-nav">
       <div class="nav-wrap">
         <div class="nav-left">
@@ -52,227 +52,278 @@
       </div>
     </header>
 
-    <!-- 主体内容 -->
-    <main class="main-content">
-      <div class="content-container">
-        <!-- 步骤指示器（优化为玻璃态卡片） -->
-        <div class="step-indicator glass-panel">
-          <div
-            v-for="(step, index) in steps"
-            :key="index"
-            class="step-item"
-            :class="{ active: activeStep === index, completed: activeStep > index }"
-          >
-            <div class="step-number">{{ activeStep > index ? '✓' : index + 1 }}</div>
-            <div class="step-text">{{ step }}</div>
+    <!-- 主体内容区域 - 改为左侧步骤导航 + 右侧内容 -->
+    <div class="main-container">
+      <!-- 左侧瀑布式步骤导航 -->
+      <aside class="sidebar-step-indicator">
+        <div class="sidebar-step-container">
+          <div class="step-sidebar-header">
+            <h3>职业规划流程</h3>
+            <p>完成以下步骤，生成专属职业规划报告</p>
           </div>
-        </div>
-
-        <!-- 第一步：个人信息与简历信息 -->
-        <div v-if="activeStep === 0" class="step-content glass-panel">
-          <h2 class="section-title">📋 个人信息</h2>
-          <div class="personal-info">
-            <el-input v-model="personalInfo.name" placeholder="姓名" size="large" class="info-input" clearable />
-            <el-input v-model="personalInfo.phone" placeholder="手机号" size="large" class="info-input" clearable />
-            <el-input v-model="personalInfo.email" placeholder="邮箱" size="large" class="info-input" clearable />
-          </div>
-
-          <h2 class="section-title" style="margin-top: 32px;">📄 简历信息</h2>
-          <div v-if="studentId" class="resume-score">
-            <span class="score-label">简历完整度</span>
-            <span class="score-value">{{ resumeScore }}%</span>
-            <div class="score-bar"><div class="bar-fill" :style="{ width: resumeScore + '%' }"></div></div>
-          </div>
-
-          <div class="input-mode-switch">
-            <button class="mode-btn" :class="{ active: inputMode === 'upload' }" @click="inputMode = 'upload'">
-              📤 上传简历
-            </button>
-            <button class="mode-btn" :class="{ active: inputMode === 'manual' }" @click="inputMode = 'manual'">
-              ✏️ 手动填写
-            </button>
-          </div>
-
-          <!-- 上传模式 -->
-          <div v-if="inputMode === 'upload'" class="upload-section">
-            <div class="upload-area" @click="triggerFileUpload" @dragover.prevent @drop.prevent="handleFileDrop">
-              <input ref="fileInput" type="file" accept=".pdf,.doc,.docx" style="display: none" @change="handleFileSelect" />
-              <div class="upload-icon">📂</div>
-              <div class="upload-text">拖拽文件到此处或点击上传</div>
-              <div class="upload-tip">支持 PDF、Word 格式，最大 10MB</div>
-            </div>
-            <div v-if="uploadedFile" class="file-info">
-              <span class="file-name">{{ uploadedFile.name }}</span>
-              <span class="file-size">{{ (uploadedFile.size / 1024).toFixed(1) }} KB</span>
-              <el-button type="text" @click="removeFile">移除</el-button>
-            </div>
-            <div class="step-actions" style="margin-top: 20px;">
-              <el-button type="primary" size="large" @click="submitUpload" :loading="uploading">开始解析</el-button>
-            </div>
-          </div>
-
-          <!-- 手动填写模式 -->
-          <div v-if="inputMode === 'manual'" class="manual-section">
-            <div class="form-tip"><i>💡</i> 请根据实际情况填写，每个区域都提供了示例文本。</div>
-            <div class="resume-block">
-              <h3 class="block-title">📚 教育经历</h3>
-              <textarea v-model="resumeText.education" class="block-textarea" rows="3" placeholder="例如：清华大学 计算机科学与技术 本科 2020-2024 GPA:3.8/4.0"></textarea>
-              <div class="block-hint">示例：清华大学 计算机科学与技术 本科 2020-2024 GPA:3.8/4.0 主修课程：数据结构、算法、数据库</div>
-            </div>
-            <div class="resume-block">
-              <h3 class="block-title">💼 工作经历</h3>
-              <textarea v-model="resumeText.work" class="block-textarea" rows="3" placeholder="例如：腾讯科技 后端开发实习生 2023.07-2023.09"></textarea>
-              <div class="block-hint">示例：腾讯科技 后端开发实习生 2023.07-2023.09 负责用户中心微服务开发，使用Spring Boot，日均接口调用量提升30%</div>
-            </div>
-            <div class="resume-block">
-              <h3 class="block-title">🚀 项目经历</h3>
-              <textarea v-model="resumeText.project" class="block-textarea" rows="3" placeholder="例如：校园二手交易平台 2024.03-2024.06"></textarea>
-              <div class="block-hint">示例：校园二手交易平台 2024.03-2024.06 担任后端开发，使用Spring Boot+Vue，实现商品发布、订单管理，用户数500+</div>
-            </div>
-            <div class="resume-block">
-              <h3 class="block-title">🔧 技能与证书</h3>
-              <textarea v-model="resumeText.skillsCerts" class="block-textarea" rows="2" placeholder="例如：Python、Java、SQL；英语六级、计算机二级"></textarea>
-              <div class="block-hint">示例：Python、Java、SQL；英语六级、计算机二级</div>
-            </div>
-            <div class="resume-block">
-              <h3 class="block-title">📝 自我总结</h3>
-              <textarea v-model="resumeText.summary" class="block-textarea" rows="3" placeholder="例如：3年后端开发经验，熟悉Java技术栈..."></textarea>
-              <div class="block-hint">示例：3年后端开发经验，熟悉Java技术栈，有高并发项目经历，善于团队协作，致力于成为全栈工程师</div>
-            </div>
-          </div>
-
-          <div class="step-actions" v-if="inputMode === 'manual'">
-            <el-button type="primary" size="large" @click="submitManual" :loading="submitting">保存并下一步</el-button>
-          </div>
-        </div>
-
-      <!-- 第二步：兴趣探索（真实测评） -->
-        <div v-if="activeStep === 1" class="step-content glass-panel">
-          <h2 class="section-title">🎯 兴趣探索</h2>
-          <div class="interest-box">
-            <p>通过兴趣测试，你可以发现更适合自己的职业方向。你也可以选择跳过，直接基于能力进行匹配。</p>
-            <el-checkbox v-model="skipInterest">跳过兴趣探索</el-checkbox>
-            <div v-if="!skipInterest" class="interest-test">
-              <div v-if="loadingQuestions" class="loading">加载题目中...</div>
-              <div v-else>
-                <div v-for="(question, idx) in questions" :key="question.id" class="question-item">
-                  <p>{{ idx + 1 }}. {{ question.question }}</p>
-                  <el-slider
-                    v-model="answers[question.id]"
-                    :min="1"
-                    :max="5"
-                    :step="1"
-                    show-stops
-                    :marks="marks"
-                  />
+          
+          <div class="step-list">
+            <div 
+              v-for="(step, index) in steps" 
+              :key="index" 
+              class="sidebar-step-item"
+              :class="{ 
+                active: index === activeStep, 
+                completed: index < activeStep 
+              }"
+              @click="jumpToStep(index)"
+            >
+              <!-- 步骤连接线 -->
+              <div class="step-connector" :class="{
+                completed: index < activeStep,
+                active: index === activeStep && index < steps.length - 1,
+                inactive: index > activeStep
+              }"></div>
+              
+              <!-- 步骤内容 -->
+              <div class="step-content-wrapper">
+                <!-- 步骤图标 -->
+                <div class="step-icon">
+                  <span v-if="index < activeStep" class="completed-icon">✓</span>
+                  <span v-else-if="index === activeStep" class="active-icon">{{ index + 1 }}</span>
+                  <span v-else class="inactive-icon">{{ index + 1 }}</span>
                 </div>
-                <el-button type="primary" @click="submitInterestTest" :loading="submittingTest">提交测评</el-button>
-              </div>
-            </div>
-          </div>
-          <div class="step-actions">
-            <el-button size="large" @click="prevStep">上一步</el-button>
-            <el-button type="primary" size="large" @click="nextStep">下一步</el-button>
-          </div>
-        </div>
-
-        <!-- 第三步：AI能力画像生成 -->
-        <div v-if="activeStep === 2" class="step-content glass-panel">
-          <h2 class="section-title">🤖 AI能力画像</h2>
-          <div v-if="!profileGenerated" class="generate-area">
-            <p>点击下方按钮，获取AI生成的能力画像。</p>
-            <el-button type="primary" size="large" @click="fetchProfile" :loading="fetchingProfile">获取能力画像</el-button>
-          </div>
-          <div v-else class="profile-result">
-            <div class="result-card">
-              <div class="score-overview">
-                <div class="score-item">
-                  <span class="score-label">完整度</span>
-                  <span class="score-value">{{ profile.completeness }}%</span>
-                  <div class="score-bar"><div class="bar-fill" :style="{ width: profile.completeness + '%' }"></div></div>
-                </div>
-                <div class="score-item">
-                  <span class="score-label">竞争力</span>
-                  <span class="score-value">{{ profile.competitiveness }}%</span>
-                  <div class="score-bar"><div class="bar-fill" :style="{ width: profile.competitiveness + '%' }"></div></div>
+                
+                <!-- 步骤文本 -->
+                <div class="step-text">
+                  <div class="step-name">{{ step }}</div>
+                  <div class="step-status" v-if="index === activeStep">当前步骤</div>
                 </div>
               </div>
-              <div class="dimension-scores">
-                <h3>各维度能力评分</h3>
-                <div class="dimension-grid">
-                  <div v-for="(score, name) in profile.dimensions" :key="name" class="dimension-item">
-                    <div class="dimension-name">{{ name }}</div>
-                    <div class="dimension-bar"><div class="bar-fill" :style="{ width: score + '%' }"></div></div>
-                    <div class="dimension-score">{{ score }}</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 右侧主体内容 -->
+      <main class="main-content">
+        <div class="content-container">
+          <!-- 第一步：个人信息与简历信息 -->
+          <div v-if="activeStep === 0" class="step-content glass-panel">
+            <h2 class="section-title">
+              <span class="step-badge">1</span>
+              📋 个人信息与简历
+            </h2>
+            <div class="personal-info">
+              <el-input v-model="personalInfo.name" placeholder="姓名" size="large" class="info-input" clearable />
+              <el-input v-model="personalInfo.phone" placeholder="手机号" size="large" class="info-input" clearable />
+              <el-input v-model="personalInfo.email" placeholder="邮箱" size="large" class="info-input" clearable />
+            </div>
+
+            <h2 class="section-title" style="margin-top: 32px;">📄 简历信息</h2>
+            <div v-if="studentId" class="resume-score">
+              <span class="score-label">简历完整度</span>
+              <span class="score-value">{{ resumeScore }}%</span>
+              <div class="score-bar"><div class="bar-fill" :style="{ width: resumeScore + '%' }"></div></div>
+            </div>
+
+            <div class="input-mode-switch">
+              <button class="mode-btn" :class="{ active: inputMode === 'upload' }" @click="inputMode = 'upload'">
+                📤 上传简历
+              </button>
+              <button class="mode-btn" :class="{ active: inputMode === 'manual' }" @click="inputMode = 'manual'">
+                ✏️ 手动填写
+              </button>
+            </div>
+
+            <!-- 上传模式 -->
+            <div v-if="inputMode === 'upload'" class="upload-section">
+              <div class="upload-area" @click="triggerFileUpload" @dragover.prevent @drop.prevent="handleFileDrop">
+                <input ref="fileInput" type="file" accept=".pdf,.doc,.docx" style="display: none" @change="handleFileSelect" />
+                <div class="upload-icon">📂</div>
+                <div class="upload-text">拖拽文件到此处或点击上传</div>
+                <div class="upload-tip">支持 PDF、Word 格式，最大 10MB</div>
+              </div>
+              <div v-if="uploadedFile" class="file-info">
+                <span class="file-name">{{ uploadedFile.name }}</span>
+                <span class="file-size">{{ (uploadedFile.size / 1024).toFixed(1) }} KB</span>
+                <el-button type="text" @click="removeFile">移除</el-button>
+              </div>
+              <div class="step-actions" style="margin-top: 20px;">
+                <el-button type="primary" size="large" @click="submitUpload" :loading="uploading">开始解析</el-button>
+              </div>
+            </div>
+
+            <!-- 手动填写模式 -->
+            <div v-if="inputMode === 'manual'" class="manual-section">
+              <div class="form-tip"><i>💡</i> 请根据实际情况填写，每个区域都提供了示例文本。</div>
+              <div class="resume-block">
+                <h3 class="block-title">📚 教育经历</h3>
+                <textarea v-model="resumeText.education" class="block-textarea" rows="3" placeholder="例如：清华大学 计算机科学与技术 本科 2020-2024 GPA:3.8/4.0"></textarea>
+                <div class="block-hint">示例：清华大学 计算机科学与技术 本科 2020-2024 GPA:3.8/4.0 主修课程：数据结构、算法、数据库</div>
+              </div>
+              <div class="resume-block">
+                <h3 class="block-title">💼 工作经历</h3>
+                <textarea v-model="resumeText.work" class="block-textarea" rows="3" placeholder="例如：腾讯科技 后端开发实习生 2023.07-2023.09"></textarea>
+                <div class="block-hint">示例：腾讯科技 后端开发实习生 2023.07-2023.09 负责用户中心微服务开发，使用Spring Boot，日均接口调用量提升30%</div>
+              </div>
+              <div class="resume-block">
+                <h3 class="block-title">🚀 项目经历</h3>
+                <textarea v-model="resumeText.project" class="block-textarea" rows="3" placeholder="例如：校园二手交易平台 2024.03-2024.06"></textarea>
+                <div class="block-hint">示例：校园二手交易平台 2024.03-2024.06 担任后端开发，使用Spring Boot+Vue，实现商品发布、订单管理，用户数500+</div>
+              </div>
+              <div class="resume-block">
+                <h3 class="block-title">🔧 技能与证书</h3>
+                <textarea v-model="resumeText.skillsCerts" class="block-textarea" rows="2" placeholder="例如：Python、Java、SQL；英语六级、计算机二级"></textarea>
+                <div class="block-hint">示例：Python、Java、SQL；英语六级、计算机二级</div>
+              </div>
+              <div class="resume-block">
+                <h3 class="block-title">📝 自我总结</h3>
+                <textarea v-model="resumeText.summary" class="block-textarea" rows="3" placeholder="例如：3年后端开发经验，熟悉Java技术栈..."></textarea>
+                <div class="block-hint">示例：3年后端开发经验，熟悉Java技术栈，有高并发项目经历，善于团队协作，致力于成为全栈工程师</div>
+              </div>
+            </div>
+
+            <div class="step-actions" v-if="inputMode === 'manual'">
+              <el-button type="primary" size="large" @click="submitManualAndRedirect" :loading="submitting">保存并下一步</el-button>
+            </div>
+          </div>
+
+          <!-- 第二步：兴趣探索（真实测评） -->
+          <div v-if="activeStep === 1" class="step-content glass-panel">
+            <h2 class="section-title">
+              <span class="step-badge">2</span>
+              🎯 兴趣探索
+            </h2>
+            <div class="interest-box">
+              <p>通过兴趣测试，你可以发现更适合自己的职业方向。你也可以选择跳过，直接基于能力进行匹配。</p>
+              <el-checkbox v-model="skipInterest">跳过兴趣探索</el-checkbox>
+              <div v-if="!skipInterest" class="interest-test">
+                <div v-if="loadingQuestions" class="loading">加载题目中...</div>
+                <div v-else>
+                  <div v-for="(question, idx) in questions" :key="question.id" class="question-item">
+                    <p>{{ idx + 1 }}. {{ question.question }}</p>
+                    <el-slider
+                      v-model="answers[question.id]"
+                      :min="1"
+                      :max="5"
+                      :step="1"
+                      show-stops
+                      :marks="marks"
+                    />
+                  </div>
+                  <el-button type="primary" @click="submitInterestTest" :loading="submittingTest">提交测评</el-button>
+                </div>
+              </div>
+            </div>
+            <div class="step-actions">
+              <el-button size="large" @click="prevStep">上一步</el-button>
+              <el-button type="primary" size="large" @click="nextStep">下一步</el-button>
+            </div>
+          </div>
+
+          <!-- 第三步：AI能力画像生成 -->
+          <div v-if="activeStep === 2" class="step-content glass-panel">
+            <h2 class="section-title">
+              <span class="step-badge">3</span>
+              🤖 AI能力画像
+            </h2>
+            <div v-if="!profileGenerated" class="generate-area">
+              <p>点击下方按钮，获取AI生成的能力画像。</p>
+              <el-button type="primary" size="large" @click="fetchProfile" :loading="fetchingProfile">获取能力画像</el-button>
+            </div>
+            <div v-else class="profile-result">
+              <div class="result-card">
+                <div class="score-overview">
+                  <div class="score-item">
+                    <span class="score-label">完整度</span>
+                    <span class="score-value">{{ profile.completeness }}%</span>
+                    <div class="score-bar"><div class="bar-fill" :style="{ width: profile.completeness + '%' }"></div></div>
+                  </div>
+                  <div class="score-item">
+                    <span class="score-label">竞争力</span>
+                    <span class="score-value">{{ profile.competitiveness }}%</span>
+                    <div class="score-bar"><div class="bar-fill" :style="{ width: profile.competitiveness + '%' }"></div></div>
                   </div>
                 </div>
-              </div>
-              <div class="skill-cert">
-                <div class="skill-section"><h4>专业技能</h4><div class="tags"><span v-for="s in profile.skills" :key="s" class="tag skill-tag">{{ s }}</span></div></div>
-                <div class="cert-section"><h4>证书</h4><div class="tags"><span v-for="c in profile.certificates" :key="c" class="tag cert-tag">{{ c }}</span></div></div>
+                <div class="dimension-scores">
+                  <h3>各维度能力评分</h3>
+                  <div class="dimension-grid">
+                    <div v-for="(score, name) in profile.dimensions" :key="name" class="dimension-item">
+                      <div class="dimension-name">{{ name }}</div>
+                      <div class="dimension-bar"><div class="bar-fill" :style="{ width: score + '%' }"></div></div>
+                      <div class="dimension-score">{{ score }}</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="skill-cert">
+                  <div class="skill-section"><h4>专业技能</h4><div class="tags"><span v-for="s in profile.skills" :key="s" class="tag skill-tag">{{ s }}</span></div></div>
+                  <div class="cert-section"><h4>证书</h4><div class="tags"><span v-for="c in profile.certificates" :key="c" class="tag cert-tag">{{ c }}</span></div></div>
+                </div>
               </div>
             </div>
-          </div>
-          <div class="step-actions">
-            <el-button size="large" @click="prevStep">上一步</el-button>
-            <el-button type="primary" size="large" @click="nextStep" :disabled="!profileGenerated">下一步</el-button>
-          </div>
-        </div>
-
-        <!-- 第四步：人岗匹配 -->
-        <div v-if="activeStep === 3" class="step-content glass-panel">
-          <h2 class="section-title">🎯 人岗匹配</h2>
-          <div v-if="!matchStarted" class="match-start">
-            <p>点击“立即匹配”，AI将分析你的能力与岗位的契合度，并推荐最适合的岗位。</p>
-            <el-button type="primary" size="large" @click="fetchMatchList" :loading="matching">立即匹配</el-button>
-          </div>
-          <div v-else class="match-result">
-            <el-table :data="matchList" style="width: 100%" stripe>
-              <el-table-column prop="job_name" label="岗位名称" width="180" />
-              <el-table-column prop="overall_score" label="匹配度" width="100">
-                <template #default="{ row }">{{ row.overall_score }}%</template>
-              </el-table-column>
-              <el-table-column label="专业技能契合度" width="140">
-                <template #default="{ row }">{{ row.skill_fit }}%</template>
-              </el-table-column>
-              <el-table-column label="通用素质差距" width="140">
-                <template #default="{ row }">{{ row.soft_gap }}%</template>
-              </el-table-column>
-            </el-table>
-            <p class="match-note">系统将基于匹配度最高的岗位生成职业发展报告。</p>
-          </div>
-          <div class="step-actions">
-            <el-button size="large" @click="prevStep">上一步</el-button>
-            <el-button type="primary" size="large" @click="nextStep" :disabled="!matchStarted">下一步</el-button>
-          </div>
-        </div>
-
-        <!-- 第五步：职业发展报告 -->
-        <div v-if="activeStep === 4" class="step-content glass-panel">
-          <h2 class="section-title">📄 职业发展报告</h2>
-          <div class="report-area">
-            <el-input
-              v-model="reportContent"
-              type="textarea"
-              :rows="15"
-              placeholder="报告内容..."
-              resize="vertical"
-              class="report-editor"
-            />
-            <div class="report-actions">
-              <el-button @click="polishReport" :loading="polishing">智能润色</el-button>
-              <el-button type="primary" @click="exportReport" :loading="exporting">导出PDF</el-button>
-              <el-button @click="resetReport">重置</el-button>
+            <div class="step-actions">
+              <el-button size="large" @click="prevStep">上一步</el-button>
+              <el-button type="primary" size="large" @click="nextStep" :disabled="!profileGenerated">下一步</el-button>
             </div>
-            <div class="edit-tip">💡 你可以直接在上方编辑修改报告内容，点击润色可优化表达。</div>
           </div>
-          <div class="step-actions">
-            <el-button size="large" @click="prevStep">上一步</el-button>
-            <el-button type="success" size="large" @click="finish">完成</el-button>
+
+          <!-- 第四步：人岗匹配 -->
+          <div v-if="activeStep === 3" class="step-content glass-panel">
+            <h2 class="section-title">
+              <span class="step-badge">4</span>
+              🎯 人岗匹配
+            </h2>
+            <div v-if="!matchStarted" class="match-start">
+              <p>点击“立即匹配”，AI将分析你的能力与岗位的契合度，并推荐最适合的岗位。</p>
+              <el-button type="primary" size="large" @click="fetchMatchList" :loading="matching">立即匹配</el-button>
+            </div>
+            <div v-else class="match-result">
+              <el-table :data="matchList" style="width: 100%" stripe>
+                <el-table-column prop="job_name" label="岗位名称" width="180" />
+                <el-table-column prop="overall_score" label="匹配度" width="100">
+                  <template #default="{ row }">{{ row.overall_score }}%</template>
+                </el-table-column>
+                <el-table-column label="专业技能契合度" width="140">
+                  <template #default="{ row }">{{ row.skill_fit }}%</template>
+                </el-table-column>
+                <el-table-column label="通用素质差距" width="140">
+                  <template #default="{ row }">{{ row.soft_gap }}%</template>
+                </el-table-column>
+              </el-table>
+              <p class="match-note">系统将基于匹配度最高的岗位生成职业发展报告。</p>
+            </div>
+            <div class="step-actions">
+              <el-button size="large" @click="prevStep">上一步</el-button>
+              <el-button type="primary" size="large" @click="nextStep" :disabled="!matchStarted">下一步</el-button>
+            </div>
+          </div>
+
+          <!-- 第五步：职业发展报告 -->
+          <div v-if="activeStep === 4" class="step-content glass-panel">
+            <h2 class="section-title">
+              <span class="step-badge">5</span>
+              📄 职业发展报告
+            </h2>
+            <div class="report-area">
+              <el-input
+                v-model="reportContent"
+                type="textarea"
+                :rows="15"
+                placeholder="报告内容..."
+                resize="vertical"
+                class="report-editor"
+              />
+              <div class="report-actions">
+                <el-button @click="polishReport" :loading="polishing">智能润色</el-button>
+                <el-button type="primary" @click="exportReport" :loading="exporting">导出PDF</el-button>
+                <el-button @click="resetReport">重置</el-button>
+              </div>
+              <div class="edit-tip">💡 你可以直接在上方编辑修改报告内容，点击润色可优化表达。</div>
+            </div>
+            <div class="step-actions">
+              <el-button size="large" @click="prevStep">上一步</el-button>
+              <el-button type="success" size="large" @click="finish">完成</el-button>
+            </div>
           </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </div>
   </div>
 </template>
 
@@ -313,7 +364,7 @@ const resumeText = reactive({
   summary: ''
 })
 const studentId = ref(null)
-const resumeScore = computed(() => profile.value.completeness || 0)
+const resumeScore = computed(() => profile?.completeness || 0)
 const uploading = ref(false)
 const submitting = ref(false)
 
@@ -361,7 +412,6 @@ const handleLogout = () => {
 const toggleTheme = () => {
   darkMode.value = !darkMode.value
   localStorage.setItem('darkMode', darkMode.value)
-  // 可添加实际主题切换逻辑（如添加类名到 body）
 }
 
 const goToFeature = (type) => {
@@ -378,6 +428,16 @@ const handleSearch = () => {
   const input = document.querySelector('.nav-search-input')
   if (input.value.trim()) {
     router.push(`/search?keyword=${encodeURIComponent(input.value.trim())}`)
+  }
+}
+
+// ========== 新增：跳转到指定步骤 ==========
+const jumpToStep = (index) => {
+  // 限制只能跳转到已完成或当前步骤，不能跳转到未完成的后续步骤
+  if (index <= activeStep.value) {
+    activeStep.value = index
+  } else {
+    ElMessage.warning('请先完成前面的步骤')
   }
 }
 
@@ -409,7 +469,19 @@ const validateAndSetFile = (file) => {
 
 const removeFile = () => { uploadedFile.value = null }
 
-// ========== 手动提交 ==========
+// ========== 新增：保存并跳转到测评页面的方法 ==========
+const submitManualAndRedirect = async () => {
+  await submitManual()
+  if (studentId.value) {
+    router.push({ 
+      path: '/ability-analysis', 
+      name: 'AbilityAnalysis',
+      query: { studentId: studentId.value } 
+    })
+  }
+}
+
+// ========== 手动提交（原有方法保留） ==========
 const submitManual = async () => {
   if (!personalInfo.name || !personalInfo.phone || !personalInfo.email) {
     ElMessage.warning('请填写完整的个人信息')
@@ -440,7 +512,6 @@ const submitManual = async () => {
     const soft = res.data.soft_abilities
     profile.dimensions = Object.fromEntries(Object.entries(soft).map(([k, v]) => [k, v.score]))
     profileGenerated.value = true
-    activeStep.value++
     ElMessage.success('信息提交成功')
   } catch (err) {
     ElMessage.error('提交失败：' + (err.response?.data?.error || err.message))
@@ -472,8 +543,12 @@ const submitUpload = async () => {
     profile.dimensions = Object.fromEntries(Object.entries(soft).map(([k, v]) => [k, v.score]))
     profile.completeness = 80
     profileGenerated.value = true
-    activeStep.value++
-    ElMessage.success('文件解析成功')
+    router.push({ 
+      path: '/interest-test', 
+      name: 'CareerInterestTest',
+      query: { studentId: studentId.value } 
+    })
+    ElMessage.success('文件解析成功，即将跳转到兴趣测评')
   } catch (err) {
     ElMessage.error('上传失败：' + (err.response?.data?.error || err.message))
   } finally {
@@ -496,7 +571,7 @@ const fetchProfile = async () => {
     const soft = data.soft_abilities || {}
     profile.dimensions = Object.fromEntries(Object.entries(soft).map(([k, v]) => [k, v.score]))
     profile.completeness = data.completeness || 0
-    profile.competitiveness = data.competitiveness || 70
+    profile.competitiveness = data.completeness || 70
     profileGenerated.value = true
   } catch (err) {
     ElMessage.error('获取画像失败：' + err.message)
@@ -728,15 +803,220 @@ onMounted(() => {
 .user-menu .menu-item { padding: 10px 15px; font-size: 14px; cursor: pointer; height: auto; line-height: normal; margin: 0; color: #333; transition: background 0.3s ease; }
 .user-menu .menu-item:hover { background: #f0f7ff; color: #333; }
 .user-menu .logout { color: #ff4d4f; border-top: 1px solid #f0f0f0; }
-/* 主体内容 */
-.main-content {
-  padding: 40px 20px;
+
+/* ========== 主体容器布局 - 左侧步骤 + 右侧内容 ========== */
+.main-container {
   display: flex;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+  gap: 24px;
+}
+
+/* ========== 左侧瀑布式步骤导航 ========== */
+.sidebar-step-indicator {
+  width: 280px;
+  min-width: 280px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border-radius: 24px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  padding: 24px;
+  height: fit-content;
+  position: sticky;
+  top: 100px;
+  align-self: flex-start;
+}
+
+.step-sidebar-header {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+}
+
+.step-sidebar-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 8px 0;
+}
+
+.step-sidebar-header p {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.step-list {
+  position: relative;
+  padding-left: 16px;
+}
+
+.sidebar-step-item {
+  display: flex;
+  position: relative;
+  margin-bottom: 8px;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  padding: 12px 16px;
+  margin-left: 8px;
+}
+
+/* 步骤连接线样式 */
+.step-connector {
+  position: absolute;
+  left: -16px;
+  top: 40px;
+  width: 2px;
+  height: calc(100% + 8px);
+  background: #e2e8f0;
+  z-index: 1;
+}
+
+.step-connector.completed {
+  background: #10b981;
+}
+
+.step-connector.active {
+  background: #2563eb;
+}
+
+.step-connector.inactive {
+  background: #e2e8f0;
+}
+
+/* 最后一个步骤隐藏连接线 */
+.sidebar-step-item:last-child .step-connector {
+  display: none;
+}
+
+.step-content-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 2;
+  width: 100%;
+}
+
+/* 步骤状态样式 */
+.sidebar-step-item:hover {
+  background: rgba(37, 99, 235, 0.05);
+}
+
+.sidebar-step-item.active {
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+}
+
+.sidebar-step-item.completed {
+  background: rgba(16, 185, 129, 0.05);
+}
+
+/* 步骤图标样式 */
+.step-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* 不同状态的图标样式 */
+.inactive-icon {
+  background: #e2e8f0;
+  color: #94a3b8;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
   justify-content: center;
 }
-.content-container {
-  max-width: 1000px;
+
+.completed-icon {
+  background: #10b981;
+  color: white;
   width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.active-icon {
+  background: white;
+  color: #2563eb;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 步骤文本样式 */
+.step-text {
+  overflow: hidden;
+}
+
+.step-name {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #475569;
+}
+
+.sidebar-step-item.completed .step-name {
+  color: #065f46;
+  font-weight: 600;
+}
+
+.sidebar-step-item.active .step-name {
+  color: white;
+  font-weight: 600;
+}
+
+.step-status {
+  font-size: 11px;
+  opacity: 0.8;
+  margin-top: 2px;
+  color: white;
+}
+
+/* ========== 右侧主体内容 ========== */
+.main-content {
+  flex: 1;
+  padding: 8px 0;
+}
+
+.content-container {
+  width: 100%;
+}
+
+/* ========== 步骤标题徽章样式 ========== */
+.step-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  margin-right: 12px;
 }
 
 /* 玻璃态卡片 */
@@ -749,63 +1029,10 @@ onMounted(() => {
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15), inset 0 1px 2px rgba(255,255,255,0.6);
 }
 
-/* 步骤指示器 */
-.step-indicator {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 40px;
-  padding: 24px 32px;
-  background: rgba(255,255,255,0.7);
-  border-radius: 60px;
-}
-.step-item {
-  flex: 1;
-  text-align: center;
-  position: relative;
-}
-.step-number {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: #e9ecf2;
-  color: #5a6a7a;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  margin: 0 auto 10px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 6px rgba(0,0,0,0.02);
-}
-.step-text {
-  font-size: 15px;
-  font-weight: 500;
-  color: #5a6a7a;
-  letter-spacing: 0.3px;
-}
-.step-item.active .step-number {
-  background: #2563eb;
-  color: white;
-  transform: scale(1.1);
-  box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.4);
-}
-.step-item.active .step-text {
-  color: #2563eb;
-  font-weight: 600;
-}
-.step-item.completed .step-number {
-  background: #10b981;
-  color: white;
-}
-.step-item.completed .step-text {
-  color: #10b981;
-}
-
 /* 步骤内容卡片 */
 .step-content {
   padding: 40px;
-  margin-top: 20px;
+  margin-top: 0;
 }
 .section-title {
   font-size: 26px;
@@ -988,13 +1215,76 @@ onMounted(() => {
   box-shadow: 0 10px 20px -8px #10b981;
 }
 
+/* 步骤操作按钮 */
+.step-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 32px;
+  justify-content: flex-end;
+}
+
 /* 响应式优化 */
+@media (max-width: 1024px) {
+  .main-container {
+    flex-direction: column;
+    padding: 16px;
+  }
+  
+  .sidebar-step-indicator {
+    width: 100%;
+    min-width: auto;
+    position: static;
+  }
+  
+  .step-list {
+    display: flex;
+    flex-wrap: wrap;
+    padding-left: 0;
+    gap: 8px;
+  }
+  
+  .sidebar-step-item {
+    flex: 1;
+    min-width: calc(50% - 4px);
+    margin-left: 0;
+  }
+  
+  .step-connector {
+    display: none;
+  }
+  
+  .personal-info { 
+    flex-direction: column; 
+    gap: 16px;
+  }
+}
+
 @media (max-width: 768px) {
-  .personal-info { flex-direction: column; }
-  .step-indicator { flex-wrap: wrap; gap: 10px; }
-  .step-item { min-width: 80px; }
+  .step-list {
+    flex-direction: column;
+  }
+  
+  .sidebar-step-item {
+    min-width: auto;
+  }
+  
+  .step-content {
+    padding: 24px 16px;
+  }
+  
+  .section-title {
+    font-size: 20px;
+  }
+  
+  .step-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 </style>
-
-
-
