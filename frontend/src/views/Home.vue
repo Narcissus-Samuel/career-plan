@@ -11,7 +11,7 @@
           <ul class="nav-menu">
             <li class="menu-item active" @click="$router.push('/')">首页</li>
             <li class="menu-item" @click="$router.push('/student-ability')">岗位画像</li>
-            <li class="menu-item" @click="$router.push('/career-planning')">职业规划</li>
+            <li class="menu-item" @click="$router.push('/career-planning-intro')">职业规划</li>
             <li class="menu-item" @click="$router.push('/resource-library')">资源库</li>
             <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
             <li class="menu-item dropdown">

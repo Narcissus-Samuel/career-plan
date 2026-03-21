@@ -1,126 +1,143 @@
 <template>
-  <div class="ability-analysis">
-    <!-- 页面头部 -->
-    <div class="page-header">
-      <h1 class="page-title">能力短板分析</h1>
-      <p class="page-desc">基于你的测评数据，精准识别职业能力短板，提供个性化提升方案</p>
-      <div class="header-actions">
-        <button class="btn-refresh" @click="refreshAnalysis">🔄 重新分析</button>
-        <button class="btn-export" @click="exportReport">📤 导出分析报告</button>
-      </div>
-    </div>
-
-    <!-- 数据概览卡片 -->
-    <div class="overview-cards">
-      <div class="overview-card">
-        <div class="card-icon">📊</div>
-        <div class="card-content">
-          <div class="card-title">综合能力评分</div>
-          <div class="card-value">{{ totalScore }}/100</div>
-          <div class="card-desc">
-            <span class="score-tag" :class="getScoreLevel(totalScore)">{{ getScoreLevelText(totalScore) }}</span>
+  <div class="ability-profile-page">
+    <!-- 顶部导航栏（与学生信息页样式一致，背景为白色） -->
+    <header class="top-nav">
+      <div class="nav-wrap">
+        <div class="nav-left">
+          <div class="logo">
+            <span class="logo-icon">🎯</span>
+            <span class="logo-text">大学生职业规划系统</span>
           </div>
+          <ul class="nav-menu">
+            <li class="menu-item" @click="$router.push('/')">首页</li>
+            <li class="menu-item active" @click="$router.push('/student-ability')">职业规划</li>
+            <li class="menu-item" @click="$router.push('/resource-library')">资源库</li>
+            <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
+            <li class="menu-item dropdown">
+              核心功能 ▼
+              <ul class="dropdown-menu">
+                <li class="dropdown-item" @click="goToFeature('测评')">
+                  <span class="color-dot red"></span> 职业兴趣测评
+                </li>
+                <li class="dropdown-item" @click="goToFeature('分析')">
+                  <span class="color-dot orange"></span> 能力短板分析
+                </li>
+                <li class="dropdown-item" @click="goToFeature('规划')">
+                  <span class="color-dot green"></span> 发展路径规划
+                </li>
+                <li class="dropdown-item" @click="goToFeature('导出')">
+                  <span class="color-dot blue"></span> 规划报告导出
+                </li>
+              </ul>
+            </li>
+          </ul>
         </div>
-      </div>
-      <div class="overview-card">
-        <div class="card-icon">⚠️</div>
-        <div class="card-content">
-          <div class="card-title">核心短板数量</div>
-          <div class="card-value">{{ shortageCount }}</div>
-          <div class="card-desc">需重点提升的能力维度</div>
-        </div>
-      </div>
-      <div class="overview-card">
-        <div class="card-icon">🎯</div>
-        <div class="card-content">
-          <div class="card-title">目标岗位匹配度</div>
-          <div class="card-value">{{ matchRate }}%</div>
-          <div class="card-desc">当前能力与目标岗位的匹配程度</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 能力维度雷达图 -->
-    <div class="chart-section">
-      <div class="chart-card">
-        <h3 class="chart-title">能力维度雷达图</h3>
-        <div class="chart-container">
-          <canvas id="abilityRadarChart"></canvas>
-        </div>
-        <div class="chart-legend">
-          <div class="legend-item">
-            <span class="legend-color your-score"></span>
-            <span class="legend-text">你的得分</span>
+        <div class="nav-right">
+          <div class="nav-search-wrap">
+            <input type="text" class="nav-search-input" placeholder="搜索..." @keyup.enter="handleSearch" />
+            <button class="nav-search-btn" @click="handleSearch">搜索</button>
           </div>
-          <div class="legend-item">
-            <span class="legend-color target-score"></span>
-            <span class="legend-text">目标岗位要求</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 短板详情列表 -->
-    <div class="shortage-section">
-      <h3 class="section-title">核心短板详情</h3>
-      <div class="shortage-list">
-        <div class="shortage-item" v-for="(item, index) in shortageList" :key="index">
-          <div class="shortage-header">
-            <div class="shortage-icon" :style="{ backgroundColor: item.color }">{{ item.icon }}</div>
-            <div class="shortage-title">
-              <h4>{{ item.name }}</h4>
-              <span class="shortage-score">{{ item.score }}/100</span>
-            </div>
-          </div>
-          <div class="shortage-desc">
-            {{ item.description }}
-          </div>
-          <div class="shortage-suggestion">
-            <h5>提升建议：</h5>
-            <ul>
-              <li v-for="(suggest, i) in item.suggestions" :key="i">{{ suggest }}</li>
-            </ul>
-          </div>
-          <div class="shortage-actions">
-            <button class="btn-learn" @click="goToLearning(item.name)">📚 立即学习</button>
-            <button class="btn-plan" @click="createImprovePlan(item.name)">📋 制定提升计划</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 提升路径规划 -->
-    <div class="improve-section">
-      <h3 class="section-title">个性化提升路径</h3>
-      <div class="improve-timeline">
-        <div class="timeline-item" v-for="(item, index) in improveTimeline" :key="index">
-          <div class="timeline-dot" :style="{ backgroundColor: item.color }"></div>
-          <div class="timeline-content">
-            <div class="timeline-period">{{ item.period }}</div>
-            <div class="timeline-title">{{ item.title }}</div>
-            <div class="timeline-tasks">
-              <span class="task-tag" v-for="task in item.tasks" :key="task">{{ task }}</span>
+          <button class="btn-toggle-theme" @click="toggleTheme">🌙</button>
+          <button class="btn-login" @click="$router.push('/login')" v-if="!isLogin">登录</button>
+          <button class="btn-register" @click="$router.push('/register')" v-if="!isLogin">注册</button>
+          <div class="user-profile" v-if="isLogin">
+            <img :src="userAvatar || 'https://picsum.photos/seed/avatar/40/40'" alt="头像" class="avatar" @click="toggleUserMenu" />
+            <div class="user-menu" v-show="isUserMenuOpen">
+              <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
+              <div class="menu-item" @click="$router.push('/settings')">账号设置</div>
+              <div class="menu-item logout" @click="handleLogout">退出登录</div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </header>
 
-    <!-- 相关学习资源 -->
-    <div class="resource-section">
-      <h3 class="section-title">推荐学习资源</h3>
-      <div class="resource-list">
-        <div class="resource-card" v-for="(item, index) in resourceList" :key="index">
-          <div class="resource-type" :style="{ backgroundColor: item.color }">{{ item.type }}</div>
-          <div class="resource-content">
-            <h4 class="resource-title">{{ item.title }}</h4>
-            <p class="resource-desc">{{ item.description }}</p>
-            <div class="resource-meta">
-              <span class="meta-item">🕒 {{ item.duration }}</span>
-              <span class="meta-item">⭐ {{ item.rating }}分</span>
+    <!-- AI能力画像核心展示区域 -->
+    <div class="profile-container">
+      <div class="step-content glass-panel">
+        <h2 class="section-title">🤖 AI 学生就业能力画像</h2>
+        
+        <!-- 加载状态 -->
+        <div v-if="generatingProfile" class="loading-container">
+          <div class="loading-spinner">🔄</div>
+          <p class="loading-text">AI 正在分析你的简历数据，生成多维度能力画像...</p>
+        </div>
+
+        <!-- 画像结果（核心展示） -->
+        <div v-else-if="profileGenerated" class="profile-result">
+          <!-- 核心评分 -->
+          <div class="core-scores">
+            <div class="score-card">
+              <span class="score-type">完整度评分</span>
+              <span class="score-num">{{ profile.completeness }}%</span>
+              <div class="score-bar">
+                <div class="bar-fill" :style="{ width: profile.completeness + '%', background: getScoreColor(profile.completeness) }"></div>
+              </div>
+              <p class="score-desc">{{ getCompletenessDesc(profile.completeness) }}</p>
+            </div>
+            <div class="score-card">
+              <span class="score-type">竞争力评分</span>
+              <span class="score-num">{{ profile.competitiveness }}%</span>
+              <div class="score-bar">
+                <div class="bar-fill" :style="{ width: profile.competitiveness + '%', background: getScoreColor(profile.competitiveness) }"></div>
+              </div>
+              <p class="score-desc">{{ getCompetitiveDesc(profile.competitiveness) }}</p>
             </div>
           </div>
-          <button class="resource-btn" @click="goToResource(item.id)">查看详情</button>
+
+          <!-- 多维度能力评分（核心） -->
+          <div class="dimension-scores">
+            <h3 class="dimension-title">📊 多维度能力细分评分</h3>
+            <div class="dimension-grid">
+              <div v-for="(item, key) in profile.dimensions" :key="key" class="dimension-item">
+                <div class="dimension-name">{{ item.label }}</div>
+                <div class="dimension-bar">
+                  <div class="bar-fill" :style="{ width: item.score + '%', background: getScoreColor(item.score) }"></div>
+                </div>
+                <div class="dimension-score">{{ item.score }}分</div>
+                <div class="dimension-tip">{{ item.evaluation }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 专业技能 & 证书 -->
+          <div class="skill-cert-section">
+            <div class="skill-card">
+              <h3 class="skill-title">💻 专业技能</h3>
+              <div class="tags">
+                <span v-for="skill in profile.skills" :key="skill.name" class="tag skill-tag">
+                  {{ skill.name }} <small>(熟练度{{ skill.proficiency }}%)</small>
+                </span>
+              </div>
+            </div>
+            <div class="cert-card">
+              <h3 class="cert-title">📜 证书资质</h3>
+              <div class="tags">
+                <span v-for="cert in profile.certificates" :key="cert.name" class="tag cert-tag">
+                  {{ cert.name }} <small>({{ cert.level }})</small>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI 综合评价 -->
+          <div class="ai-evaluation">
+            <h3 class="eval-title">📝 AI 综合能力评价</h3>
+            <div class="eval-content">{{ profile.aiEvaluation }}</div>
+          </div>
+
+          <!-- 操作按钮 -->
+          <div class="profile-actions">
+            <el-button @click="regenerateProfile" :loading="generatingProfile">重新生成画像</el-button>
+            <el-button type="primary" @click="exportProfile">导出能力画像</el-button>
+            <el-button type="success" @click="goToMatch">进入人岗匹配</el-button>
+          </div>
+        </div>
+
+        <!-- 未生成状态 -->
+        <div v-else class="empty-profile">
+          <p class="empty-text">暂无能力画像数据，请先完成简历上传/手动录入</p>
+          <el-button type="primary" @click="goBack">返回填写信息</el-button>
         </div>
       </div>
     </div>
@@ -128,618 +145,558 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import Chart from 'chart.js/auto' // 引入Chart.js
+import { ElMessage, ElMessageBox } from 'element-plus'
+import axios from 'axios'
 
-// 初始化路由实例
+// 路由实例
 const router = useRouter()
 
-// 页面核心数据
-const totalScore = ref(75) // 综合能力总分
-const shortageCount = ref(3) // 核心短板数量
-const matchRate = ref(78) // 目标岗位匹配度
+// ========== 导航栏相关数据 ==========
+const isLogin = ref(!!localStorage.getItem('token'))
+const userAvatar = ref(localStorage.getItem('avatar') || '')
+const isUserMenuOpen = ref(false)
+const darkMode = ref(localStorage.getItem('darkMode') === 'true')
 
-// 能力维度数据（雷达图）
-const abilityDimensions = ref([
-  { name: '专业技能', yourScore: 80, targetScore: 90 },
-  { name: '沟通表达', yourScore: 65, targetScore: 85 },
-  { name: '逻辑思维', yourScore: 75, targetScore: 80 },
-  { name: '团队协作', yourScore: 70, targetScore: 85 },
-  { name: '学习能力', yourScore: 85, targetScore: 80 },
-  { name: '抗压能力', yourScore: 60, targetScore: 80 },
-  { name: '创新能力', yourScore: 70, targetScore: 85 }
-])
+// ========== 基础配置 ==========
+const token = localStorage.getItem('token')
+const userId = localStorage.getItem('userId') || 3
+const studentId = ref(localStorage.getItem('studentId') || null)
 
-// 核心短板列表
-const shortageList = ref([
-  {
-    icon: '🗣️',
-    name: '沟通表达能力',
-    score: 65,
-    color: '#ff7a45',
-    description: '在团队协作和对外沟通场景中，表达不够清晰、简洁，难以快速传递核心信息，影响工作效率和协作效果。',
-    suggestions: [
-      '参加线下沟通技巧培训课程，每周进行1次模拟演讲练习',
-      '阅读《非暴力沟通》《金字塔原理》等书籍，学习结构化表达',
-      '主动承担团队汇报、跨部门沟通的任务，积累实战经验',
-      '录制自己的沟通场景视频，复盘并优化表达逻辑'
-    ]
-  },
-  {
-    icon: '💪',
-    name: '抗压能力',
-    score: 60,
-    color: '#faad14',
-    description: '面对紧急任务、多任务并行或负面反馈时，容易产生焦虑情绪，影响决策效率和执行质量。',
-    suggestions: [
-      '学习时间管理方法（如番茄工作法），合理拆分任务降低压力',
-      '培养运动、冥想等放松习惯，每周至少3次，每次30分钟以上',
-      '建立情绪日记，记录压力来源并分析应对策略',
-      '主动挑战有难度的任务，逐步提升心理承受能力'
-    ]
-  },
-  {
-    icon: '✨',
-    name: '创新能力',
-    score: 70,
-    color: '#52c41a',
-    description: '在解决问题时倾向于使用传统方法，缺乏多角度思考和创新解决方案，难以在竞争中形成差异化优势。',
-    suggestions: [
-      '定期浏览行业前沿资讯，每周学习1个新的思维模型（如六顶思考帽）',
-      '参加创新工作坊或头脑风暴活动，锻炼发散思维',
-      '尝试用跨界思维解决现有问题，记录创新想法并落地验证',
-      '学习设计思维，从用户需求出发重构解决方案'
-    ]
-  }
-])
-
-// 提升路径时间线
-const improveTimeline = ref([
-  {
-    period: '1-2个月',
-    title: '基础能力提升',
-    color: '#1890ff',
-    tasks: ['沟通技巧入门', '压力管理基础', '创新思维启蒙']
-  },
-  {
-    period: '3-4个月',
-    title: '实战应用阶段',
-    color: '#52c41a',
-    tasks: ['团队沟通实战', '高压场景模拟', '创新方案落地']
-  },
-  {
-    period: '5-6个月',
-    title: '能力固化阶段',
-    color: '#faad14',
-    tasks: ['沟通习惯养成', '抗压能力强化', '创新思维内化']
-  },
-  {
-    period: '7-8个月',
-    title: '能力突破阶段',
-    color: '#ff7a45',
-    tasks: ['高阶沟通技巧', '极端压力应对', '创新方法论构建']
-  }
-])
-
-// 推荐学习资源
-const resourceList = ref([
-  {
-    id: 1,
-    type: '课程',
-    color: '#1890ff',
-    title: '高效沟通表达实战课',
-    description: '从表达逻辑、肢体语言、倾听技巧等维度，全面提升沟通能力，适合职场新人。',
-    duration: '12小时',
-    rating: 4.8
-  },
-  {
-    id: 2,
-    type: '书籍',
-    color: '#52c41a',
-    title: '抗压能力：从焦虑到从容',
-    description: '结合心理学和实战案例，教你如何识别压力源、调整心态、提升心理韧性。',
-    duration: '3小时/章',
-    rating: 4.7
-  },
-  {
-    id: 3,
-    type: '训练营',
-    color: '#faad14',
-    title: '创新思维30天训练营',
-    description: '通过每日打卡、实战任务、导师点评，系统培养创新思维和解决问题的能力。',
-    duration: '30天',
-    rating: 4.9
-  },
-  {
-    id: 4,
-    type: '直播',
-    color: '#ff7a45',
-    title: '职场沟通与压力管理专场',
-    description: '行业大咖分享实战经验，实时解答沟通和抗压相关问题。',
-    duration: '2小时',
-    rating: 4.6
-  }
-])
-
-// 获取分数等级
-const getScoreLevel = (score) => {
-  if (score >= 90) return 'excellent'
-  if (score >= 80) return 'good'
-  if (score >= 70) return 'normal'
-  if (score >= 60) return 'poor'
-  return 'very-poor'
-}
-
-// 获取分数等级文本
-const getScoreLevelText = (score) => {
-  if (score >= 90) return '优秀'
-  if (score >= 80) return '良好'
-  if (score >= 70) return '中等'
-  if (score >= 60) return '待提升'
-  return '急需提升'
-}
-
-// 初始化雷达图
-const initRadarChart = () => {
-  const ctx = document.getElementById('abilityRadarChart').getContext('2d')
-  
-  // 提取雷达图数据
-  const labels = abilityDimensions.value.map(item => item.name)
-  const yourScores = abilityDimensions.value.map(item => item.yourScore)
-  const targetScores = abilityDimensions.value.map(item => item.targetScore)
-
-  new Chart(ctx, {
-    type: 'radar',
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: '你的得分',
-          data: yourScores,
-          backgroundColor: 'rgba(24, 144, 255, 0.2)',
-          borderColor: 'rgba(24, 144, 255, 1)',
-          pointBackgroundColor: 'rgba(24, 144, 255, 1)',
-          pointBorderColor: '#fff',
-          pointHoverBackgroundColor: '#fff',
-          pointHoverBorderColor: 'rgba(24, 144, 255, 1)'
-        },
-        {
-          label: '目标岗位要求',
-          data: targetScores,
-          backgroundColor: 'rgba(82, 196, 26, 0.2)',
-          borderColor: 'rgba(82, 196, 26, 1)',
-          pointBackgroundColor: 'rgba(82, 196, 26, 1)',
-          pointBorderColor: '#fff',
-          pointHoverBackgroundColor: '#fff',
-          pointHoverBorderColor: 'rgba(82, 196, 26, 1)'
-        }
-      ]
-    },
-    options: {
-      elements: {
-        line: {
-          borderWidth: 2
-        }
-      },
-      scales: {
-        r: {
-          angleLines: {
-            display: true
-          },
-          suggestedMin: 0,
-          suggestedMax: 100
-        }
-      }
-    }
-  })
-}
-
-// 重新分析
-const refreshAnalysis = () => {
-  // 模拟重新分析（实际项目中可调用后端接口）
-  alert('正在重新分析你的能力数据，请稍候...')
-  // 随机更新部分数据（仅演示）
-  totalScore.value = Math.floor(Math.random() * 20) + 70
-  matchRate.value = Math.floor(Math.random() * 15) + 70
-}
-
-// 导出报告
-const exportReport = () => {
-  alert('能力短板分析报告正在导出为PDF格式，请稍候...')
-  // 实际项目中可调用导出接口或前端生成PDF
-}
-
-// 跳转到学习页面
-const goToLearning = (abilityName) => {
-  router.push({ 
-    path: '/resource-library', 
-    query: { keyword: abilityName } 
-  })
-}
-
-// 制定提升计划
-const createImprovePlan = (abilityName) => {
-  router.push({
-    path: '/career-planning',
-    query: { focus: abilityName }
-  })
-}
-
-// 跳转到资源详情
-const goToResource = (id) => {
-  router.push({
-    path: `/detail/${id}`,
-    query: { type: 'resource' }
-  })
-}
-
-// 页面挂载时初始化图表
-onMounted(() => {
-  initRadarChart()
+// Axios 实例
+const api = axios.create({
+  baseURL: 'http://127.0.0.1:5000/api',
+  headers: { Authorization: token ? `Bearer ${token}` : '' },
+  timeout: 30000
 })
+
+// ========== 核心数据 ==========
+// 加载状态
+const generatingProfile = ref(false)
+// 画像生成状态
+const profileGenerated = ref(true) // 直接设为true，模拟生成完成状态
+
+// AI能力画像数据（模拟生成后的完整数据）
+const profile = reactive({
+  // 核心评分
+  completeness: 85,     // 完整度
+  competitiveness: 88,   // 竞争力
+  // 多维度能力（包含所有核心维度）
+  dimensions: {
+    professionalSkill: { label: '专业技能', score: 90, evaluation: '专业技能扎实，掌握Java/Python等核心技术' },
+    certificate: { label: '证书资质', score: 80, evaluation: '持有英语六级、计算机二级等核心证书' },
+    innovation: { label: '创新能力', score: 75, evaluation: '具备一定创新思维，能提出优化方案' },
+    learning: { label: '学习能力', score: 92, evaluation: '学习能力极强，能快速掌握新技术' },
+    pressureResistance: { label: '抗压能力', score: 85, evaluation: '抗压能力良好，能应对紧急项目' },
+    communication: { label: '沟通能力', score: 88, evaluation: '沟通表达清晰，善于团队协作沟通' },
+    internship: { label: '实习能力', score: 82, evaluation: '有大厂实习经历，实践能力突出' },
+    teamwork: { label: '团队协作', score: 89, evaluation: '团队协作能力优秀，能有效配合团队' },
+    problemSolving: { label: '问题解决', score: 87, evaluation: '独立解决问题能力强，逻辑清晰' }
+  },
+  // 技能详情（带熟练度）
+  skills: [
+    { name: 'Java', proficiency: 90 },
+    { name: 'Python', proficiency: 85 },
+    { name: 'Spring Boot', proficiency: 88 },
+    { name: 'MySQL', proficiency: 82 },
+    { name: 'Vue.js', proficiency: 75 }
+  ],
+  // 证书详情（带等级）
+  certificates: [
+    { name: '英语六级', level: '优秀' },
+    { name: '计算机二级', level: '良好' },
+    { name: 'PMP项目管理师', level: '认证' }
+  ],
+  // AI综合评价
+  aiEvaluation: `该学生综合能力优秀，专业技能扎实，尤其在Java后端开发领域具备较强竞争力。
+学习能力突出，能快速适应新技术和新环境，实习经历丰富，具备实际项目经验。
+沟通能力和团队协作能力良好，抗压能力强，适合互联网企业后端开发岗位。
+建议重点提升前端技能和云原生技术，进一步增强全栈开发能力。`
+})
+
+// ========== 导航栏方法 ==========
+const toggleUserMenu = () => {
+  isUserMenuOpen.value = !isUserMenuOpen.value
+}
+
+const handleLogout = () => {
+  localStorage.clear()
+  isLogin.value = false
+  router.push('/')
+  ElMessage.success('退出登录成功')
+}
+
+const toggleTheme = () => {
+  darkMode.value = !darkMode.value
+  localStorage.setItem('darkMode', darkMode.value)
+  // 可在这里添加主题切换的实际逻辑
+}
+
+const goToFeature = (type) => {
+  const map = {
+    '测评': '/interest-test',
+    '分析': '/ability-analysis',
+    '规划': '/development-path',
+    '导出': '/report-export'
+  }
+  router.push(map[type] || '/')
+}
+
+const handleSearch = () => {
+  const input = document.querySelector('.nav-search-input')
+  if (input.value.trim()) {
+    router.push(`/search?keyword=${encodeURIComponent(input.value.trim())}`)
+  }
+}
+
+// ========== 核心方法 ==========
+/**
+ * 重新生成能力画像
+ */
+const regenerateProfile = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要重新生成能力画像吗？当前画像数据将被覆盖',
+      '提示',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    generatingProfile.value = true
+    // 调用接口重新生成（此处保留真实接口逻辑）
+    const res = await api.get(`/profile/${studentId.value}/resume-data`)
+    const newProfile = res.data
+    
+    // 更新画像数据
+    profile.completeness = newProfile.completeness || profile.completeness
+    profile.competitiveness = newProfile.competitiveness || profile.competitiveness
+    profile.dimensions = newProfile.dimensions || profile.dimensions
+    profile.skills = newProfile.skills || profile.skills
+    profile.certificates = newProfile.certificates || profile.certificates
+    profile.aiEvaluation = newProfile.ai_evaluation || profile.aiEvaluation
+    
+    ElMessage.success('AI能力画像重新生成成功！')
+  } catch (err) {
+    if (err !== 'cancel') {
+      ElMessage.error('重新生成失败：' + (err.message || '服务器错误'))
+    }
+  } finally {
+    generatingProfile.value = false
+  }
+}
+
+/**
+ * 导出能力画像为PDF
+ */
+const exportProfile = async () => {
+  try {
+    const res = await api.post('/profile/export', {
+      student_id: studentId.value,
+      format: 'pdf',
+      profile_data: profile  // 传入当前画像数据
+    }, { responseType: 'blob' })
+    
+    // 下载文件
+    const url = window.URL.createObjectURL(new Blob([res.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `学生能力画像_${localStorage.getItem('userName') || '未知用户'}.pdf`)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success('能力画像导出成功！')
+  } catch (err) {
+    ElMessage.error('导出失败：' + (err.message || '服务器错误'))
+  }
+}
+
+// ========== 辅助方法 ==========
+/**
+ * 根据分数获取评分颜色
+ * @param {number} score 分数
+ * @returns {string} 颜色值
+ */
+const getScoreColor = (score) => {
+  if (score >= 80) return '#10b981'  // 绿色
+  if (score >= 60) return '#f59e0b'  // 黄色
+  if (score >= 40) return '#f97316'  // 橙色
+  return '#ef4444'                   // 红色
+}
+
+/**
+ * 获取完整度描述
+ * @param {number} score 分数
+ * @returns {string} 描述文本
+ */
+const getCompletenessDesc = (score) => {
+  if (score >= 90) return '信息完整度极高，包含了所有核心维度的信息'
+  if (score >= 80) return '信息完整度优秀，仅少量维度信息缺失'
+  if (score >= 70) return '信息完整度良好，部分维度信息可补充'
+  if (score >= 60) return '信息完整度一般，建议补充关键维度信息'
+  return '信息完整度较低，需补充更多个人能力相关信息'
+}
+
+/**
+ * 获取竞争力描述
+ * @param {number} score 分数
+ * @returns {string} 描述文本
+ */
+const getCompetitiveDesc = (score) => {
+  if (score >= 90) return '在同批次求职者中竞争力极强，具备核心优势'
+  if (score >= 80) return '在同批次求职者中竞争力优秀，具备明显优势'
+  if (score >= 70) return '在同批次求职者中竞争力良好，有一定优势'
+  if (score >= 60) return '在同批次求职者中竞争力一般，需提升核心能力'
+  return '在同批次求职者中竞争力较弱，建议重点提升短板能力'
+}
+
+// ========== 页面跳转方法 ==========
+const goBack = () => {
+  // 跳回信息填写页
+  router.push('/student-ability')
+}
+
+const goToMatch = () => {
+  // 跳转到人岗匹配页
+  router.push('/interest-test')
+}
 </script>
 
 <style scoped>
-/* 全局样式 */
-.ability-analysis {
+/* 页面全局样式 */
+.ability-profile-page {
+  width: 100%;
+  min-height: 100vh;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: linear-gradient(145deg, #f9fafc 0%, #f0f3f8 100%);
+  margin: 0;
+  padding: 60px 0 0 0; /* 给导航栏留出空间 */
+  color: #1a2639;
+}
+
+/* ========== 导航栏样式（白色背景） ========== */
+.top-nav {
+  height: 60px;
+  background: #ffffff; /* 导航栏背景改为白色 */
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  width: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+}
+.nav-wrap {
   width: 1200px;
   margin: 0 auto;
-  padding: 20px 0 50px;
-  font-family: "Microsoft Yahei", sans-serif;
-  color: #333;
-}
-
-/* 页面头部 */
-.page-header {
-  margin-bottom: 30px;
-}
-.page-title {
-  font-size: 28px;
-  margin: 0 0 8px 0;
-  color: #2f54eb;
-}
-.page-desc {
-  font-size: 16px;
-  color: #666;
-  margin: 0 0 15px 0;
-}
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-.btn-refresh, .btn-export {
-  padding: 8px 15px;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-}
-.btn-refresh {
-  background: #f5f7fa;
-  color: #2f54eb;
-}
-.btn-export {
-  background: #2f54eb;
-  color: #fff;
-}
-
-/* 概览卡片 */
-.overview-cards {
-  display: flex;
-  gap: 20px;
-  margin-bottom: 40px;
-}
-.overview-card {
-  flex: 1;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  padding: 20px;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-.card-icon {
-  font-size: 32px;
-  width: 60px;
-  height: 60px;
-  border-radius: 8px;
-  background: #f5f7fa;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.card-content {
-  flex: 1;
-}
-.card-title {
-  font-size: 14px;
-  color: #666;
-  margin: 0 0 5px 0;
-}
-.card-value {
-  font-size: 24px;
-  font-weight: bold;
-  margin: 0 0 5px 0;
-}
-.card-desc {
-  font-size: 12px;
-  color: #999;
-}
-.score-tag {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-}
-.score-tag.excellent {
-  background: #f6ffed;
-  color: #52c41a;
-}
-.score-tag.good {
-  background: #e6f7ff;
-  color: #1890ff;
-}
-.score-tag.normal {
-  background: #fffbe6;
-  color: #faad14;
-}
-.score-tag.poor {
-  background: #fff2e8;
-  color: #ff7a45;
-}
-.score-tag.very-poor {
-  background: #fff1f0;
-  color: #ff4d4f;
-}
-
-/* 图表区域 */
-.chart-section {
-  margin-bottom: 40px;
-}
-.chart-card {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  padding: 20px;
-}
-.chart-title {
-  font-size: 18px;
-  margin: 0 0 15px 0;
-  color: #333;
-}
-.chart-container {
-  height: 400px;
-  margin-bottom: 15px;
-}
-.chart-legend {
-  display: flex;
-  gap: 20px;
-  justify-content: center;
-}
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 14px;
-}
-.legend-color {
-  width: 12px;
-  height: 12px;
-  border-radius: 4px;
-  display: inline-block;
-}
-.legend-color.your-score {
-  background: rgba(24, 144, 255, 0.7);
-}
-.legend-color.target-score {
-  background: rgba(82, 196, 26, 0.7);
-}
-
-/* 短板详情 */
-.shortage-section {
-  margin-bottom: 40px;
-}
-.section-title {
-  font-size: 20px;
-  margin: 0 0 20px 0;
-  color: #333;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #e8e8e8;
-}
-.shortage-list {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-.shortage-item {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  padding: 20px;
-}
-.shortage-header {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  margin-bottom: 15px;
-}
-.shortage-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  color: #fff;
-}
-.shortage-title {
-  flex: 1;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  height: 100%;
 }
-.shortage-title h4 {
-  font-size: 18px;
-  margin: 0;
-}
-.shortage-score {
-  font-size: 14px;
-  color: #ff7a45;
-  font-weight: bold;
-}
-.shortage-desc {
-  font-size: 14px;
-  color: #666;
-  line-height: 1.6;
-  margin-bottom: 15px;
-}
-.shortage-suggestion h5 {
-  font-size: 14px;
-  margin: 0 0 8px 0;
-  color: #333;
-}
-.shortage-suggestion ul {
-  margin: 0;
-  padding-left: 20px;
-  font-size: 14px;
-  color: #666;
-  line-height: 1.8;
-}
-.shortage-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 15px;
-}
-.btn-learn, .btn-plan {
-  padding: 6px 12px;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  font-size: 12px;
-}
-.btn-learn {
-  background: #e6f7ff;
-  color: #1890ff;
-}
-.btn-plan {
-  background: #f6ffed;
-  color: #52c41a;
+.nav-left { display: flex; align-items: center; }
+.logo { display: flex; align-items: center; margin-right: 40px; font-size: 18px; font-weight: bold; color: #000; }
+.logo-icon { font-size: 24px; margin-right: 8px; }
+.nav-menu { display: flex; list-style: none; margin: 0; padding: 0; }
+.menu-item { margin: 0 15px; font-size: 14px; cursor: pointer; padding: 0 5px; position: relative; height: 60px; line-height: 60px; color: #000; transition: color 0.3s ease; }
+.menu-item:hover { color: #2f54eb; }
+.menu-item.active { color: #2f54eb; }
+.menu-item.active::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 3px; background: #2f54eb; border-radius: 3px 3px 0 0; }
+.dropdown { position: relative; }
+.dropdown-menu { position: absolute; top: 100%; left: 0; width: 200px; background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.12); border-radius: 8px; list-style: none; padding: 8px 0; margin: 0; display: none; z-index: 9999; }
+.dropdown:hover .dropdown-menu { display: block; animation: fadeIn 0.3s ease; }
+.dropdown-item { padding: 12px 20px; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; height: auto; line-height: normal; color: #333; transition: background 0.3s ease; }
+.dropdown-item:hover { background: #f0f7ff; }
+.color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.color-dot.red { background: #ff7a45; }
+.color-dot.orange { background: #faad14; }
+.color-dot.green { background: #52c41a; }
+.color-dot.blue { background: #1890ff; }
+.nav-right { display: flex; gap: 15px; align-items: center; }
+.nav-search-wrap { display: flex; width: 200px; height: 24px; border-radius: 12px; overflow: hidden; border: 1px solid #e8e8e8; transition: border 0.3s ease; }
+.nav-search-wrap:focus-within { border-color: #2f54eb; }
+.nav-search-input { flex: 1; height: 100%; padding: 0 12px; border: none; outline: none; font-size: 12px; background: transparent; }
+.nav-search-btn { width: 53px; height: 100%; background: #2f54eb; color: #fff; border: none; cursor: pointer; font-size: 12px; transition: background 0.3s ease; }
+.nav-search-btn:hover { background: #1d39c4; }
+.btn-toggle-theme { padding: 6px 10px; border: none; background: #f5f7fa; border-radius: 4px; cursor: pointer; color: #000; transition: all 0.3s ease; }
+.btn-toggle-theme:hover { background: #e8e8e8; }
+.btn-login { padding: 6px 15px; border: 1px solid #2f54eb; color: #2f54eb; background: #fff; border-radius: 4px; cursor: pointer; transition: all 0.3s ease; }
+.btn-login:hover { background: #f0f7ff; }
+.btn-register { padding: 6px 15px; border: none; color: #fff; background: #2f54eb; border-radius: 4px; cursor: pointer; transition: all 0.3s ease; }
+.btn-register:hover { background: #1d39c4; }
+.user-profile { position: relative; display: flex; align-items: center; }
+.avatar { width: 36px; height: 36px; border-radius: 50%; cursor: pointer; border: 2px solid #f0f0f0; transition: border 0.3s ease; }
+.avatar:hover { border-color: #2f54eb; }
+.user-menu { position: absolute; top: 50px; right: 0; width: 120px; background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.12); border-radius: 8px; z-index: 9999; animation: fadeIn 0.3s ease; }
+.user-menu .menu-item { padding: 10px 15px; font-size: 14px; cursor: pointer; height: auto; line-height: normal; margin: 0; color: #333; transition: background 0.3s ease; }
+.user-menu .menu-item:hover { background: #f0f7ff; color: #333; }
+.user-menu .logout { color: #ff4d4f; border-top: 1px solid #f0f0f0; }
+
+/* 容器样式 */
+.profile-container {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px;
 }
 
-/* 提升路径 */
-.improve-section {
-  margin-bottom: 40px;
+/* 玻璃态卡片 */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 32px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15), inset 0 1px 2px rgba(255,255,255,0.6);
+  padding: 40px;
 }
-.improve-timeline {
-  position: relative;
-  padding-left: 30px;
-  border-left: 2px solid #e8e8e8;
-  margin-left: 10px;
-}
-.timeline-item {
-  position: relative;
-  margin-bottom: 25px;
-}
-.timeline-dot {
-  position: absolute;
-  left: -38px;
-  top: 0;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 3px solid #fff;
-}
-.timeline-content {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  padding: 15px;
-}
-.timeline-period {
-  font-size: 12px;
-  color: #999;
-  margin-bottom: 5px;
-}
-.timeline-title {
-  font-size: 16px;
-  font-weight: bold;
-  margin: 0 0 8px 0;
-}
-.timeline-tasks {
+
+/* 标题样式 */
+.section-title {
+  font-size: 26px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 24px 0;
+  padding-bottom: 16px;
+  border-bottom: 2px solid rgba(37, 99, 235, 0.1);
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
-.task-tag {
-  padding: 2px 8px;
-  background: #f5f7fa;
-  border-radius: 4px;
-  font-size: 12px;
-  color: #666;
-}
 
-/* 学习资源 */
-.resource-section {
-  margin-bottom: 20px;
-}
-.resource-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-}
-.resource-card {
-  width: calc(25% - 15px);
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  overflow: hidden;
+/* 加载状态 */
+.loading-container {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
 }
-.resource-type {
-  padding: 8px 0;
-  text-align: center;
-  color: #fff;
-  font-size: 12px;
-  font-weight: bold;
+.loading-spinner {
+  font-size: 48px;
+  animation: spin 2s linear infinite;
+  margin-bottom: 20px;
 }
-.resource-content {
-  padding: 15px;
-  flex: 1;
-}
-.resource-title {
+.loading-text {
   font-size: 16px;
-  margin: 0 0 8px 0;
+  color: #64748b;
+  text-align: center;
 }
-.resource-desc {
-  font-size: 14px;
-  color: #666;
-  line-height: 1.6;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3; /* 新增：标准属性，消除兼容性警告 */
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
-.resource-meta {
+
+/* 核心评分卡片 */
+.core-scores {
   display: flex;
-  gap: 10px;
-  font-size: 12px;
-  color: #999;
+  gap: 24px;
+  margin-bottom: 40px;
 }
-.resource-btn {
-  width: 100%;
-  padding: 8px 0;
-  background: #f5f7fa;
-  color: #2f54eb;
-  border: none;
-  border-top: 1px solid #e8e8e8;
-  cursor: pointer;
+.score-card {
+  flex: 1;
+  background: rgba(255,255,255,0.9);
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+}
+.score-type {
+  display: block;
+  font-size: 16px;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+.score-num {
+  display: block;
+  font-size: 48px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 12px;
+}
+.score-bar {
+  height: 12px;
+  background: #e2e8f0;
+  border-radius: 20px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.bar-fill {
+  height: 100%;
+  border-radius: 20px;
+  transition: width 1s ease-in-out;
+}
+.score-desc {
   font-size: 14px;
+  color: #64748b;
+  margin: 0;
 }
-.resource-btn:hover {
-  background: #e6f7ff;
+
+/* 多维度能力评分 */
+.dimension-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 20px;
+}
+.dimension-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px;
+}
+.dimension-item {
+  background: rgba(255,255,255,0.9);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+}
+.dimension-name {
+  font-weight: 500;
+  color: #1e293b;
+  margin-bottom: 8px;
+}
+.dimension-bar {
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 20px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.dimension-score {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.dimension-tip {
+  font-size: 12px;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* 技能证书区域 */
+.skill-cert-section {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 40px;
+}
+.skill-card, .cert-card {
+  flex: 1;
+  background: rgba(255,255,255,0.9);
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+}
+.skill-title, .cert-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 16px;
+}
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.tag {
+  padding: 8px 16px;
+  border-radius: 40px;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+}
+.skill-tag { background: #dbeafe; color: #1e40af; }
+.cert-tag { background: #dcfce7; color: #166534; }
+.tag small {
+  font-size: 12px;
+  opacity: 0.8;
+  font-weight: normal;
+}
+
+/* AI综合评价 */
+.ai-evaluation {
+  background: rgba(255,255,255,0.9);
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+  margin-bottom: 32px;
+}
+.eval-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 16px;
+}
+.eval-content {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #334155;
+  white-space: pre-line;
+}
+
+/* 操作按钮 */
+.profile-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+/* 空状态 */
+.empty-profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+.empty-text {
+  font-size: 16px;
+  color: #64748b;
+  margin-bottom: 20px;
+}
+
+/* 按钮样式优化 */
+:deep(.el-button--primary) {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  border: none;
+  border-radius: 40px;
+  padding: 12px 32px;
+  font-weight: 600;
+  box-shadow: 0 10px 20px -8px #2563eb;
+  transition: all 0.3s;
+}
+:deep(.el-button--primary:hover) {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 30px -10px #2563eb;
+}
+:deep(.el-button--success) {
+  background: linear-gradient(135deg, #10b981, #34d399);
+  border: none;
+  border-radius: 40px;
+  padding: 12px 32px;
+  font-weight: 600;
+  box-shadow: 0 10px 20px -8px #10b981;
+}
+
+/* 响应式适配 */
+@media (max-width: 768px) {
+  .core-scores { flex-direction: column; }
+  .skill-cert-section { flex-direction: column; }
+  .dimension-grid { grid-template-columns: 1fr; }
+  .glass-panel { padding: 20px; }
+  .nav-wrap { width: 95%; }
+  .nav-menu { display: none; } /* 移动端隐藏导航菜单 */
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 </style>
