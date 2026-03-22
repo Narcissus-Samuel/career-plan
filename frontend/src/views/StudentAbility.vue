@@ -1,6 +1,6 @@
 <template>
   <div class="student-ability-page">
-    <!-- 顶部导航栏（保持不变） -->
+    <!-- 顶部导航栏 -->
     <header class="top-nav">
       <div class="nav-wrap">
         <div class="nav-left">
@@ -52,351 +52,256 @@
       </div>
     </header>
 
-    <!-- 主体内容区域 - 改为左侧步骤导航 + 右侧内容 -->
+    <!-- 主体内容 -->
     <div class="main-container">
-      <!-- 左侧瀑布式步骤导航 -->
-      <aside class="sidebar-step-indicator">
-        <div class="sidebar-step-container">
-          <div class="step-sidebar-header">
-            <h3>职业规划流程</h3>
-            <p>完成以下步骤，生成专属职业规划报告</p>
+      <div class="content-wrapper glass-panel">
+        <h2 class="page-title">📋 学生信息与简历填写</h2>
+        
+        <!-- 历史能力画像选择 -->
+        <div v-if="historyProfiles.length > 0" class="history-profile-section">
+          <h3 class="section-subtitle">📊 历史能力画像</h3>
+          <div class="history-profile-card">
+            <div class="profile-info">
+              <span class="profile-label">上次生成时间：</span>
+              <span class="profile-value">{{ formatTime(historyProfiles[0].created_at) }}</span>
+            </div>
+            <el-button type="primary" @click="useHistoryProfile">使用上次生成的能力画像</el-button>
+          </div>
+        </div>
+        
+        <!-- 基础信息 -->
+        <div class="basic-info-section">
+          <h3 class="section-subtitle">个人基础信息</h3>
+          <div class="form-row">
+            <el-input v-model="formData.name" placeholder="姓名" size="large" class="form-item" clearable required />
+            <el-input v-model="formData.phone" placeholder="手机号码" size="large" class="form-item" clearable />
+            <el-input v-model="formData.email" placeholder="邮箱" size="large" class="form-item" clearable />
+          </div>
+        </div>
+
+        <!-- 输入模式切换 -->
+        <div class="input-mode-switch">
+          <button class="mode-btn" :class="{ active: inputMode === 'manual' }" @click="inputMode = 'manual'">
+            ✏️ 手动填写简历
+          </button>
+          <button class="mode-btn" :class="{ active: inputMode === 'upload' }" @click="inputMode = 'upload'">
+            📤 上传简历文件
+          </button>
+        </div>
+
+        <!-- 手动填写模式 -->
+        <div v-if="inputMode === 'manual'" class="manual-input-section">
+          <div class="form-tip"><i>💡</i> 请详细填写以下信息，AI将基于这些内容生成精准的能力画像</div>
+          
+          <div class="resume-block">
+            <h3 class="block-title">🎓 教育经历</h3>
+            <textarea v-model="formData.education" class="block-textarea" rows="2" placeholder="例如：清华大学 计算机科学与技术 本科 2021-2025" />
+            <div class="block-hint">示例：北京大学 软件工程 硕士 2022-2025 | 绩点：3.8/4.0 | 专业排名：前5%</div>
+          </div>
+
+          <div class="resume-block">
+            <h3 class="block-title">💼 工作/实习经历</h3>
+            <textarea v-model="formData.work" class="block-textarea" rows="4" placeholder="请详细描述你的工作/实习经历，包括公司、职位、时间、职责和成果" />
+            <div class="block-hint">示例：字节跳动 数据分析实习生 2024.03-2024.09 | 负责用户行为分析，搭建数据看板，优化推荐算法，提升点击率15%</div>
+          </div>
+
+          <div class="resume-block">
+            <h3 class="block-title">📖 项目经历</h3>
+            <textarea v-model="formData.project" class="block-textarea" rows="4" placeholder="请详细描述你的项目经历，包括项目名称、角色、技术栈、成果" />
+            <div class="block-hint">示例：智能推荐系统开发 | 核心开发 | 技术栈：Python、TensorFlow、MySQL | 实现用户个性化推荐，准确率提升20%</div>
+          </div>
+
+          <div class="resume-block">
+            <h3 class="block-title">🔧 技能与证书</h3>
+            <textarea v-model="formData.skills_certs" class="block-textarea" rows="2" placeholder="例如：Python、Java、SQL、CET-6、PMP证书" />
+            <div class="block-hint">示例：Python（精通）、Java（熟练）、SQL（精通）、Vue.js（掌握）、CET-6、计算机二级、PMP项目管理师</div>
+          </div>
+
+          <div class="resume-block">
+            <h3 class="block-title">📝 自我总结</h3>
+            <textarea v-model="formData.summary" class="block-textarea" rows="3" placeholder="请简要总结你的优势、特长、职业规划等" />
+            <div class="block-hint">示例：具备扎实的计算机基础和数据分析能力，熟悉机器学习算法，有2年大型互联网公司实习经验，擅长数据驱动的决策分析，职业目标是成为资深数据分析师</div>
+          </div>
+
+          <div class="submit-actions">
+            <el-button type="primary" size="large" @click="submitManualForm" :loading="submitting">
+              提交并生成能力画像
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 上传文件模式 -->
+        <div v-if="inputMode === 'upload'" class="upload-section">
+          <!-- 历史上传文件 -->
+          <div v-if="historyFiles.length > 0" class="history-file-section">
+            <div class="history-file-card">
+              <div class="file-info">
+                <span class="file-label">上次上传：</span>
+                <span class="file-name">{{ historyFiles[0].file_name }}</span>
+                <span class="file-time">({{ formatTime(historyFiles[0].upload_time) }})</span>
+              </div>
+              <el-button type="info" @click="useHistoryFile">使用此文件</el-button>
+            </div>
           </div>
           
-          <div class="step-list">
-            <div 
-              v-for="(step, index) in steps" 
-              :key="index" 
-              class="sidebar-step-item"
-              :class="{ 
-                active: index === activeStep, 
-                completed: index < activeStep 
-              }"
-              @click="jumpToStep(index)"
-            >
-              <!-- 步骤连接线 -->
-              <div class="step-connector" :class="{
-                completed: index < activeStep,
-                active: index === activeStep && index < steps.length - 1,
-                inactive: index > activeStep
-              }"></div>
-              
-              <!-- 步骤内容 -->
-              <div class="step-content-wrapper">
-                <!-- 步骤图标 -->
-                <div class="step-icon">
-                  <span v-if="index < activeStep" class="completed-icon">✓</span>
-                  <span v-else-if="index === activeStep" class="active-icon">{{ index + 1 }}</span>
-                  <span v-else class="inactive-icon">{{ index + 1 }}</span>
-                </div>
-                
-                <!-- 步骤文本 -->
-                <div class="step-text">
-                  <div class="step-name">{{ step }}</div>
-                  <div class="step-status" v-if="index === activeStep">当前步骤</div>
-                </div>
-              </div>
-            </div>
+          <div class="upload-area" @click="triggerFileUpload" @dragover.prevent @drop.prevent="handleFileDrop">
+            <input ref="fileInput" type="file" accept=".pdf,.doc,.docx" style="display: none" @change="handleFileSelect" />
+            <div class="upload-icon">📂</div>
+            <div class="upload-text">拖拽简历文件到此处或点击上传</div>
+            <div class="upload-tip">支持 PDF、Word 格式，最大 10MB</div>
+          </div>
+
+          <div v-if="uploadedFile" class="file-info">
+            <span class="file-name">{{ uploadedFile.name }}</span>
+            <span class="file-size">{{ (uploadedFile.size / 1024).toFixed(1) }} KB</span>
+            <el-button type="text" @click="removeFile">移除</el-button>
+          </div>
+
+          <div class="submit-actions" v-if="uploadedFile">
+            <el-button type="primary" size="large" @click="submitUploadFile" :loading="uploading">
+              上传并生成能力画像
+            </el-button>
           </div>
         </div>
-      </aside>
-
-      <!-- 右侧主体内容 -->
-      <main class="main-content">
-        <div class="content-container">
-          <!-- 第一步：个人信息与简历信息 -->
-          <div v-if="activeStep === 0" class="step-content glass-panel">
-            <h2 class="section-title">
-              <span class="step-badge">1</span>
-              📋 个人信息与简历
-            </h2>
-            <div class="personal-info">
-              <el-input v-model="personalInfo.name" placeholder="姓名" size="large" class="info-input" clearable />
-              <el-input v-model="personalInfo.phone" placeholder="手机号" size="large" class="info-input" clearable />
-              <el-input v-model="personalInfo.email" placeholder="邮箱" size="large" class="info-input" clearable />
-            </div>
-
-            <h2 class="section-title" style="margin-top: 32px;">📄 简历信息</h2>
-            <div v-if="studentId" class="resume-score">
-              <span class="score-label">简历完整度</span>
-              <span class="score-value">{{ resumeScore }}%</span>
-              <div class="score-bar"><div class="bar-fill" :style="{ width: resumeScore + '%' }"></div></div>
-            </div>
-
-            <div class="input-mode-switch">
-              <button class="mode-btn" :class="{ active: inputMode === 'upload' }" @click="inputMode = 'upload'">
-                📤 上传简历
-              </button>
-              <button class="mode-btn" :class="{ active: inputMode === 'manual' }" @click="inputMode = 'manual'">
-                ✏️ 手动填写
-              </button>
-            </div>
-
-            <!-- 上传模式 -->
-            <div v-if="inputMode === 'upload'" class="upload-section">
-              <div class="upload-area" @click="triggerFileUpload" @dragover.prevent @drop.prevent="handleFileDrop">
-                <input ref="fileInput" type="file" accept=".pdf,.doc,.docx" style="display: none" @change="handleFileSelect" />
-                <div class="upload-icon">📂</div>
-                <div class="upload-text">拖拽文件到此处或点击上传</div>
-                <div class="upload-tip">支持 PDF、Word 格式，最大 10MB</div>
-              </div>
-              <div v-if="uploadedFile" class="file-info">
-                <span class="file-name">{{ uploadedFile.name }}</span>
-                <span class="file-size">{{ (uploadedFile.size / 1024).toFixed(1) }} KB</span>
-                <el-button type="text" @click="removeFile">移除</el-button>
-              </div>
-              <div class="step-actions" style="margin-top: 20px;">
-                <el-button type="primary" size="large" @click="submitUpload" :loading="uploading">开始解析</el-button>
-              </div>
-            </div>
-
-            <!-- 手动填写模式 -->
-            <div v-if="inputMode === 'manual'" class="manual-section">
-              <div class="form-tip"><i>💡</i> 请根据实际情况填写，每个区域都提供了示例文本。</div>
-              <div class="resume-block">
-                <h3 class="block-title">📚 教育经历</h3>
-                <textarea v-model="resumeText.education" class="block-textarea" rows="3" placeholder="例如：清华大学 计算机科学与技术 本科 2020-2024 GPA:3.8/4.0"></textarea>
-                <div class="block-hint">示例：清华大学 计算机科学与技术 本科 2020-2024 GPA:3.8/4.0 主修课程：数据结构、算法、数据库</div>
-              </div>
-              <div class="resume-block">
-                <h3 class="block-title">💼 工作经历</h3>
-                <textarea v-model="resumeText.work" class="block-textarea" rows="3" placeholder="例如：腾讯科技 后端开发实习生 2023.07-2023.09"></textarea>
-                <div class="block-hint">示例：腾讯科技 后端开发实习生 2023.07-2023.09 负责用户中心微服务开发，使用Spring Boot，日均接口调用量提升30%</div>
-              </div>
-              <div class="resume-block">
-                <h3 class="block-title">🚀 项目经历</h3>
-                <textarea v-model="resumeText.project" class="block-textarea" rows="3" placeholder="例如：校园二手交易平台 2024.03-2024.06"></textarea>
-                <div class="block-hint">示例：校园二手交易平台 2024.03-2024.06 担任后端开发，使用Spring Boot+Vue，实现商品发布、订单管理，用户数500+</div>
-              </div>
-              <div class="resume-block">
-                <h3 class="block-title">🔧 技能与证书</h3>
-                <textarea v-model="resumeText.skillsCerts" class="block-textarea" rows="2" placeholder="例如：Python、Java、SQL；英语六级、计算机二级"></textarea>
-                <div class="block-hint">示例：Python、Java、SQL；英语六级、计算机二级</div>
-              </div>
-              <div class="resume-block">
-                <h3 class="block-title">📝 自我总结</h3>
-                <textarea v-model="resumeText.summary" class="block-textarea" rows="3" placeholder="例如：3年后端开发经验，熟悉Java技术栈..."></textarea>
-                <div class="block-hint">示例：3年后端开发经验，熟悉Java技术栈，有高并发项目经历，善于团队协作，致力于成为全栈工程师</div>
-              </div>
-            </div>
-
-            <div class="step-actions" v-if="inputMode === 'manual'">
-              <el-button type="primary" size="large" @click="submitManualAndRedirect" :loading="submitting">保存并下一步</el-button>
-            </div>
-          </div>
-
-          <!-- 第二步：兴趣探索（真实测评） -->
-          <div v-if="activeStep === 1" class="step-content glass-panel">
-            <h2 class="section-title">
-              <span class="step-badge">2</span>
-              🎯 兴趣探索
-            </h2>
-            <div class="interest-box">
-              <p>通过兴趣测试，你可以发现更适合自己的职业方向。你也可以选择跳过，直接基于能力进行匹配。</p>
-              <el-checkbox v-model="skipInterest">跳过兴趣探索</el-checkbox>
-              <div v-if="!skipInterest" class="interest-test">
-                <div v-if="loadingQuestions" class="loading">加载题目中...</div>
-                <div v-else>
-                  <div v-for="(question, idx) in questions" :key="question.id" class="question-item">
-                    <p>{{ idx + 1 }}. {{ question.question }}</p>
-                    <el-slider
-                      v-model="answers[question.id]"
-                      :min="1"
-                      :max="5"
-                      :step="1"
-                      show-stops
-                      :marks="marks"
-                    />
-                  </div>
-                  <el-button type="primary" @click="submitInterestTest" :loading="submittingTest">提交测评</el-button>
-                </div>
-              </div>
-            </div>
-            <div class="step-actions">
-              <el-button size="large" @click="prevStep">上一步</el-button>
-              <el-button type="primary" size="large" @click="nextStep">下一步</el-button>
-            </div>
-          </div>
-
-          <!-- 第三步：AI能力画像生成 -->
-          <div v-if="activeStep === 2" class="step-content glass-panel">
-            <h2 class="section-title">
-              <span class="step-badge">3</span>
-              🤖 AI能力画像
-            </h2>
-            <div v-if="!profileGenerated" class="generate-area">
-              <p>点击下方按钮，获取AI生成的能力画像。</p>
-              <el-button type="primary" size="large" @click="fetchProfile" :loading="fetchingProfile">获取能力画像</el-button>
-            </div>
-            <div v-else class="profile-result">
-              <div class="result-card">
-                <div class="score-overview">
-                  <div class="score-item">
-                    <span class="score-label">完整度</span>
-                    <span class="score-value">{{ profile.completeness }}%</span>
-                    <div class="score-bar"><div class="bar-fill" :style="{ width: profile.completeness + '%' }"></div></div>
-                  </div>
-                  <div class="score-item">
-                    <span class="score-label">竞争力</span>
-                    <span class="score-value">{{ profile.competitiveness }}%</span>
-                    <div class="score-bar"><div class="bar-fill" :style="{ width: profile.competitiveness + '%' }"></div></div>
-                  </div>
-                </div>
-                <div class="dimension-scores">
-                  <h3>各维度能力评分</h3>
-                  <div class="dimension-grid">
-                    <div v-for="(score, name) in profile.dimensions" :key="name" class="dimension-item">
-                      <div class="dimension-name">{{ name }}</div>
-                      <div class="dimension-bar"><div class="bar-fill" :style="{ width: score + '%' }"></div></div>
-                      <div class="dimension-score">{{ score }}</div>
-                    </div>
-                  </div>
-                </div>
-                <div class="skill-cert">
-                  <div class="skill-section"><h4>专业技能</h4><div class="tags"><span v-for="s in profile.skills" :key="s" class="tag skill-tag">{{ s }}</span></div></div>
-                  <div class="cert-section"><h4>证书</h4><div class="tags"><span v-for="c in profile.certificates" :key="c" class="tag cert-tag">{{ c }}</span></div></div>
-                </div>
-              </div>
-            </div>
-            <div class="step-actions">
-              <el-button size="large" @click="prevStep">上一步</el-button>
-              <el-button type="primary" size="large" @click="nextStep" :disabled="!profileGenerated">下一步</el-button>
-            </div>
-          </div>
-
-          <!-- 第四步：人岗匹配 -->
-          <div v-if="activeStep === 3" class="step-content glass-panel">
-            <h2 class="section-title">
-              <span class="step-badge">4</span>
-              🎯 人岗匹配
-            </h2>
-            <div v-if="!matchStarted" class="match-start">
-              <p>点击“立即匹配”，AI将分析你的能力与岗位的契合度，并推荐最适合的岗位。</p>
-              <el-button type="primary" size="large" @click="fetchMatchList" :loading="matching">立即匹配</el-button>
-            </div>
-            <div v-else class="match-result">
-              <el-table :data="matchList" style="width: 100%" stripe>
-                <el-table-column prop="job_name" label="岗位名称" width="180" />
-                <el-table-column prop="overall_score" label="匹配度" width="100">
-                  <template #default="{ row }">{{ row.overall_score }}%</template>
-                </el-table-column>
-                <el-table-column label="专业技能契合度" width="140">
-                  <template #default="{ row }">{{ row.skill_fit }}%</template>
-                </el-table-column>
-                <el-table-column label="通用素质差距" width="140">
-                  <template #default="{ row }">{{ row.soft_gap }}%</template>
-                </el-table-column>
-              </el-table>
-              <p class="match-note">系统将基于匹配度最高的岗位生成职业发展报告。</p>
-            </div>
-            <div class="step-actions">
-              <el-button size="large" @click="prevStep">上一步</el-button>
-              <el-button type="primary" size="large" @click="nextStep" :disabled="!matchStarted">下一步</el-button>
-            </div>
-          </div>
-
-          <!-- 第五步：职业发展报告 -->
-          <div v-if="activeStep === 4" class="step-content glass-panel">
-            <h2 class="section-title">
-              <span class="step-badge">5</span>
-              📄 职业发展报告
-            </h2>
-            <div class="report-area">
-              <el-input
-                v-model="reportContent"
-                type="textarea"
-                :rows="15"
-                placeholder="报告内容..."
-                resize="vertical"
-                class="report-editor"
-              />
-              <div class="report-actions">
-                <el-button @click="polishReport" :loading="polishing">智能润色</el-button>
-                <el-button type="primary" @click="exportReport" :loading="exporting">导出PDF</el-button>
-                <el-button @click="resetReport">重置</el-button>
-              </div>
-              <div class="edit-tip">💡 你可以直接在上方编辑修改报告内容，点击润色可优化表达。</div>
-            </div>
-            <div class="step-actions">
-              <el-button size="large" @click="prevStep">上一步</el-button>
-              <el-button type="success" size="large" @click="finish">完成</el-button>
-            </div>
-          </div>
-        </div>
-      </main>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElLoading } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
 
+// 路由实例
 const router = useRouter()
+
+// 导航栏相关
 const isLogin = ref(!!localStorage.getItem('token'))
 const userAvatar = ref(localStorage.getItem('avatar') || '')
 const isUserMenuOpen = ref(false)
 const darkMode = ref(localStorage.getItem('darkMode') === 'true')
-const token = localStorage.getItem('token')
-const userId = 3   // 临时写死，测试用
+const userId = ref(localStorage.getItem('userId') || 1) // 从本地存储获取用户ID，默认1
+
+// 历史数据
+const historyProfiles = ref([]) // 历史能力画像
+const historyFiles = ref([]) // 历史上传文件
 
 // Axios 实例
 const api = axios.create({
   baseURL: 'http://127.0.0.1:5000/api',
-  headers: { Authorization: token ? `Bearer ${token}` : '' }
+  headers: { 
+    Authorization: localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '',
+    'Content-Type': 'application/json'
+  },
+  timeout: 30000
 })
 
-// 步骤定义
-const steps = ['填写信息', '兴趣探索', '能力画像', '人岗匹配', '生成报告']
-const activeStep = ref(0)
-
-// 第一步数据
-const personalInfo = reactive({ name: '', phone: '', email: '' })
-const inputMode = ref('manual')
-const uploadedFile = ref(null)
-const fileInput = ref(null)
-const resumeText = reactive({
+// 表单数据
+const formData = reactive({
+  name: '',
+  phone: '',
+  email: '',
   education: '',
   work: '',
   project: '',
-  skillsCerts: '',
+  skills_certs: '',
   summary: ''
 })
-const studentId = ref(null)
-const resumeScore = computed(() => profile?.completeness || 0)
-const uploading = ref(false)
+
+// 上传相关
+const inputMode = ref('manual')
+const uploadedFile = ref(null)
+const fileInput = ref(null)
 const submitting = ref(false)
+const uploading = ref(false)
 
-// 第二步数据
-const skipInterest = ref(false)
-const questions = ref([])
-const answers = ref({})
-const loadingQuestions = ref(false)
-const submittingTest = ref(false)
-const marks = { 1: '1', 2: '2', 3: '3', 4: '4', 5: '5' }
+// ========== 工具方法 ==========
+// 格式化时间
+const formatTime = (timeStr) => {
+  if (!timeStr) return '未知时间'
+  const date = new Date(timeStr)
+  return `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
+}
 
-// 第三步数据
-const fetchingProfile = ref(false)
-const profileGenerated = ref(false)
-const profile = reactive({
-  completeness: 0,
-  competitiveness: 0,
-  dimensions: {},
-  skills: [],
-  certificates: []
-})
+// ========== 历史数据加载 ==========
+// 加载用户的历史能力画像
+const loadHistoryProfiles = async () => {
+  try {
+    const res = await api.get(`/profile/history/${userId.value}`)
+    if (res.data && res.data.length > 0) {
+      historyProfiles.value = res.data
+      // 自动填充最新的基础信息
+      const latestProfile = res.data[0]
+      formData.name = latestProfile.name || ''
+      formData.phone = latestProfile.phone || ''
+      formData.email = latestProfile.email || ''
+      formData.education = latestProfile.education_text || ''
+      formData.work = latestProfile.work_text || ''
+      formData.project = latestProfile.project_text || ''
+      formData.skills_certs = latestProfile.skills?.join('、') || ''
+      formData.summary = latestProfile.summary || ''
+    }
+  } catch (err) {
+    console.error('加载历史画像失败:', err)
+    // 不提示错误，可能是首次使用
+  }
+}
 
-// 第四步数据
-const matching = ref(false)
-const matchStarted = ref(false)
-const matchList = ref([])
+// 加载用户的历史上传文件
+const loadHistoryFiles = async () => {
+  try {
+    const res = await api.get(`/file/history/${userId.value}`)
+    if (res.data && res.data.length > 0) {
+      historyFiles.value = res.data
+    }
+  } catch (err) {
+    console.error('加载历史文件失败:', err)
+  }
+}
 
-// 第五步数据
-const reportContent = ref('')
-const polishing = ref(false)
-const exporting = ref(false)
-const reportId = ref(null)
+// 使用历史能力画像
+const useHistoryProfile = () => {
+  if (historyProfiles.value.length === 0) return
+  
+  const latestProfile = historyProfiles.value[0]
+  router.push({
+    path: '/ability-analysis',
+    query: { studentId: latestProfile.id }
+  })
+  ElMessage.success('正在加载您上次生成的能力画像')
+}
+
+// 使用历史上传文件
+const useHistoryFile = async () => {
+  if (historyFiles.value.length === 0) return
+  
+  uploading.value = true
+  try {
+    const fileId = historyFiles.value[0].id
+    // 调用使用历史文件的接口
+    const res = await api.post('/profile/use-history-file', {
+      user_id: parseInt(userId.value),
+      file_id: fileId
+    })
+    
+    if (res.data.student_id) {
+      localStorage.setItem('studentId', res.data.student_id)
+      ElMessage.success('正在使用历史简历文件生成能力画像')
+      
+      router.push({
+        path: '/ability-analysis',
+        query: { studentId: res.data.student_id }
+      })
+    }
+  } catch (err) {
+    console.error('使用历史文件失败:', err)
+    ElMessage.error('使用历史文件失败：' + (err.response?.data?.error || err.message))
+  } finally {
+    uploading.value = false
+  }
+}
 
 // ========== 导航栏方法 ==========
 const toggleUserMenu = () => {
@@ -407,6 +312,7 @@ const handleLogout = () => {
   localStorage.clear()
   isLogin.value = false
   router.push('/')
+  ElMessage.success('退出登录成功')
 }
 
 const toggleTheme = () => {
@@ -431,312 +337,164 @@ const handleSearch = () => {
   }
 }
 
-// ========== 新增：跳转到指定步骤 ==========
-const jumpToStep = (index) => {
-  // 限制只能跳转到已完成或当前步骤，不能跳转到未完成的后续步骤
-  if (index <= activeStep.value) {
-    activeStep.value = index
-  } else {
-    ElMessage.warning('请先完成前面的步骤')
-  }
-}
-
 // ========== 文件上传方法 ==========
-const triggerFileUpload = () => { fileInput.value.click() }
+const triggerFileUpload = () => {
+  fileInput.value.click()
+}
 
 const handleFileSelect = (e) => {
   const file = e.target.files[0]
-  if (file) validateAndSetFile(file)
+  if (file) {
+    validateAndSetFile(file)
+  }
 }
 
 const handleFileDrop = (e) => {
   const file = e.dataTransfer.files[0]
-  if (file) validateAndSetFile(file)
+  if (file) {
+    validateAndSetFile(file)
+  }
 }
 
 const validateAndSetFile = (file) => {
+  // 验证文件类型
   const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
   if (!allowedTypes.includes(file.type)) {
     ElMessage.error('仅支持 PDF 或 Word 文档')
     return
   }
+  
+  // 验证文件大小
   if (file.size > 10 * 1024 * 1024) {
     ElMessage.error('文件大小不能超过 10MB')
     return
   }
+  
   uploadedFile.value = file
 }
 
-const removeFile = () => { uploadedFile.value = null }
-
-// ========== 新增：保存并跳转到测评页面的方法 ==========
-const submitManualAndRedirect = async () => {
-  await submitManual()
-  if (studentId.value) {
-    router.push({ 
-      path: '/ability-analysis', 
-      name: 'AbilityAnalysis',
-      query: { studentId: studentId.value } 
-    })
-  }
+const removeFile = () => {
+  uploadedFile.value = null
+  fileInput.value.value = ''
 }
 
-// ========== 手动提交（原有方法保留） ==========
-const submitManual = async () => {
-  if (!personalInfo.name || !personalInfo.phone || !personalInfo.email) {
-    ElMessage.warning('请填写完整的个人信息')
+// ========== 提交方法 ==========
+// 手动填写表单提交
+const submitManualForm = async () => {
+  // 基础校验
+  if (!formData.name) {
+    ElMessage.warning('请填写姓名')
     return
   }
-  if (!userId) {
-    ElMessage.warning('请先登录')
-    return
-  }
+  
   submitting.value = true
+  
   try {
+    // 构造请求数据
     const payload = {
-      user_id: parseInt(userId),
-      name: personalInfo.name,
-      phone: personalInfo.phone,
-      email: personalInfo.email,
-      education: resumeText.education,
-      work: resumeText.work,
-      project: resumeText.project,
-      skills_certs: resumeText.skillsCerts,
-      summary: resumeText.summary
+      user_id: parseInt(userId.value),
+      name: formData.name,
+      phone: formData.phone,
+      email: formData.email,
+      education: formData.education,
+      work: formData.work,
+      project: formData.project,
+      skills_certs: formData.skills_certs,
+      summary: formData.summary
     }
+    
+    // 调用后端提交接口（会保存到数据库）
     const res = await api.post('/profile/submit', payload)
-    studentId.value = res.data.student_id
-    profile.completeness = res.data.completeness
-    profile.skills = res.data.skills
-    profile.certificates = res.data.certificates
-    const soft = res.data.soft_abilities
-    profile.dimensions = Object.fromEntries(Object.entries(soft).map(([k, v]) => [k, v.score]))
-    profileGenerated.value = true
-    ElMessage.success('信息提交成功')
+    
+    if (res.data.student_id) {
+      // 保存studentId到本地存储
+      localStorage.setItem('studentId', res.data.student_id)
+      ElMessage.success('信息提交成功，即将生成能力画像')
+      
+      // 跳转到能力画像页面
+      router.push({
+        path: '/ability-analysis',
+        query: { studentId: res.data.student_id }
+      })
+    }
   } catch (err) {
+    console.error('提交失败:', err)
     ElMessage.error('提交失败：' + (err.response?.data?.error || err.message))
   } finally {
     submitting.value = false
   }
 }
 
-// ========== 上传文件并解析 ==========
-const submitUpload = async () => {
+// 上传文件提交
+const submitUploadFile = async () => {
   if (!uploadedFile.value) {
     ElMessage.warning('请先选择文件')
     return
   }
-  if (!userId) {
-    ElMessage.warning('请先登录')
-    return
-  }
+  
   uploading.value = true
-  const formData = new FormData()
-  formData.append('file', uploadedFile.value)
-  formData.append('user_id', parseInt(userId))
+  
   try {
-    const res = await api.post('/profile/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
-    studentId.value = res.data.student_id
-    profile.skills = res.data.skills
-    profile.certificates = res.data.certificates
-    const soft = res.data.soft_abilities
-    profile.dimensions = Object.fromEntries(Object.entries(soft).map(([k, v]) => [k, v.score]))
-    profile.completeness = 80
-    profileGenerated.value = true
-    router.push({ 
-      path: '/interest-test', 
-      name: 'CareerInterestTest',
-      query: { studentId: studentId.value } 
+    // 创建FormData
+    const formData = new FormData()
+    formData.append('file', uploadedFile.value)
+    formData.append('user_id', userId.value)
+    
+    // 调用上传接口（会保存文件信息和解析结果到数据库）
+    const res = await api.post('/profile/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
     })
-    ElMessage.success('文件解析成功，即将跳转到兴趣测评')
+    
+    if (res.data.student_id) {
+      // 保存studentId到本地存储
+      localStorage.setItem('studentId', res.data.student_id)
+      ElMessage.success('简历上传并解析成功，即将生成能力画像')
+      
+      // 跳转到能力画像页面
+      router.push({
+        path: '/ability-analysis',
+        query: { studentId: res.data.student_id }
+      })
+    }
   } catch (err) {
+    console.error('上传失败:', err)
     ElMessage.error('上传失败：' + (err.response?.data?.error || err.message))
   } finally {
     uploading.value = false
   }
 }
 
-// ========== 获取能力画像 ==========
-const fetchProfile = async () => {
-  if (!studentId.value) {
-    ElMessage.warning('尚无学生信息，请先完成第一步')
-    return
-  }
-  fetchingProfile.value = true
-  try {
-    const res = await api.get(`/profile/${studentId.value}`)
-    const data = res.data
-    profile.skills = data.skills || []
-    profile.certificates = data.certificates || []
-    const soft = data.soft_abilities || {}
-    profile.dimensions = Object.fromEntries(Object.entries(soft).map(([k, v]) => [k, v.score]))
-    profile.completeness = data.completeness || 0
-    profile.competitiveness = data.completeness || 70
-    profileGenerated.value = true
-  } catch (err) {
-    ElMessage.error('获取画像失败：' + err.message)
-  } finally {
-    fetchingProfile.value = false
-  }
-}
-
-// ========== 获取测评题目 ==========
-const fetchQuestions = async () => {
-  loadingQuestions.value = true
-  try {
-    const res = await api.get('/assessment/questions')
-    questions.value = res.data
-    answers.value = {}
-    questions.value.forEach(q => { answers.value[q.id] = 3 })
-  } catch (err) {
-    ElMessage.error('获取题目失败：' + err.message)
-  } finally {
-    loadingQuestions.value = false
-  }
-}
-
-// ========== 提交兴趣测试 ==========
-const submitInterestTest = async () => {
-  if (!userId) {
-    ElMessage.warning('请先登录')
-    return
-  }
-  const answerList = Object.entries(answers.value).map(([question_id, score]) => ({
-    question_id: parseInt(question_id),
-    score
-  }))
-  submittingTest.value = true
-  try {
-    await api.post('/assessment/submit', {
-      user_id: parseInt(userId),
-      answers: answerList,
-      test_mode: false
+// 页面初始化
+onMounted(async () => {
+  // 检查登录状态
+  if (!isLogin.value) {
+    ElMessageBox.confirm(
+      '请先登录后再填写信息',
+      '提示',
+      {
+        confirmButtonText: '去登录',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    ).then(() => {
+      router.push('/login')
+    }).catch(() => {
+      router.push('/')
     })
-    ElMessage.success('兴趣测试提交成功')
-  } catch (err) {
-    ElMessage.error('提交失败：' + (err.response?.data?.error || err.message))
-  } finally {
-    submittingTest.value = false
-  }
-}
-
-// ========== 人岗匹配 ==========
-const fetchMatchList = async () => {
-  if (!studentId.value) {
-    ElMessage.warning('尚无学生信息')
     return
   }
-  matching.value = true
-  try {
-    const res = await api.get(`/match/recommend?student_id=${studentId.value}&limit=10`)
-    matchList.value = res.data
-    matchStarted.value = true
-    if (matchList.value.length > 0) {
-      generateReport(matchList.value[0])
-    }
-  } catch (err) {
-    ElMessage.error('匹配失败：' + err.message)
-  } finally {
-    matching.value = false
-  }
-}
-
-// ========== 生成报告 ==========
-const generateReport = async (job) => {
-  try {
-    const res = await api.post('/report/generate', { student_id: studentId.value, job_name: job.job_name })
-    reportContent.value = res.data.content
-    reportId.value = res.data.report_id
-  } catch (err) {
-    ElMessage.error('报告生成失败')
-  }
-}
-
-// ========== 润色 ==========
-const polishReport = async () => {
-  if (!reportContent.value) return
-  polishing.value = true
-  try {
-    const res = await api.post('/report/polish', { text: reportContent.value })
-    reportContent.value = res.data.polished
-  } catch (err) {
-    ElMessage.error('润色失败')
-  } finally {
-    polishing.value = false
-  }
-}
-
-// ========== 导出 PDF ==========
-const exportReport = async () => {
-  if (!reportContent.value) return
-  exporting.value = true
-  try {
-    const res = await api.post('/report/export', { markdown: reportContent.value }, { responseType: 'blob' })
-    const url = window.URL.createObjectURL(new Blob([res.data]))
-    const link = document.createElement('a')
-    link.href = url
-    link.setAttribute('download', 'career_report.pdf')
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    ElMessage.success('导出成功')
-  } catch (err) {
-    ElMessage.error('导出失败')
-  } finally {
-    exporting.value = false
-  }
-}
-
-// ========== 重置报告 ==========
-const resetReport = () => {
-  if (matchList.value.length > 0) {
-    generateReport(matchList.value[0])
-  } else {
-    reportContent.value = ''
-  }
-}
-
-// ========== 步骤导航 ==========
-const prevStep = () => { if (activeStep.value > 0) activeStep.value-- }
-
-const nextStep = () => {
-  if (activeStep.value === 0 && !studentId.value) {
-    ElMessage.warning('请先提交个人信息')
-    return
-  }
-  if (activeStep.value === 1) {
-    // 兴趣探索可跳过
-  }
-  if (activeStep.value === 2 && !profileGenerated.value) {
-    ElMessage.warning('请先获取能力画像')
-    return
-  }
-  if (activeStep.value === 3 && !matchStarted.value) {
-    ElMessage.warning('请先完成人岗匹配')
-    return
-  }
-  if (activeStep.value < steps.length - 1) activeStep.value++
-}
-
-const finish = () => {
-  ElMessage.success('恭喜你完成了职业规划！')
-  router.push('/')
-}
-
-// ========== 监听步骤变化加载题目 ==========
-watch(() => activeStep.value, (newVal) => {
-  if (newVal === 1 && !skipInterest.value && questions.value.length === 0) {
-    fetchQuestions()
-  }
-})
-
-// 组件挂载时检查登录状态（可选）
-onMounted(() => {
-  // 可在此处执行初始化操作，如检查 token 有效性
+  
+  // 加载历史数据
+  await Promise.all([
+    loadHistoryProfiles(),
+    loadHistoryFiles()
+  ])
 })
 </script>
+
 <style scoped>
-/* ========== 全局样式优化 ========== */
 .student-ability-page {
   width: 100%;
   min-height: 100vh;
@@ -747,10 +505,10 @@ onMounted(() => {
   color: #1a2639;
 }
 
-/* ========== 导航栏 ========== */
+/* 导航栏样式 */
 .top-nav {
   height: 60px;
-  background: #fff;
+  background: #ffffff;
   box-shadow: 0 2px 12px rgba(0,0,0,0.08);
   width: 100%;
   position: fixed;
@@ -804,262 +562,116 @@ onMounted(() => {
 .user-menu .menu-item:hover { background: #f0f7ff; color: #333; }
 .user-menu .logout { color: #ff4d4f; border-top: 1px solid #f0f0f0; }
 
-/* ========== 主体容器布局 - 左侧步骤 + 右侧内容 ========== */
+/* 主体内容 */
 .main-container {
-  display: flex;
   width: 100%;
-  max-width: 1400px;
+  max-width: 1000px;
   margin: 0 auto;
-  padding: 20px;
-  gap: 24px;
+  padding: 30px 20px;
 }
 
-/* ========== 左侧瀑布式步骤导航 ========== */
-.sidebar-step-indicator {
-  width: 280px;
-  min-width: 280px;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  border-radius: 24px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
-  padding: 24px;
-  height: fit-content;
-  position: sticky;
-  top: 100px;
-  align-self: flex-start;
-}
-
-.step-sidebar-header {
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.5);
-}
-
-.step-sidebar-header h3 {
-  font-size: 18px;
-  font-weight: 600;
-  color: #1f2937;
-  margin: 0 0 8px 0;
-}
-
-.step-sidebar-header p {
-  font-size: 13px;
-  color: #64748b;
-  margin: 0;
-  line-height: 1.5;
-}
-
-.step-list {
-  position: relative;
-  padding-left: 16px;
-}
-
-.sidebar-step-item {
-  display: flex;
-  position: relative;
-  margin-bottom: 8px;
-  cursor: pointer;
-  border-radius: 12px;
-  transition: all 0.3s ease;
-  padding: 12px 16px;
-  margin-left: 8px;
-}
-
-/* 步骤连接线样式 */
-.step-connector {
-  position: absolute;
-  left: -16px;
-  top: 40px;
-  width: 2px;
-  height: calc(100% + 8px);
-  background: #e2e8f0;
-  z-index: 1;
-}
-
-.step-connector.completed {
-  background: #10b981;
-}
-
-.step-connector.active {
-  background: #2563eb;
-}
-
-.step-connector.inactive {
-  background: #e2e8f0;
-}
-
-/* 最后一个步骤隐藏连接线 */
-.sidebar-step-item:last-child .step-connector {
-  display: none;
-}
-
-.step-content-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  z-index: 2;
-  width: 100%;
-}
-
-/* 步骤状态样式 */
-.sidebar-step-item:hover {
-  background: rgba(37, 99, 235, 0.05);
-}
-
-.sidebar-step-item.active {
-  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
-  color: white;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
-}
-
-.sidebar-step-item.completed {
-  background: rgba(16, 185, 129, 0.05);
-}
-
-/* 步骤图标样式 */
-.step-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-/* 不同状态的图标样式 */
-.inactive-icon {
-  background: #e2e8f0;
-  color: #94a3b8;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.completed-icon {
-  background: #10b981;
-  color: white;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.active-icon {
-  background: white;
-  color: #2563eb;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 步骤文本样式 */
-.step-text {
-  overflow: hidden;
-}
-
-.step-name {
-  font-size: 14px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: #475569;
-}
-
-.sidebar-step-item.completed .step-name {
-  color: #065f46;
-  font-weight: 600;
-}
-
-.sidebar-step-item.active .step-name {
-  color: white;
-  font-weight: 600;
-}
-
-.step-status {
-  font-size: 11px;
-  opacity: 0.8;
-  margin-top: 2px;
-  color: white;
-}
-
-/* ========== 右侧主体内容 ========== */
-.main-content {
-  flex: 1;
-  padding: 8px 0;
-}
-
-.content-container {
-  width: 100%;
-}
-
-/* ========== 步骤标题徽章样式 ========== */
-.step-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
-  color: white;
-  font-size: 16px;
-  font-weight: 600;
-  margin-right: 12px;
-}
-
-/* 玻璃态卡片 */
-.glass-panel {
+.content-wrapper {
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 32px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15), inset 0 1px 2px rgba(255,255,255,0.6);
+  padding: 40px;
 }
 
-/* 步骤内容卡片 */
-.step-content {
-  padding: 40px;
-  margin-top: 0;
-}
-.section-title {
-  font-size: 26px;
+.page-title {
+  font-size: 28px;
   font-weight: 600;
   color: #1f2937;
-  margin: 0 0 24px 0;
+  margin: 0 0 32px 0;
   padding-bottom: 16px;
   border-bottom: 2px solid rgba(37, 99, 235, 0.1);
+}
+
+.section-subtitle {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 16px 0;
+}
+
+/* 历史能力画像样式 */
+.history-profile-section {
+  margin-bottom: 32px;
+  padding: 16px;
+  background: rgba(240, 249, 255, 0.7);
+  border-radius: 16px;
+  border: 1px solid #e0e7ff;
+}
+
+.history-profile-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.profile-info {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-/* 个人信息 */
-.personal-info {
+.profile-label {
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.profile-value {
+  color: #1e40af;
+  font-weight: 500;
+}
+
+/* 历史文件样式 */
+.history-file-section {
+  margin-bottom: 20px;
+}
+
+.history-file-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.file-label {
+  font-weight: 500;
+  color: #4b5563;
+  margin-right: 8px;
+}
+
+.file-time {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.form-row {
   display: flex;
   gap: 20px;
   margin-bottom: 32px;
 }
-.info-input :deep(.el-input__wrapper) {
+
+.form-item {
+  flex: 1;
+}
+
+:deep(.form-item .el-input__wrapper) {
   background: white;
   border-radius: 16px;
   box-shadow: 0 4px 10px rgba(0,0,0,0.02);
   border: 1px solid #edf2f7;
   transition: all 0.2s;
 }
-.info-input :deep(.el-input__wrapper:hover) {
+
+:deep(.form-item .el-input__wrapper:hover) {
   border-color: #2563eb;
   box-shadow: 0 8px 16px -8px rgba(37,99,235,0.2);
 }
@@ -1070,6 +682,7 @@ onMounted(() => {
   gap: 16px;
   margin: 24px 0;
 }
+
 .mode-btn {
   flex: 1;
   padding: 14px 0;
@@ -1087,39 +700,40 @@ onMounted(() => {
   gap: 8px;
   backdrop-filter: blur(4px);
 }
+
 .mode-btn.active {
   background: #2563eb;
   color: white;
   border-color: #2563eb;
   box-shadow: 0 12px 20px -10px #2563eb;
 }
+
 .mode-btn:hover:not(.active) {
   background: #f8fafc;
   border-color: #94a3b8;
 }
 
-/* 上传区域 */
-.upload-area {
-  border: 2px dashed #cbd5e1;
-  border-radius: 32px;
-  padding: 48px 24px;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.3s;
-  background: rgba(255,255,255,0.5);
+/* 手动填写区域 */
+.form-tip {
+  font-size: 14px;
+  color: #64748b;
+  margin-bottom: 24px;
+  padding: 12px;
+  background: rgba(37, 99, 235, 0.05);
+  border-radius: 12px;
 }
-.upload-area:hover {
-  border-color: #2563eb;
-  background: rgba(37,99,235,0.02);
-  transform: scale(1.01);
-}
-.upload-icon { font-size: 56px; color: #94a3b8; margin-bottom: 16px; }
-.upload-text { font-size: 20px; font-weight: 500; color: #1e293b; margin-bottom: 8px; }
-.upload-tip { font-size: 14px; color: #64748b; }
 
-/* 手动填写模块 */
-.resume-block { margin-bottom: 28px; }
-.block-title { font-size: 18px; font-weight: 600; color: #1f2937; margin: 0 0 10px 0; }
+.resume-block {
+  margin-bottom: 28px;
+}
+
+.block-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 10px 0;
+}
+
 .block-textarea {
   width: 100%;
   padding: 16px;
@@ -1132,157 +746,138 @@ onMounted(() => {
   background: white;
   box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
 }
+
 .block-textarea:focus {
   outline: none;
   border-color: #2563eb;
   box-shadow: 0 0 0 4px rgba(37,99,235,0.1);
 }
-.block-hint { font-size: 13px; color: #94a3b8; margin-top: 8px; padding-left: 8px; }
 
-/* 能力画像结果卡片 */
-.result-card {
-  background: rgba(255,255,255,0.7);
-  border-radius: 28px;
-  padding: 32px;
-  backdrop-filter: blur(4px);
+.block-hint {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-top: 8px;
+  padding-left: 8px;
 }
-.score-overview { display: flex; gap: 40px; margin-bottom: 32px; }
-.score-item { flex: 1; }
-.score-label { display: block; font-size: 14px; color: #64748b; margin-bottom: 6px; }
-.score-value { font-size: 32px; font-weight: 700; color: #1f2937; display: block; margin-bottom: 8px; }
-.score-bar { height: 10px; background: #e2e8f0; border-radius: 20px; overflow: hidden; }
-.bar-fill { height: 100%; background: linear-gradient(90deg, #2563eb, #3b82f6); border-radius: 20px; }
 
-/* 维度网格 */
-.dimension-item {
-  display: grid;
-  grid-template-columns: 120px 1fr 50px;
-  align-items: center;
-  gap: 16px;
-  padding: 8px 0;
+/* 上传区域 */
+.upload-area {
+  border: 2px dashed #cbd5e1;
+  border-radius: 32px;
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: rgba(255,255,255,0.5);
+  margin-bottom: 24px;
 }
-.dimension-name { color: #475569; font-weight: 500; }
-.dimension-bar { height: 10px; background: #e2e8f0; border-radius: 20px; }
-.dimension-score { font-weight: 600; color: #1f2937; }
 
-/* 技能证书标签 */
-.tags { display: flex; flex-wrap: wrap; gap: 10px; }
-.tag {
-  padding: 6px 16px;
-  border-radius: 40px;
-  font-size: 14px;
+.upload-area:hover {
+  border-color: #2563eb;
+  background: rgba(37,99,235,0.02);
+  transform: scale(1.01);
+}
+
+.upload-icon {
+  font-size: 56px;
+  color: #94a3b8;
+  margin-bottom: 16px;
+}
+
+.upload-text {
+  font-size: 20px;
   font-weight: 500;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.02);
-}
-.skill-tag { background: #dbeafe; color: #1e40af; }
-.cert-tag { background: #dcfce7; color: #166534; }
-
-/* 表格美化 */
-:deep(.el-table) {
-  border-radius: 24px;
-  overflow: hidden;
-  background: rgba(255,255,255,0.6);
-  backdrop-filter: blur(4px);
-}
-:deep(.el-table th) {
-  background: #f8fafc;
   color: #1e293b;
-  font-weight: 600;
-  border-bottom: none;
+  margin-bottom: 8px;
 }
-:deep(.el-table tr) { background: transparent; }
 
-/* 按钮优化 */
-.el-button--primary {
+.upload-tip {
+  font-size: 14px;
+  color: #64748b;
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: white;
+  border-radius: 16px;
+  margin-bottom: 24px;
+}
+
+.file-name {
+  flex: 1;
+  font-size: 14px;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-size {
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* 提交按钮 */
+.submit-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 32px;
+}
+
+:deep(.el-button--primary) {
   background: linear-gradient(135deg, #2563eb, #3b82f6);
   border: none;
   border-radius: 40px;
-  padding: 12px 32px;
+  padding: 12px 48px;
   font-weight: 600;
+  font-size: 16px;
   box-shadow: 0 10px 20px -8px #2563eb;
   transition: all 0.3s;
 }
-.el-button--primary:hover {
+
+:deep(.el-button--primary:hover) {
   transform: translateY(-2px);
   box-shadow: 0 20px 30px -10px #2563eb;
 }
-.el-button--success {
-  background: linear-gradient(135deg, #10b981, #34d399);
-  border: none;
-  border-radius: 40px;
-  padding: 12px 32px;
-  font-weight: 600;
-  box-shadow: 0 10px 20px -8px #10b981;
+
+:deep(.el-button--info) {
+  border-radius: 8px;
+  padding: 8px 16px;
 }
 
-/* 步骤操作按钮 */
-.step-actions {
-  display: flex;
-  gap: 16px;
-  margin-top: 32px;
-  justify-content: flex-end;
-}
-
-/* 响应式优化 */
-@media (max-width: 1024px) {
-  .main-container {
-    flex-direction: column;
-    padding: 16px;
+/* 响应式 */
+@media (max-width: 768px) {
+  .nav-wrap {
+    width: 95%;
   }
   
-  .sidebar-step-indicator {
-    width: 100%;
-    min-width: auto;
-    position: static;
-  }
-  
-  .step-list {
-    display: flex;
-    flex-wrap: wrap;
-    padding-left: 0;
-    gap: 8px;
-  }
-  
-  .sidebar-step-item {
-    flex: 1;
-    min-width: calc(50% - 4px);
-    margin-left: 0;
-  }
-  
-  .step-connector {
+  .nav-menu {
     display: none;
   }
   
-  .personal-info { 
-    flex-direction: column; 
+  .form-row {
+    flex-direction: column;
     gap: 16px;
   }
-}
-
-@media (max-width: 768px) {
-  .step-list {
+  
+  .content-wrapper {
+    padding: 20px;
+  }
+  
+  .page-title {
+    font-size: 24px;
+  }
+  
+  .history-profile-card, .history-file-card {
     flex-direction: column;
-  }
-  
-  .sidebar-step-item {
-    min-width: auto;
-  }
-  
-  .step-content {
-    padding: 24px 16px;
-  }
-  
-  .section-title {
-    font-size: 20px;
-  }
-  
-  .step-actions {
-    flex-direction: column;
-    align-items: stretch;
+    gap: 12px;
+    align-items: flex-start;
   }
 }
 
-/* 动画效果 */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
