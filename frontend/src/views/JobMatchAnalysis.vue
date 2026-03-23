@@ -35,7 +35,7 @@
         </div>
         <div class="nav-right">
           <div class="nav-search-wrap">
-            <input type="text" class="nav-search-input" placeholder="搜索目标岗位..." @keyup.enter="handleSearch" />
+            <input type="text" class="nav-search-input" placeholder="搜索目标岗位/首字母..." @keyup.enter="handleSearch" v-model="searchKeyword" />
             <button class="nav-search-btn" @click="handleSearch">搜索</button>
           </div>
           <button class="btn-toggle-theme" @click="toggleTheme">🌙</button>
@@ -57,242 +57,117 @@
     <div class="match-container">
       <!-- 页面标题 -->
       <div class="page-header">
-        <h1>人岗匹配分析</h1>
-        <p>基于你的就业能力画像，智能分析与目标岗位的契合度与差距</p>
+        <h1>岗位信息</h1>
       </div>
 
-      <!-- 岗位推荐与选择区域 -->
-      <div class="job-selection-section glass-panel">
-        <h2 class="section-title">🎯 目标岗位选择</h2>
+      <!-- 新增：推荐岗位板块 -->
+      <div class="recommended-jobs-section">
+        <div class="section-header">
+          <h2>为你推荐的适配岗位</h2>
+          <span class="match-rate-tip">基于你的能力画像，匹配度 {{recommendMatchRate}}%</span>
+        </div>
         
-        <!-- 岗位推荐卡片 -->
-        <div class="job-recommendation">
-          <h3>为你推荐的匹配岗位</h3>
-          <div class="job-card-list">
-            <div 
-              class="job-card" 
-              v-for="job in recommendedJobs" 
-              :key="job.id"
-              :class="{ active: selectedJob.id === job.id }"
-              @click="selectJob(job)"
-            >
-              <div class="job-icon">{{ job.icon }}</div>
-              <div class="job-info">
-                <h4 class="job-name">{{ job.name }}</h4>
-                <p class="job-desc">{{ job.desc }}</p>
-                <div class="job-tags">
-                  <span class="tag" v-for="tag in job.tags" :key="tag">{{ tag }}</span>
-                </div>
+        <div class="recommended-jobs-list">
+          <div 
+            class="recommended-job-card" 
+            v-for="job in recommendedJobs" 
+            :key="job.id"
+            :class="{ active: selectedJob.id === job.id }"
+            @click="selectJob(job)"
+          >
+            <div class="match-rate-badge">
+              {{ job.predictedMatch }}%
+            </div>
+            <div class="job-image">
+              <img :src="job.image || 'https://picsum.photos/seed/' + job.id + '/400/250'" alt="岗位背景" />
+            </div>
+            <div class="job-info">
+              <div class="job-location-date">
+                <span class="location">{{ job.city }}</span>
+                <span class="date">{{ job.date }}</span>
               </div>
-              <div class="match-prediction">
-                <span>预估匹配度</span>
-                <span class="score">{{ job.predictedMatch }}%</span>
+              <h4 class="job-name">{{ job.name }}</h4>
+              <p class="company">{{ job.company }}</p>
+              <div class="match-tag">
+                <span>匹配度：{{ job.predictedMatch }}%</span>
               </div>
             </div>
           </div>
-        </div>
-
-        <!-- 自定义岗位选择 -->
-        <div class="custom-job-selection">
-          <h3>或选择其他岗位</h3>
-          <el-select 
-            v-model="selectedJobId" 
-            placeholder="请选择目标岗位" 
-            filterable 
-            class="job-selector"
-            @change="onJobChange"
-          >
-            <el-option 
-              v-for="job in allJobs" 
-              :key="job.id" 
-              :label="job.name" 
-              :value="job.id"
-            ></el-option>
-          </el-select>
-        </div>
-
-        <!-- 匹配按钮 - 核心修改点 -->
-        <div class="match-action">
-          <el-button 
-            type="primary" 
-            @click="handleMatchButtonClick"
-            :loading="matching"
-            :disabled="matching"
-            class="match-btn"
-          >
-            {{ matching ? '匹配分析中...' : '开始人岗匹配分析' }}
-          </el-button>
-          <span v-if="!hasAbilityProfile" class="tips">
-            👉 请先完成<a @click="goToAbilityProfile" class="link">能力画像</a>生成
-          </span>
         </div>
       </div>
 
-      <!-- 匹配结果展示区域 -->
-      <div v-if="matchResultVisible" class="match-result-section glass-panel">
-        <h2 class="section-title">📊 人岗匹配分析结果</h2>
-        
-        <!-- 总体匹配度 -->
-        <div class="overall-match">
-          <div class="match-score-card">
-            <span class="score-label">总体匹配度</span>
-            <span class="total-score">{{ matchResult.overallScore }}%</span>
-            <div class="score-bar">
-              <div class="bar-fill" :style="{ width: matchResult.overallScore + '%', background: getScoreColor(matchResult.overallScore) }"></div>
-            </div>
-            <span class="match-level" :style="{ color: getScoreColor(matchResult.overallScore) }">
-              {{ getMatchLevelText(matchResult.overallScore) }}
-            </span>
+      <!-- 所有岗位选择 -->
+      <div class="all-job-selection">
+        <h3>所有岗位列表</h3>
+        <!-- 岗位分类标签栏 -->
+        <div class="job-category-tabs">
+          <div 
+            class="tab-item" 
+            :class="{ active: activeCategory === '全部岗位' }"
+            @click="activeCategory = '全部岗位'"
+          >
+            全部岗位
+          </div>
+          <div 
+            v-for="cat in categoryList" 
+            :key="cat"
+            class="tab-item"
+            :class="{ active: activeCategory === cat }"
+            @click="activeCategory = cat"
+          >
+            {{ cat }}
           </div>
         </div>
-
-        <!-- 维度对比分析 -->
-        <div class="dimension-analysis">
-          <h3>多维度契合度对比</h3>
-          <div class="dimension-grid">
-            <!-- 专业技能维度 -->
-            <div class="dimension-item">
-              <h4 class="dimension-name">专业技能</h4>
-              <div class="dimension-compare">
-                <div class="compare-item">
-                  <span class="label">你的能力</span>
-                  <div class="score-bar">
-                    <div class="bar-fill self" :style="{ width: matchResult.dimensions.professionalSkill.self + '%' }"></div>
-                  </div>
-                  <span class="score">{{ matchResult.dimensions.professionalSkill.self }}%</span>
-                </div>
-                <div class="compare-item">
-                  <span class="label">岗位要求</span>
-                  <div class="score-bar">
-                    <div class="bar-fill job" :style="{ width: matchResult.dimensions.professionalSkill.job + '%' }"></div>
-                  </div>
-                  <span class="score">{{ matchResult.dimensions.professionalSkill.job }}%</span>
-                </div>
-              </div>
-              <div class="gap-analysis">
-                <span class="gap-label">差距分析：</span>
-                <span class="gap-text">{{ matchResult.dimensions.professionalSkill.gap }}</span>
+        <!-- 搜索框 -->
+        <div class="search-wrap">
+          <input 
+            type="text" 
+            v-model="allJobsSearchKeyword"
+            placeholder="搜索所有岗位..." 
+            class="all-jobs-search-input"
+            @keyup.enter="handleAllJobsSearch"
+          />
+          <button class="all-jobs-search-btn" @click="handleAllJobsSearch">搜索</button>
+        </div>
+        <div class="job-card-list">
+          <div 
+            class="job-card" 
+            v-for="job in filteredAllJobs" 
+            :key="job.id"
+            :class="{ active: selectedJob.id === job.id }"
+            @click="selectJob(job)"
+          >
+            <div class="job-image">
+              <img :src="job.image || 'https://picsum.photos/seed/' + job.id + '/400/250'" alt="岗位背景" />
+              <div class="job-overlay" v-if="job.salary">
+                <span class="salary">{{ job.salary }}</span>
+                <span class="portrait-tag">岗位画像</span>
               </div>
             </div>
-
-            <!-- 通用素质维度 -->
-            <div class="dimension-item">
-              <h4 class="dimension-name">通用素质</h4>
-              <div class="dimension-compare">
-                <div class="compare-item">
-                  <span class="label">你的能力</span>
-                  <div class="score-bar">
-                    <div class="bar-fill self" :style="{ width: matchResult.dimensions.generalQuality.self + '%' }"></div>
-                  </div>
-                  <span class="score">{{ matchResult.dimensions.generalQuality.self }}%</span>
-                </div>
-                <div class="compare-item">
-                  <span class="label">岗位要求</span>
-                  <div class="score-bar">
-                    <div class="bar-fill job" :style="{ width: matchResult.dimensions.generalQuality.job + '%' }"></div>
-                  </div>
-                  <span class="score">{{ matchResult.dimensions.generalQuality.job }}%</span>
-                </div>
+            <div class="job-info">
+              <div class="job-location-date">
+                <span class="location">{{ job.city }}</span>
+                <span class="date">{{ job.date }}</span>
               </div>
-              <div class="gap-analysis">
-                <span class="gap-label">差距分析：</span>
-                <span class="gap-text">{{ matchResult.dimensions.generalQuality.gap }}</span>
-              </div>
-            </div>
-
-            <!-- 实践经验维度 -->
-            <div class="dimension-item">
-              <h4 class="dimension-name">实践经验</h4>
-              <div class="dimension-compare">
-                <div class="compare-item">
-                  <span class="label">你的能力</span>
-                  <div class="score-bar">
-                    <div class="bar-fill self" :style="{ width: matchResult.dimensions.practicalExperience.self + '%' }"></div>
-                  </div>
-                  <span class="score">{{ matchResult.dimensions.practicalExperience.self }}%</span>
-                </div>
-                <div class="compare-item">
-                  <span class="label">岗位要求</span>
-                  <div class="score-bar">
-                    <div class="bar-fill job" :style="{ width: matchResult.dimensions.practicalExperience.job + '%' }"></div>
-                  </div>
-                  <span class="score">{{ matchResult.dimensions.practicalExperience.job }}%</span>
-                </div>
-              </div>
-              <div class="gap-analysis">
-                <span class="gap-label">差距分析：</span>
-                <span class="gap-text">{{ matchResult.dimensions.practicalExperience.gap }}</span>
-              </div>
-            </div>
-
-            <!-- 发展潜力维度 -->
-            <div class="dimension-item">
-              <h4 class="dimension-name">发展潜力</h4>
-              <div class="dimension-compare">
-                <div class="compare-item">
-                  <span class="label">你的能力</span>
-                  <div class="score-bar">
-                    <div class="bar-fill self" :style="{ width: matchResult.dimensions.developmentPotential.self + '%' }"></div>
-                  </div>
-                  <span class="score">{{ matchResult.dimensions.developmentPotential.self }}%</span>
-                </div>
-                <div class="compare-item">
-                  <span class="label">岗位要求</span>
-                  <div class="score-bar">
-                    <div class="bar-fill job" :style="{ width: matchResult.dimensions.developmentPotential.job + '%' }"></div>
-                  </div>
-                  <span class="score">{{ matchResult.dimensions.developmentPotential.job }}%</span>
-                </div>
-              </div>
-              <div class="gap-analysis">
-                <span class="gap-label">差距分析：</span>
-                <span class="gap-text">{{ matchResult.dimensions.developmentPotential.gap }}</span>
-              </div>
+              <h4 class="job-name">{{ job.name }}</h4>
+              <p class="company">{{ job.company }}</p>
             </div>
           </div>
-        </div>
-
-        <!-- 详细差距分析与提升建议 -->
-        <div class="detailed-analysis">
-          <h3>差距分析与提升建议</h3>
-          <el-collapse accordion>
-            <el-collapse-item title="核心短板分析">
-              <div class="collapse-content">
-                {{ matchResult.detailedAnalysis.shortcomings }}
-              </div>
-            </el-collapse-item>
-            <el-collapse-item title="能力提升建议">
-              <div class="collapse-content">
-                {{ matchResult.detailedAnalysis.suggestions }}
-              </div>
-            </el-collapse-item>
-            <el-collapse-item title="求职策略建议">
-              <div class="collapse-content">
-                {{ matchResult.detailedAnalysis.strategy }}
-              </div>
-            </el-collapse-item>
-          </el-collapse>
-        </div>
-
-        <!-- 操作按钮 -->
-        <div class="result-actions">
-          <el-button @click="resetMatch">重新选择岗位</el-button>
-          <el-button type="primary" @click="exportMatchReport">导出匹配报告</el-button>
-          <el-button type="success" @click="generateCareerPlan">生成职业规划</el-button>
         </div>
       </div>
 
-      <!-- 空状态 -->
-      <div v-if="!matchResultVisible && hasAbilityProfile" class="empty-state glass-panel">
-        <div class="empty-icon">📋</div>
-        <p class="empty-text">请选择目标岗位，点击匹配按钮生成分析结果</p>
+      <!-- 开始人岗匹配按钮 - 移到最下方并居中 -->
+      <div class="match-action-bar">
+        <el-button type="primary" size="large" @click="startJobMatch">
+          开始人岗匹配
+        </el-button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -305,6 +180,7 @@ const isLogin = ref(!!localStorage.getItem('token'))
 const userAvatar = ref(localStorage.getItem('avatar') || '')
 const isUserMenuOpen = ref(false)
 const darkMode = ref(localStorage.getItem('darkMode') === 'true')
+const searchKeyword = ref('') // 顶部搜索关键词
 
 // 导航栏方法
 const toggleUserMenu = () => {
@@ -334,397 +210,172 @@ const goToFeature = (type) => {
   router.push(map[type] || '/')
 }
 
+// 拼音首字母匹配函数
+const getFirstLetter = (str) => {
+  const pyMap = {
+    'A': 'A', 'B': 'B', 'C': 'C', 'D': 'D', 'E': 'E', 'F': 'F', 'G': 'G',
+    'H': 'H', 'J': 'J', 'K': 'K', 'L': 'L', 'M': 'M', 'N': 'N', 'P': 'P',
+    'Q': 'Q', 'R': 'R', 'S': 'S', 'T': 'T', 'W': 'W', 'X': 'X', 'Y': 'Y', 'Z': 'Z',
+    'a': 'A', 'b': 'B', 'c': 'C', 'd': 'D', 'e': 'E', 'f': 'F', 'g': 'G',
+    'h': 'H', 'j': 'J', 'k': 'K', 'l': 'L', 'm': 'M', 'n': 'N', 'p': 'P',
+    'q': 'Q', 'r': 'R', 's': 'S', 't': 'T', 'w': 'W', 'x': 'X', 'y': 'Y', 'z': 'Z'
+  }
+  
+  const chineseFirstLetter = (char) => {
+    const charCode = char.charCodeAt(0)
+    if (charCode >= 19968 && charCode <= 40869) {
+      const index = Math.floor((charCode - 19968) / 94)
+      const letters = 'ABCDEFGHJKLMNOPQRSTWXYZ'
+      return letters[index] || ''
+    }
+    return ''
+  }
+  
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charAt(i)
+    if (pyMap[char]) {
+      return pyMap[char]
+    } else if (/[\u4e00-\u9fa5]/.test(char)) {
+      return chineseFirstLetter(char)
+    }
+  }
+  return ''
+}
+
+// 处理顶部搜索
 const handleSearch = () => {
-  const input = document.querySelector('.nav-search-input')
-  if (input.value.trim()) {
-    // 岗位搜索逻辑
-    const keyword = input.value.trim()
-    const matchedJob = allJobs.value.find(job => 
+  const keyword = searchKeyword.value.trim()
+  if (!keyword) {
+    ElMessage.warning('请输入搜索关键词或首字母')
+    return
+  }
+  
+  let matchedJobs = []
+  const firstLetter = getFirstLetter(keyword)
+  if (firstLetter) {
+    matchedJobs = allJobs.value.filter(job => {
+      const jobFirstLetter = getFirstLetter(job.name)
+      return jobFirstLetter === firstLetter
+    })
+  }
+  
+  if (matchedJobs.length === 0) {
+    matchedJobs = allJobs.value.filter(job => 
       job.name.includes(keyword) || job.tags.some(tag => tag.includes(keyword))
     )
-    if (matchedJob) {
-      selectJob(matchedJob)
-      ElMessage.success('找到匹配岗位：' + matchedJob.name)
-    } else {
-      ElMessage.warning('未找到包含"' + keyword + '"的岗位')
-    }
-    input.value = ''
   }
+  
+  if (matchedJobs.length > 0) {
+    selectJob(matchedJobs[0])
+    ElMessage.success(`找到 ${matchedJobs.length} 个匹配岗位，已选中第一个：${matchedJobs[0].name}`)
+  } else {
+    ElMessage.warning('未找到包含"' + keyword + '"或对应首字母的岗位')
+  }
+  searchKeyword.value = ''
 }
 
 // ========== 核心业务逻辑 ==========
-// 检查是否有能力画像数据（增加兜底逻辑）
+// 检查是否有能力画像数据
 const hasAbilityProfile = ref(false)
+
+// 岗位分类
+const categoryList = ref([
+  'APP推广', 'BD经理', 'C/C++', 'Java', '产品专员/助理', '储备干部', '储备经理人',
+  '内容审核', '前端开发', '咨询顾问', '售后客服', '商务专员', '培训师', '大客户代表',
+  '实施工程师', '广告销售', '律师', '律师助理', '总助/CEO助理/董事长助理',
+  '技术支持工程师', '招聘专员/助理', '日语翻译', '档案管理', '法务专员/助理',
+  '测试工程师', '游戏推广', '游戏运营', '猎头顾问', '电话客服', '电话销售',
+  '知识产权/专利代理', '硬件测试'
+])
+const activeCategory = ref('全部岗位')
 
 // 所有岗位数据
 const allJobs = ref([
-  { id: 1, name: 'Java开发工程师', icon: '☕', desc: '负责后端系统设计与开发，构建高可用分布式系统', tags: ['后端', 'Java', 'SpringBoot', '分布式'], predictedMatch: 85 },
-  { id: 2, name: 'Python开发工程师', icon: '🐍', desc: '专注于数据处理、AI算法实现或后端开发', tags: ['Python', '数据分析', 'AI', '爬虫'], predictedMatch: 88 },
-  { id: 3, name: 'Web前端开发工程师', icon: '🌐', desc: '负责用户界面开发，实现优质的交互体验', tags: ['前端', 'Vue', 'React', 'JavaScript'], predictedMatch: 75 },
-  { id: 4, name: '全栈开发工程师', icon: '🔧', desc: '兼具前后端开发能力，独立完成完整项目开发', tags: ['全栈', '前后端', 'Node.js', '数据库'], predictedMatch: 80 },
-  { id: 5, name: '大数据开发工程师', icon: '📊', desc: '设计和实现大数据处理系统，分析海量数据', tags: ['大数据', 'Hadoop', 'Spark', '数据仓库'], predictedMatch: 78 },
-  { id: 6, name: '人工智能算法工程师', icon: '🤖', desc: '研发AI算法模型，应用于实际业务场景', tags: ['AI', '机器学习', '深度学习', '算法'], predictedMatch: 82 },
-  { id: 7, name: '网络安全工程师', icon: '🛡️', desc: '保障系统安全，防范网络攻击和数据泄露', tags: ['网络安全', '渗透测试', '防火墙', '加密'], predictedMatch: 70 },
-  { id: 8, name: '测试开发工程师', icon: '🧪', desc: '设计自动化测试框架，保障产品质量', tags: ['测试', '自动化', 'Python', '接口测试'], predictedMatch: 83 },
-  { id: 9, name: '产品经理（技术方向）', icon: '📱', desc: '衔接技术与业务，设计产品功能和用户体验', tags: ['产品', '需求分析', '原型设计', '项目管理'], predictedMatch: 81 },
-  { id: 10, name: '云计算运维工程师', icon: '☁️', desc: '负责云平台搭建、维护和优化', tags: ['云计算', 'Docker', 'K8s', '运维'], predictedMatch: 76 }
+  { id: 1, name: '前端开发', icon: '🌐', city: '东莞', area: '其他', date: '2026-03', company: '东莞市恒亚罗斯计算机科技有限公司', tags: ['前端', 'Vue', 'React'], predictedMatch: 75, salary: '', image: 'https://picsum.photos/seed/forest/400/250' },
+  { id: 2, name: '实施工程师', icon: '🔧', city: '广东', area: '其他', date: '2026-03', company: '广东南方数码科技股份有限公司', tags: ['全栈', '实施'], predictedMatch: 80, salary: '', image: 'https://picsum.photos/seed/mountain/400/250' },
+  { id: 3, name: '科研人员', icon: '🔬', city: '河南', area: '其他', date: '2026-03', company: '河南二建集团', tags: ['科研'], predictedMatch: 82, salary: '1-1.3万', image: 'https://picsum.photos/seed/waterfall/400/250' },
+  { id: 4, name: '科研人员', icon: '🔬', city: '香港', area: '其他', date: '2026-03', company: '香港中文大学深圳研究院', tags: ['科研'], predictedMatch: 82, salary: '', image: 'https://picsum.photos/seed/pool/400/250' },
+  { id: 5, name: '科研人员', icon: '🔬', city: '成都', area: '其他', date: '2026-03', company: '成都新朝阳作物科学股份有限公司', tags: ['科研'], predictedMatch: 82, salary: '', image: 'https://picsum.photos/seed/pool2/400/250' },
+  { id: 6, name: '技术支持工程师', icon: '🛠️', city: '昆山', area: '其他', date: '2026-03', company: '昆山华海环保科技有限公司', tags: ['技术支持'], predictedMatch: 76, salary: '', image: 'https://picsum.photos/seed/mountain2/400/250' },
+  { id: 7, name: '技术支持工程师', icon: '🛠️', city: '唐山', area: '其他', date: '2026-03', company: '唐山松下产业机器有限公司', tags: ['技术支持'], predictedMatch: 76, salary: '', image: 'https://picsum.photos/seed/mountain3/400/250' },
+  { id: 8, name: '实施工程师', icon: '🔧', city: '安科', area: '其他', date: '2026-03', company: '安科瑞', tags: ['全栈', '实施'], predictedMatch: 80, salary: '', image: 'https://picsum.photos/seed/bird/400/250' },
+  { id: 9, name: 'Java', icon: '☕', city: '济南', area: '其他', date: '2026-03', company: '济南北海软件工程有限公司', tags: ['后端', 'Java'], predictedMatch: 85, salary: '', image: 'https://picsum.photos/seed/snow/400/250' },
+  { id: 10, name: '软件测试', icon: '🧪', city: '源创', area: '其他', date: '2026-03', company: '源创客成都科技有限公司', tags: ['测试'], predictedMatch: 83, salary: '', image: 'https://picsum.photos/seed/field/400/250' }
 ])
 
-// 推荐岗位（前6个）
-const recommendedJobs = ref(allJobs.value.slice(0, 6))
-
-// 选中的岗位ID（单独声明，避免对象绑定问题）
-const selectedJobId = ref('')
-// 选中的岗位
-const selectedJob = ref({})
-
-// 匹配状态
-const matching = ref(false)
-const matchResultVisible = ref(false)
-
-// 匹配结果数据
-const matchResult = reactive({
-  overallScore: 0,
-  dimensions: {
-    professionalSkill: { self: 0, job: 0, gap: '' },
-    generalQuality: { self: 0, job: 0, gap: '' },
-    practicalExperience: { self: 0, job: 0, gap: '' },
-    developmentPotential: { self: 0, job: 0, gap: '' }
-  },
-  detailedAnalysis: {
-    shortcomings: '',
-    suggestions: '',
-    strategy: ''
-  }
+// 新增：推荐岗位相关
+const recommendMatchRate = ref(82) // 整体匹配度
+// 计算属性：获取匹配度最高的8个岗位作为推荐岗位（正好两行，每行4个）
+const recommendedJobs = computed(() => {
+  // 按匹配度降序排序，取前8个（两行，每行4个）
+  return [...allJobs.value]
+    .sort((a, b) => b.predictedMatch - a.predictedMatch)
+    .slice(0, 8)
 })
 
-// 监听选中岗位ID变化
-watch(selectedJobId, (newVal) => {
-  if (newVal) {
-    const job = allJobs.value.find(item => item.id === newVal)
-    if (job) {
-      selectedJob.value = job
-    }
+// 所有岗位搜索关键词
+const allJobsSearchKeyword = ref('')
+
+// 过滤后的所有岗位（支持搜索和分类）
+const filteredAllJobs = computed(() => {
+  let list = allJobs.value
+  
+  // 按分类过滤
+  if (activeCategory.value !== '全部岗位') {
+    list = list.filter(job => job.tags.includes(activeCategory.value) || job.name.includes(activeCategory.value))
   }
-}, { immediate: true })
+  
+  // 按搜索关键词过滤
+  if (allJobsSearchKeyword.value) {
+    const keyword = allJobsSearchKeyword.value.trim()
+    const firstLetter = getFirstLetter(keyword)
+    
+    list = list.filter(job => {
+      const jobFirstLetter = getFirstLetter(job.name)
+      return (firstLetter && jobFirstLetter === firstLetter) || 
+             job.name.includes(keyword) || 
+             job.tags.some(tag => tag.includes(keyword))
+    })
+  }
+  
+  return list
+})
+
+// 选中的岗位
+const selectedJobId = ref('')
+const selectedJob = ref({})
 
 // 选择岗位
 const selectJob = (job) => {
   selectedJob.value = job
   selectedJobId.value = job.id
+  ElMessage.info(`已选中岗位：${job.name} - ${job.company}`)
 }
 
-// 岗位选择变更
-const onJobChange = (jobId) => {
-  const job = allJobs.value.find(item => item.id === jobId)
-  if (job) {
-    selectedJob.value = job
-    selectedJobId.value = jobId
+// 处理所有岗位搜索
+const handleAllJobsSearch = () => {
+  const keyword = allJobsSearchKeyword.value.trim()
+  if (!keyword) {
+    ElMessage.warning('请输入搜索关键词')
+    return
   }
+  ElMessage.success(`搜索关键词：${keyword}，共找到 ${filteredAllJobs.value.length} 个匹配岗位`)
 }
 
-// 跳转到能力画像页面
-const goToAbilityProfile = () => {
-  router.push('/student-ability')
-}
-
-// 处理匹配按钮点击 - 核心修改点
-const handleMatchButtonClick = async () => {
-  // 1. 检查是否选择了岗位，未选择则提示并选中第一个
-  if (!selectedJob.value.id) {
-    ElMessage.warning('未选择岗位，已为你默认选择第一个推荐岗位')
-    // 自动选中第一个岗位
-    selectedJob.value = recommendedJobs.value[0]
-    selectedJobId.value = recommendedJobs.value[0].id
-  }
-  
-  // 2. 检查能力画像，无数据则自动生成测试数据
+// 开始人岗匹配
+const startJobMatch = () => {
   if (!hasAbilityProfile.value) {
-    ElMessage.info('未检测到能力画像数据，已为你生成测试数据')
-    // 自动生成测试用的能力画像数据
-    localStorage.setItem('abilityProfile', JSON.stringify({
-      dimensions: {
-        professionalSkill: { score: 85 },
-        communication: { score: 88 },
-        internship: { score: 82 },
-        learning: { score: 92 }
-      }
-    }))
-    hasAbilityProfile.value = true
+    ElMessage.warning('请先完成能力画像测评，才能进行人岗匹配！')
+    router.push('/student-ability')
+    return
   }
-
-  // 3. 执行匹配分析（包含跳转逻辑）
-  await startMatchAnalysis()
-  
-  // 4. 强制跳转到匹配结果页面（确保跳转生效）
-  await router.push({
-    path: '/match-result',
-    query: { jobId: selectedJob.value.id }
-  })
-}
-
-// 开始匹配分析
-const startMatchAnalysis = async () => {
-  matching.value = true
-  
-  try {
-    // 模拟接口请求延迟
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
-    // 从本地获取能力画像数据（增加兜底）
-    let abilityProfile = {}
-    try {
-      abilityProfile = JSON.parse(localStorage.getItem('abilityProfile') || '{}')
-    } catch (e) {
-      // 解析失败则使用默认数据
-      abilityProfile = {
-        dimensions: {
-          professionalSkill: { score: 85 },
-          communication: { score: 88 },
-          internship: { score: 82 },
-          learning: { score: 92 }
-        }
-      }
-    }
-    
-    // 根据不同岗位生成差异化的匹配结果
-    generateMatchResult(abilityProfile, selectedJob.value)
-    
-    matchResultVisible.value = true
-    ElMessage.success('人岗匹配分析完成！')
-  } catch (error) {
-    ElMessage.error('匹配分析失败：' + error.message)
-  } finally {
-    matching.value = false
-  }
-}
-
-// 生成匹配结果
-const generateMatchResult = (profile, job) => {
-  // 基础能力分数（从能力画像获取或使用默认值）
-  const baseScores = {
-    professionalSkill: profile.dimensions?.professionalSkill?.score || 85,
-    generalQuality: profile.dimensions?.communication?.score || 88,
-    practicalExperience: profile.dimensions?.internship?.score || 82,
-    developmentPotential: profile.dimensions?.learning?.score || 92
-  }
-
-  // 不同岗位的要求分数
-  let jobRequirements = {
-    professionalSkill: 90,
-    generalQuality: 85,
-    practicalExperience: 80,
-    developmentPotential: 85
-  }
-
-  // 根据岗位类型调整要求分数
-  if (job.name.includes('人工智能')) {
-    jobRequirements.professionalSkill = 95
-    jobRequirements.developmentPotential = 90
-  } else if (job.name.includes('全栈')) {
-    jobRequirements.professionalSkill = 92
-    jobRequirements.practicalExperience = 88
-  } else if (job.name.includes('安全')) {
-    jobRequirements.professionalSkill = 93
-    jobRequirements.generalQuality = 88
-  } else if (job.name.includes('前端')) {
-    jobRequirements.professionalSkill = 88
-    jobRequirements.generalQuality = 90
-  }
-
-  // 计算各维度匹配分数（相对契合度）
-  const calcMatchScore = (self, job) => {
-    const score = Math.round((self / job) * 100)
-    return score > 100 ? 100 : score
-  }
-
-  // 维度匹配结果
-  const dimensionResults = {
-    professionalSkill: {
-      self: baseScores.professionalSkill,
-      job: jobRequirements.professionalSkill,
-      gap: generateGapAnalysis('专业技能', baseScores.professionalSkill, jobRequirements.professionalSkill, job.name)
-    },
-    generalQuality: {
-      self: baseScores.generalQuality,
-      job: jobRequirements.generalQuality,
-      gap: generateGapAnalysis('通用素质', baseScores.generalQuality, jobRequirements.generalQuality, job.name)
-    },
-    practicalExperience: {
-      self: baseScores.practicalExperience,
-      job: jobRequirements.practicalExperience,
-      gap: generateGapAnalysis('实践经验', baseScores.practicalExperience, jobRequirements.practicalExperience, job.name)
-    },
-    developmentPotential: {
-      self: baseScores.developmentPotential,
-      job: jobRequirements.developmentPotential,
-      gap: generateGapAnalysis('发展潜力', baseScores.developmentPotential, jobRequirements.developmentPotential, job.name)
-    }
-  }
-
-  // 计算总体匹配度（加权平均）
-  const weights = {
-    professionalSkill: 0.4,
-    generalQuality: 0.25,
-    practicalExperience: 0.2,
-    developmentPotential: 0.15
-  }
-  
-  let totalScore = 0
-  Object.keys(dimensionResults).forEach(key => {
-    const matchScore = calcMatchScore(dimensionResults[key].self, dimensionResults[key].job)
-    totalScore += matchScore * weights[key]
-  })
-  
-  matchResult.overallScore = Math.round(totalScore)
-  
-  // 赋值维度结果
-  matchResult.dimensions = dimensionResults
-  
-  // 生成详细分析
-  matchResult.detailedAnalysis = generateDetailedAnalysis(matchResult.overallScore, dimensionResults, job.name)
-}
-
-// 生成维度差距分析
-const generateGapAnalysis = (dimension, selfScore, jobScore, jobName) => {
-  const gap = jobScore - selfScore
-  
-  if (gap <= 0) {
-    return '你的' + dimension + '(' + selfScore + '分)已超过' + jobName + '岗位要求(' + jobScore + '分)，具备核心竞争优势。'
-  } else if (gap <= 5) {
-    return '你的' + dimension + '(' + selfScore + '分)略低于' + jobName + '岗位要求(' + jobScore + '分)，只需小幅提升即可达标。'
-  } else if (gap <= 10) {
-    return '你的' + dimension + '(' + selfScore + '分)低于' + jobName + '岗位要求(' + jobScore + '分)，需要针对性学习提升。'
-  } else {
-    return '你的' + dimension + '(' + selfScore + '分)明显低于' + jobName + '岗位要求(' + jobScore + '分)，是核心短板，需重点提升。'
-  }
-}
-
-// 生成详细分析报告
-const generateDetailedAnalysis = (totalScore, dimensions, jobName) => {
-  // 找出短板维度
-  const shortDimensions = Object.entries(dimensions)
-    .filter(([key, val]) => val.self < val.job - 5)
-    .map(([key, val]) => {
-      const nameMap = {
-        professionalSkill: '专业技能',
-        generalQuality: '通用素质',
-        practicalExperience: '实践经验',
-        developmentPotential: '发展潜力'
-      }
-      return nameMap[key]
-    })
-
-  // 生成短板分析
-  let shortcomings = ''
-  if (shortDimensions.length === 0) {
-    shortcomings = '你与' + jobName + '岗位的匹配度极高(' + totalScore + '分)，各维度能力均达到或超过岗位要求，具备很强的竞争力。'
-  } else if (shortDimensions.length === 1) {
-    shortcomings = '你与' + jobName + '岗位的主要短板在' + shortDimensions[0] + '方面，该维度能力未达到岗位要求，是影响匹配度的核心因素。'
-  } else {
-    shortcomings = '你与' + jobName + '岗位的主要短板在' + shortDimensions.join('、') + '等方面，这些维度能力不足导致整体匹配度(' + totalScore + '分)未达到理想水平。'
-  }
-
-  // 生成提升建议
-  let suggestions = ''
-  if (totalScore >= 90) {
-    suggestions = '恭喜！你的能力与' + jobName + '岗位高度匹配，建议重点关注该岗位的招聘信息，准备项目经验和技术亮点的梳理，提升求职成功率。'
-  } else if (totalScore >= 80) {
-    suggestions = '你的能力与' + jobName + '岗位较匹配，建议：1) 针对' + shortDimensions.join('、') + '短板进行专项学习；2) 参与相关项目实践，积累实战经验；3) 学习岗位相关的新技术和框架。'
-  } else if (totalScore >= 70) {
-    suggestions = '你的能力与' + jobName + '岗位基本匹配，但存在明显短板：1) 系统学习' + shortDimensions.join('、') + '相关知识；2) 找相关实习或兼职机会积累经验；3) 考取相关技能证书；4) 参与开源项目提升实战能力。'
-  } else {
-    suggestions = '你的能力与' + jobName + '岗位匹配度较低，建议：1) 重新评估职业定位，考虑入门级岗位；2) 制定3-6个月的系统学习计划，重点提升' + shortDimensions.join('、') + '；3) 先从基础项目做起，逐步积累经验；4) 考虑相关的职业培训课程。'
-  }
-
-  // 生成求职策略
-  let strategy = ''
-  if (totalScore >= 85) {
-    strategy = '求职策略建议：1) 优先投递' + jobName + '相关岗位，突出你的核心优势；2) 准备针对性的项目案例和技术问答；3) 可以尝试一线互联网企业的相关岗位；4) 薪资期望可参考市场中高水平标准。'
-  } else if (totalScore >= 75) {
-    strategy = '求职策略建议：1) 投递' + jobName + '相关岗位时，重点展示你的优势维度；2) 坦诚说明短板但强调学习能力和提升计划；3) 优先选择有培训体系的中型企业；4) 薪资期望可参考市场平均水平。'
-  } else {
-    strategy = '求职策略建议：1) 优先投递' + jobName + '相关的初级岗位或实习岗位；2) 突出你的学习能力和发展潜力；3) 考虑加入技术社群，拓展人脉；4) 薪资期望可适当降低，以积累经验为主。'
-  }
-
-  return { shortcomings, suggestions, strategy }
-}
-
-// 获取分数颜色
-const getScoreColor = (score) => {
-  if (score >= 90) return '#10b981'  // 绿色
-  if (score >= 80) return '#34d399'  // 浅绿色
-  if (score >= 70) return '#f59e0b'  // 黄色
-  if (score >= 60) return '#f97316'  // 橙色
-  return '#ef4444'                   // 红色
-}
-
-// 获取匹配等级文本
-const getMatchLevelText = (score) => {
-  if (score >= 90) return '高度匹配'
-  if (score >= 80) return '较匹配'
-  if (score >= 70) return '基本匹配'
-  if (score >= 60) return '匹配度较低'
-  return '匹配度极低'
-}
-
-// 重置匹配
-const resetMatch = () => {
-  selectedJob.value = {}
-  selectedJobId.value = ''
-  matchResultVisible.value = false
-}
-
-// 导出匹配报告
-const exportMatchReport = () => {
-  try {
-    // 构建导出数据
-    const exportData = {
-      jobName: selectedJob.value.name,
-      matchScore: matchResult.overallScore,
-      matchLevel: getMatchLevelText(matchResult.overallScore),
-      dimensionAnalysis: matchResult.dimensions,
-      detailedAnalysis: matchResult.detailedAnalysis,
-      exportTime: new Date().toLocaleString()
-    }
-
-    // 生成JSON文件下载
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = selectedJob.value.name + '_人岗匹配分析报告_' + new Date().getTime() + '.json'
-    a.click()
-    URL.revokeObjectURL(url)
-
-    ElMessage.success('匹配报告导出成功！')
-  } catch (error) {
-    ElMessage.error('导出失败：' + error.message)
-  }
-}
-
-// 生成职业规划
-const generateCareerPlan = () => {
-  // 保存当前匹配结果，用于生成职业规划
-  localStorage.setItem('currentMatchResult', JSON.stringify({
-    job: selectedJob.value,
-    result: matchResult
-  }))
-  router.push('/career-planning')
-  ElMessage.info('正在为你生成个性化职业规划...')
+  ElMessage.success('正在为您生成最佳匹配岗位...')
+  router.push('/match-result')
 }
 
 // 页面初始化
 onMounted(() => {
-  // 默认选中第一个推荐岗位（确保按钮点击时有默认岗位）
-  if (recommendedJobs.value.length > 0) {
-    selectedJob.value = recommendedJobs.value[0]
-    selectedJobId.value = recommendedJobs.value[0].id
-  }
-  
-  // 检查能力画像（增加兜底，无数据则自动生成）
   if (!localStorage.getItem('abilityProfile')) {
-    // 自动生成测试用的能力画像数据
     localStorage.setItem('abilityProfile', JSON.stringify({
       dimensions: {
         professionalSkill: { score: 85 },
@@ -736,16 +387,11 @@ onMounted(() => {
   }
   hasAbilityProfile.value = !!localStorage.getItem('abilityProfile')
   
-  // 如果是从其他页面跳转过来且有选中的岗位，自动执行匹配分析
   if (route.query.jobId) {
     const jobId = parseInt(route.query.jobId)
     const job = allJobs.value.find(item => item.id === jobId)
     if (job) {
       selectJob(job)
-      // 延迟执行，确保页面加载完成
-      setTimeout(() => {
-        startMatchAnalysis()
-      }, 500)
     }
   }
 })
@@ -757,7 +403,7 @@ onMounted(() => {
   width: 100%;
   min-height: 100vh;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  background: linear-gradient(145deg, #f9fafc 0%, #f0f3f8 100%);
+  background: #fff;
   margin: 0;
   padding: 60px 0 0 0;
   color: #1a2639;
@@ -830,361 +476,280 @@ onMounted(() => {
 
 /* 页面标题 */
 .page-header {
-  text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 .page-header h1 {
-  font-size: 32px;
+  font-size: 24px;
   font-weight: 700;
   color: #1f2937;
-  margin-bottom: 8px;
-}
-.page-header p {
-  font-size: 16px;
-  color: #64748b;
   margin: 0;
 }
 
-/* 玻璃态面板通用样式 */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  border-radius: 24px;
-  box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.1);
-  padding: 30px;
+/* 新增：推荐岗位样式 */
+.recommended-jobs-section {
+  background: #f8f9ff;
+  border-radius: 16px;
+  padding: 24px;
   margin-bottom: 30px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  /* 增大推荐岗位板块尺寸 */
+  min-height: 600px;
 }
-
-/* 区域标题 */
-.section-title {
-  font-size: 22px;
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.section-header h2 {
+  font-size: 20px;
   font-weight: 600;
   color: #1f2937;
-  margin: 0 0 20px 0;
-  padding-bottom: 12px;
-  border-bottom: 2px solid rgba(47, 84, 235, 0.1);
+  margin: 0;
 }
-
-/* 岗位选择区域 */
-.job-selection-section {
-  margin-bottom: 30px;
+.match-rate-tip {
+  font-size: 14px;
+  color: #2f54eb;
+  background: #e6f7ff;
+  padding: 4px 12px;
+  border-radius: 16px;
 }
-
-/* 岗位推荐 */
-.job-recommendation h3 {
-  font-size: 18px;
+.recommended-jobs-list {
+  /* 修改为每行4个，固定网格布局 */
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px; /* 增大间距 */
+  /* 调整高度，确保内容不被遮挡 */
+  max-height: 500px;
+  overflow: hidden;
+}
+.recommended-job-card {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  /* 增大卡片尺寸 */
+  width: 100%;
+  height: 220px;
+}
+.recommended-job-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+.recommended-job-card.active {
+  border: 2px solid #2f54eb;
+}
+.match-rate-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: #2f54eb;
+  color: #fff;
+  font-size: 12px;
   font-weight: 600;
-  color: #334155;
-  margin-bottom: 16px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  z-index: 1;
+  /* 增加背景透明度，避免完全遮挡 */
+  background: rgba(47, 84, 235, 0.9);
+}
+.recommended-job-card .job-image {
+  width: 100%;
+  height: 130px; /* 增大图片区域 */
+  overflow: hidden;
+}
+.recommended-job-card .job-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.recommended-job-card .job-info {
+  padding: 12px;
+}
+.recommended-job-card .job-location-date {
+  font-size: 11px;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+.recommended-job-card .job-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 4px 0;
+}
+.recommended-job-card .company {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0 0 6px 0;
+}
+.recommended-job-card .match-tag {
+  font-size: 11px;
+  color: #52c41a;
+}
+
+/* 所有岗位选择 */
+.all-job-selection {
+  background: #f8f9ff; /* 增加背景色 */
+  border-radius: 16px; /* 圆角 */
+  padding: 24px; /* 内边距 */
+  margin-top: 0;
+  margin-bottom: 40px; /* 增加底部间距，为按钮留出空间 */
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05); /* 阴影效果 */
+}
+.all-job-selection h3 {
+  font-size: 20px; /* 增大标题字号 */
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e8e8e8; /* 增加下划线 */
+}
+/* 岗位分类标签栏 */
+.job-category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+  max-height: 80px; /* 减小高度 */
+  overflow-y: auto;
+}
+.tab-item {
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: #f5f7fa;
+  font-size: 14px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.tab-item:hover {
+  background: #e8e8e8;
+}
+.tab-item.active {
+  background: #2f54eb;
+  color: #fff;
+}
+.search-wrap {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.all-jobs-search-input {
+  flex: 1;
+  padding: 10px 16px;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border 0.3s ease;
+}
+.all-jobs-search-input:focus {
+  border-color: #2f54eb;
+}
+.all-jobs-search-btn {
+  padding: 10px 20px;
+  background: #2f54eb;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+.all-jobs-search-btn:hover {
+  background: #1d39c4;
 }
 .job-card-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
-  margin-bottom: 30px;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 20px;
+  /* 限制只显示两行 */
+  max-height: calc((220px + 20px) * 2);
+  overflow: hidden;
 }
 .job-card {
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
   cursor: pointer;
   transition: all 0.3s ease;
-  display: flex;
-  gap: 16px;
+  height: 220px; /* 固定卡片高度 */
 }
 .job-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
 }
 .job-card.active {
   border: 2px solid #2f54eb;
-  background: rgba(47, 84, 235, 0.05);
 }
-.job-icon {
-  font-size: 24px;
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  background: #f0f7ff;
+.job-image {
+  position: relative;
+  width: 100%;
+  height: 130px;
+  overflow: hidden;
+}
+.job-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.job-overlay {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  right: 10px;
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+}
+.salary {
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.portrait-tag {
+  background: #2f54eb;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
 }
 .job-info {
-  flex: 1;
+  padding: 12px;
+}
+.job-location-date {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 8px;
 }
 .job-name {
   font-size: 16px;
   font-weight: 600;
   color: #1f2937;
-  margin: 0 0 8px 0;
+  margin: 0 0 6px 0;
 }
-.job-desc {
-  font-size: 14px;
-  color: #64748b;
-  margin: 0 0 12px 0;
-  line-height: 1.4;
-}
-.job-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.tag {
-  font-size: 12px;
-  padding: 4px 8px;
-  border-radius: 12px;
-  background: #f0f7ff;
-  color: #2f54eb;
-}
-.match-prediction {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
-}
-.match-prediction .score {
-  font-size: 20px;
-  font-weight: 700;
-  color: #2f54eb;
-}
-
-/* 自定义岗位选择 */
-.custom-job-selection {
-  margin-bottom: 30px;
-}
-.custom-job-selection h3 {
-  font-size: 18px;
-  font-weight: 600;
-  color: #334155;
-  margin-bottom: 12px;
-}
-.job-selector {
-  width: 100%;
-  max-width: 500px;
-}
-
-/* 匹配按钮 */
-.match-action {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.match-btn {
-  padding: 12px 40px;
-  border-radius: 40px;
-  font-size: 16px;
-  font-weight: 600;
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
-  border: none;
-  box-shadow: 0 10px 20px -8px #2563eb;
-  transition: all 0.3s;
-}
-.match-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 15px 30px -10px #2563eb;
-}
-.tips {
-  font-size: 14px;
-  color: #64748b;
-}
-.link {
-  color: #2f54eb;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-/* 匹配结果区域 */
-.match-result-section {
-  animation: fadeIn 0.5s ease;
-}
-
-/* 总体匹配度 */
-.overall-match {
-  margin-bottom: 40px;
-}
-.match-score-card {
-  max-width: 500px;
-  margin: 0 auto;
-  text-align: center;
-  padding: 30px;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 20px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
-}
-.score-label {
-  display: block;
-  font-size: 18px;
-  color: #64748b;
-  margin-bottom: 12px;
-}
-.total-score {
-  display: block;
-  font-size: 64px;
-  font-weight: 700;
-  color: #2f54eb;
-  margin-bottom: 16px;
-  line-height: 1;
-}
-.score-bar {
-  height: 12px;
-  background: #e2e8f0;
-  border-radius: 20px;
-  overflow: hidden;
-  margin-bottom: 12px;
-}
-.bar-fill {
-  height: 100%;
-  border-radius: 20px;
-  transition: width 1s ease-in-out;
-}
-.match-level {
-  font-size: 18px;
-  font-weight: 600;
-}
-
-/* 维度分析 */
-.dimension-analysis {
-  margin-bottom: 40px;
-}
-.dimension-analysis h3 {
-  font-size: 20px;
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 20px;
-}
-.dimension-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-  gap: 20px;
-}
-.dimension-item {
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-}
-.dimension-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: #1f2937;
-  margin: 0 0 16px 0;
-}
-.dimension-compare {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-.compare-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.compare-item .label {
-  font-size: 14px;
-  color: #64748b;
-  width: 80px;
-  flex-shrink: 0;
-}
-.compare-item .score-bar {
-  flex: 1;
-  height: 8px;
-  margin-bottom: 0;
-}
-.compare-item .score {
-  font-size: 14px;
-  font-weight: 600;
-  width: 50px;
-  text-align: right;
-  flex-shrink: 0;
-}
-.bar-fill.self {
-  background: #2563eb;
-}
-.bar-fill.job {
-  background: #94a3b8;
-}
-.gap-analysis {
-  font-size: 14px;
-  color: #334155;
-  line-height: 1.5;
-}
-.gap-label {
-  font-weight: 600;
-}
-
-/* 详细分析 */
-.detailed-analysis {
-  margin-bottom: 30px;
-}
-.detailed-analysis h3 {
-  font-size: 20px;
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 20px;
-}
-:deep(.el-collapse-item__header) {
-  font-weight: 600;
-  color: #334155;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 12px;
-  margin-bottom: 8px;
-}
-:deep(.el-collapse-item__content) {
-  padding: 20px;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 12px;
-}
-.collapse-content {
-  font-size: 14px;
-  line-height: 1.8;
-  color: #334155;
-}
-
-/* 结果操作按钮 */
-.result-actions {
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  margin-top: 30px;
-}
-:deep(.el-button) {
-  padding: 10px 24px;
-  border-radius: 40px;
-  font-weight: 600;
-}
-:deep(.el-button--primary) {
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
-  border: none;
-}
-:deep(.el-button--success) {
-  background: linear-gradient(135deg, #10b981, #34d399);
-  border: none;
-}
-
-/* 空状态 */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  text-align: center;
-}
-.empty-icon {
-  font-size: 64px;
-  margin-bottom: 20px;
-  color: #cbd5e1;
-}
-.empty-text {
-  font-size: 18px;
+.company {
+  font-size: 13px;
   color: #64748b;
   margin: 0;
+}
+
+/* 人岗匹配按钮栏 - 修改为居中显示，放在页面最下方 */
+.match-action-bar {
+  margin-top: 40px;
+  margin-bottom: 60px;
+  text-align: center; /* 按钮居中 */
+}
+.match-action-bar .el-button {
+  padding: 12px 40px; /* 增大按钮尺寸 */
+  font-size: 16px;
 }
 
 /* 动画效果 */
@@ -1198,11 +763,18 @@ onMounted(() => {
   .nav-menu { display: none; }
   .nav-wrap { width: 95%; }
   .match-container { padding: 20px 15px; }
-  .glass-panel { padding: 20px; }
-  .job-card-list { grid-template-columns: 1fr; }
-  .dimension-grid { grid-template-columns: 1fr; }
-  .match-action { flex-direction: column; align-items: stretch; }
-  .result-actions { flex-direction: column; }
-  .total-score { font-size: 48px; }
+  /* 移动端推荐岗位改为每行2个 */
+  .recommended-jobs-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .job-card-list { 
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    max-height: calc((200px + 15px) * 2);
+  }
+  .job-card { height: 200px; }
+  .recommended-job-card { height: 200px; }
+  .search-wrap { flex-direction: column; }
+  .section-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .recommended-jobs-section { min-height: auto; }
 }
 </style>

@@ -35,7 +35,7 @@
         </div>
         <div class="nav-right">
           <div class="nav-search-wrap">
-            <input type="text" class="nav-search-input" placeholder="搜索目标岗位..." @keyup.enter="handleSearch" />
+            <input type="text" class="nav-search-input" placeholder="搜索岗位详情..." @keyup.enter="handleSearch" />
             <button class="nav-search-btn" @click="handleSearch">搜索</button>
           </div>
           <button class="btn-toggle-theme" @click="toggleTheme">🌙</button>
@@ -74,9 +74,7 @@
           <div class="job-title">
             <span>目标岗位：{{ matchForm.targetJob || defaultJob }}</span>
           </div>
-          <el-tag class="save-tag" color="#409EFF" text-color="#fff">
-            数据已自动保存
-          </el-tag>
+          <!-- 已移除"数据已自动保存"标签 -->
         </div>
 
         <!-- 总评分 -->
@@ -85,7 +83,18 @@
             <h3>匹配度总评分</h3>
             <div class="score-value">{{ matchResult.totalScore }}分</div>
             <div class="score-level">
-              <el-tag :color="getScoreLevelColor()">{{ getScoreLevelText() }}</el-tag>
+              <el-tag 
+                :style="{ 
+                  backgroundColor: getScoreLevelColor(), 
+                  color: '#ffffff !important',
+                  border: 'none',
+                  padding: '6px 16px',
+                  borderRadius: '4px',
+                  fontSize: '14px'
+                }"
+              >
+                {{ getScoreLevelText() }}
+              </el-tag>
             </div>
           </div>
 
@@ -121,7 +130,17 @@
             <el-table-column prop="contribution" label="加权得分" align="center"></el-table-column>
             <el-table-column prop="status" label="匹配状态" align="center">
               <template #default="scope">
-                <el-tag :color="scope.row.score >= 80 ? '#409EFF' : (scope.row.score >= 60 ? '#66b1ff' : '#ff7d7d')">
+                <el-tag 
+                  :style="{
+                    backgroundColor: scope.row.score >= 80 ? '#1989fa' : (scope.row.score >= 60 ? '#409EFF' : '#f56c6c'),
+                    color: '#ffffff !important',
+                    border: 'none',
+                    padding: '4px 12px',
+                    borderRadius: '4px',
+                    fontSize: '12px'
+                  }"
+                  class="status-tag"
+                >
                   {{ scope.row.score >= 80 ? '优秀' : (scope.row.score >= 60 ? '良好' : '待提升') }}
                 </el-tag>
               </template>
@@ -225,22 +244,16 @@ const goToFeature = (type) => {
   router.push(map[type] || '/')
 }
 
+// 修改：搜索框直接跳转到岗位详情页
 const handleSearch = () => {
   const input = document.querySelector('.nav-search-input')
   if (input.value.trim()) {
-    // 岗位搜索逻辑
     const keyword = input.value.trim()
-    const matchedJob = jobList.value.find(job => job.jobName.includes(keyword))
-    if (matchedJob) {
-      matchForm.value.targetJob = matchedJob.jobName
-      saveFormData()
-      // 重新生成匹配结果
-      generateDefaultMatchResult()
-      ElMessage.success('找到匹配岗位：' + matchedJob.jobName)
-    } else {
-      ElMessage.warning('未找到包含"' + keyword + '"的岗位')
-    }
+    // 直接跳转到岗位详情页面，关键词作为参数
+    router.push(`/job-detail/${encodeURIComponent(keyword)}`)
     input.value = ''
+  } else {
+    ElMessage.warning('请输入岗位名称')
   }
 }
 
@@ -426,9 +439,9 @@ const checkStudentInfo = () => {
 
 // 统一评分等级颜色（主色渐变）
 const getScoreLevelColor = () => {
-  if (matchResult.value.totalScore >= 85) return '#409EFF'
-  if (matchResult.value.totalScore >= 70) return '#66b1ff'
-  return '#ff7d7d'
+  if (matchResult.value.totalScore >= 85) return '#1989fa'
+  if (matchResult.value.totalScore >= 70) return '#409EFF'
+  return '#f56c6c'
 }
 
 const getScoreLevelText = () => {
@@ -503,11 +516,10 @@ const generateReport = () => {
   router.push('/career-planning')
 }
 
+// 修改：更换岗位按钮跳转到 /jobmatch-analysis 页面
 const changeJob = () => {
-  // 跳转到岗位选择页面或重新选择岗位
-  router.push('/match-result')
-  // 或者可以弹出岗位选择弹窗
-  ElMessage.info('请在顶部搜索框中输入新的岗位名称进行搜索')
+  router.push('/jobmatch-analysis')
+  ElMessage.info('请在新页面中选择新的岗位进行匹配')
 }
 
 // ===== 图表相关（统一主色） =====
@@ -777,8 +789,10 @@ onUnmounted(() => {
   color: #303133;
 }
 
+/* 强制设置标签文字颜色为白色，提高优先级 */
 .save-tag {
-  border: none !important;
+  color: #ffffff !important;
+  font-weight: 500 !important;
 }
 
 /* 总评分区域 */
