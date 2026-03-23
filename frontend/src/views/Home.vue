@@ -10,7 +10,7 @@
           </div>
           <ul class="nav-menu">
             <li class="menu-item active" @click="$router.push('/')">首页</li>
-            <li class="menu-item" @click="$router.push('/student-ability')">岗位画像</li>
+            <!-- <li class="menu-item" @click="$router.push('/student-ability')">岗位画像</li> -->
             <li class="menu-item" @click="$router.push('/career-planning-intro')">职业规划</li>
             <li class="menu-item" @click="$router.push('/resource-library')">资源库</li>
             <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
@@ -150,7 +150,7 @@
       </div>
     </section>
 
-    <!-- 7. 招聘岗位卡片区（修改为五列两行，和图片一致） -->
+    <!-- 7. 招聘岗位卡片区（修改为五列两行，纯文字样式） -->
     <section class="job-section">
       <div class="job-wrap">
         <!-- 新增：岗位信息标题 + 筛选栏 - 调整布局，筛选词放在标题下方 -->
@@ -192,13 +192,13 @@
           <button class="reload-btn" @click="fetchAllJobData">重新加载</button>
         </div>
 
-        <!-- 岗位卡片容器（改为五列网格布局，和图片一致） -->
+        <!-- 岗位卡片容器（五列网格布局，纯文字样式） -->
         <div 
           class="job-card-container" 
           ref="jobContainerRef"
           v-else
         >
-          <!-- 岗位卡片（五列两行排列，和图片样式一致） -->
+          <!-- 岗位卡片（纯文字样式，突出岗位名称和公司名称） -->
           <div
             class="job-card"
             v-for="(item, index) in currentPageJobs" 
@@ -208,37 +208,20 @@
             @mouseleave="hoverJobCard = null"
             @dblclick="goToJobDetail(item.id)"
           >
-            <!-- 岗位卡片背景图（带弧形底部，和图片一致） -->
-            <div class="card-image-wrap">
-              <!-- 修改：使用岗位名称作为seed生成对应图片 -->
-              <img 
-                :src="`https://picsum.photos/seed/${item.job_name}/200/200`" 
-                alt="岗位图片" 
-                class="portrait-cover"
-              >
-              <!-- 左侧竖排文字（和图片一致） -->
-              <div class="vertical-text">
-                <span>{{ item.companyShort || item.company?.substring(0, 2) || '未知' }}</span>
-                <span>{{ item.category || '其他' }}</span>
-                <span class="date">{{ item.date || '2026-03' }}</span>
-              </div>
-              
-              <!-- 新增：悬浮时显示的岗位画像和薪资信息（右下角） -->
-              <div class="job-hover-info" v-if="hoverJobCard === item.id">
-                <div class="job-portrait-tag">
-                  <span>岗位画像</span>
-                </div>
-                <div class="job-salary-tag">
-                  <span>{{ item.salary_range || item.salary || '面议' }}</span>
-                </div>
-              </div>
-            </div>
-            
-            <!-- 岗位信息文字（修改：岗位名称在上，公司名称在下，颜色区分） -->
+            <!-- 简化：只保留白色背景的核心内容区域 -->
             <div class="job-card-content">
               <div class="job-title">{{ item.job_name || '未知岗位' }}</div>
               <div class="job-company">{{ item.company || '未知公司' }}</div>
-              <!-- 移除原有的desc，如需保留可调整位置 -->
+              
+              <!-- 补充信息：薪资 + 经验（移除学历） -->
+              <div class="job-meta">
+                <span class="salary">{{ item.salary_range || item.salary || '面议' }}</span>
+              </div>
+              
+              <!-- 悬浮时显示的岗位画像标签 -->
+              <div class="job-hover-info" v-if="hoverJobCard === item.id">
+                <span class="job-portrait-tag">岗位画像</span>
+              </div>
             </div>
           </div>
 
@@ -720,9 +703,9 @@ const fetchAllJobData = async () => {
           type: jobType,
           salary_range: item.salary_range || item.salary || '面议',
           salaryValue,
-          education: item.education || '本科及以上',
+          // 移除学历信息
           experience: item.experience || '1-3年',
-          date: item.date || '2026-03',
+          // 移除日期信息
           detailFetched: false
         }
       })
@@ -1629,12 +1612,16 @@ onUnmounted(() => {
   box-sizing: border-box;
 }
 
-/* 岗位卡片样式 */
+/* 岗位卡片样式（优化版，增加渐变背景和精致样式） */
 .job-card {
   width: 100%;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  /* 渐变背景 */
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+  border-radius: 12px;
+  /* 更精致的阴影 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  /* 增加边框 */
+  border: 1px solid #f0f2ff;
   overflow: hidden;
   cursor: pointer;
   transform: translateY(20px);
@@ -1642,6 +1629,26 @@ onUnmounted(() => {
   transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   z-index: 1;
   box-sizing: border-box;
+  /* 调整卡片高度 */
+  height: 180px;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  position: relative;
+  /* 增加装饰元素 */
+}
+/* 卡片装饰元素 - 左上角小三角 */
+.job-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 40px 40px 0;
+  border-color: transparent #2f54eb30 transparent transparent;
+  opacity: 0.5;
 }
 
 /* 岗位卡片飞入动画 */
@@ -1650,54 +1657,72 @@ onUnmounted(() => {
   opacity: 1;
 }
 
-/* 岗位卡片悬浮效果 */
+/* 岗位卡片悬浮效果（增强） */
 .job-card:hover {
   transform: translateY(-8px) scale(1.02);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  /* 更强的阴影 */
+  box-shadow: 0 8px 24px rgba(47, 84, 235, 0.15);
   z-index: 10;
+  /* 悬浮时边框变色 */
+  border-color: #2f54eb;
 }
 
-/* 卡片图片容器 */
-.card-image-wrap {
-  position: relative;
-  width: 100%;
-  height: 200px;
-  overflow: hidden;
-  border-bottom-left-radius: 50% 20%;
-  border-bottom-right-radius: 50% 20%;
-}
-.portrait-cover {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/* 左侧竖排文字 */
-.vertical-text {
-  position: absolute;
-  top: 15px;
-  left: 15px;
+/* 岗位卡片内容样式（优化排版和间距） */
+.job-card-content {
+  flex: 1;
+  padding: 15px;
   display: flex;
   flex-direction: column;
-  color: #000;
-  font-size: 24px;
-  font-weight: bold;
-  line-height: 1.2;
+  justify-content: center;
+  position: relative;
+  height: 100%;
+  box-sizing: border-box;
 }
-.vertical-text .date {
-  font-size: 16px;
-  margin-top: 5px;
-  font-weight: normal;
+.job-card-content .job-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #222;
+  margin-bottom: 12px;
+  line-height: 1.4;
+  word-break: break-all;
+  /* 增加文字阴影 */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+.job-card-content .job-company {
+  font-size: 15px;
+  color: #666;
+  margin-bottom: 15px;
+  line-height: 1.4;
 }
 
-/* 悬浮时显示的岗位画像和薪资信息样式 */
+/* 岗位元信息（薪资+经验） */
+.job-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  margin-bottom: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.salary {
+  color: #ff7a45;
+  font-weight: 600;
+  /* 增加薪资文字效果 */
+  text-shadow: 0 1px 3px rgba(255, 122, 69, 0.2);
+}
+.experience {
+  color: #666;
+  background: #f5f7fa;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* 悬浮时显示的岗位画像标签 */
 .job-hover-info {
   position: absolute;
-  bottom: 20px;
-  right: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  bottom: 15px;
+  right: 15px;
   z-index: 5;
 }
 .job-portrait-tag {
@@ -1708,33 +1733,6 @@ onUnmounted(() => {
   font-size: 12px;
   text-align: center;
   animation: fadeInUp 0.3s ease;
-}
-.job-salary-tag {
-  background: rgba(255, 255, 255, 0.9);
-  color: #2f54eb;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: 600;
-  text-align: center;
-  animation: fadeInUp 0.4s ease;
-}
-
-/* 岗位卡片内容样式 */
-.job-card-content {
-  padding: 15px;
-}
-.job-card-content .job-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #222;
-  margin-bottom: 6px;
-  line-height: 1.4;
-}
-.job-card-content .job-company {
-  font-size: 14px;
-  color: #999;
-  line-height: 1.4;
 }
 
 /* 分页导航样式 */
@@ -1807,7 +1805,6 @@ onUnmounted(() => {
   font-size: 14px;
   color: #ccc;
 }
-
 
 /* 最适配十大岗位 - 传送带样式 */
 .top-ten-jobs-section {
