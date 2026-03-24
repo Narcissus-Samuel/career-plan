@@ -41,6 +41,7 @@
             <input 
               type="text" 
               class="nav-search-input" 
+              v-model="searchKeyword"
               placeholder="搜索职业方向、专业、院校、岗位类型"
               @keyup.enter="handleSearch"
             >
@@ -155,15 +156,20 @@
       <div class="job-wrap">
         <!-- 新增：岗位信息标题 + 筛选栏 - 调整布局，筛选词放在标题下方 -->
         <div class="job-header">
-          <h2 class="job-title-main">岗位信息</h2>
+          <h2 class="job-title-main">
+            岗位信息
+            <span v-if="searchKeyword" style="font-size:16px;color:#666;margin-left:10px;">
+              搜索结果：{{ searchKeyword }}
+            </span>
+          </h2>
           <!-- 修改：筛选栏移到标题下方，移除重置按钮 -->
           <div class="job-filter">
             <div class="filter-tags">
               <!-- 动态渲染岗位名称筛选标签 -->
               <span 
                 class="filter-tag" 
-                :class="{ active: filterJobName === '' }"
-                @click="filterJobName = ''; filterJobs()"
+                :class="{ active: filterJobName === '' && searchKeyword === '' }"
+                @click="resetAllFilter"
               >
                 全部岗位
               </span>
@@ -311,11 +317,10 @@
       </div>
     </section>
 
-    <!-- 新增：岗位画像卡片区域（番茄小说网瀑布流排版+黑色背景） -->
+    <!-- 热门岗位画像卡片区域（数据库全部去重数据+纯文字+双击跳转） -->
     <section class="job-portrait-card-section" ref="portraitSectionRef">
       <div class="section-header">
         <h2 class="section-title">热门岗位画像</h2>
-        <el-button type="text" @click="$router.push('/job-portrait')">查看全部 ></el-button>
       </div>
       <div 
         class="portrait-card-container" 
@@ -328,17 +333,24 @@
           :key="job.jobName"
           :style="getCardStyle(index)"
           :class="{ 'animate-in': cardAnimateStates[index] }"
-          @click="$router.push('/job-portrait')"
           @mouseenter="hoverPortrait = job.jobName"
           @mouseleave="hoverPortrait = null"
+          @dblclick="goToJobPortraitDetail(job.jobName)"
         >
-          <!-- 仅显示岗位画像图片，无默认文字 -->
-          <img :src="job.cover" :alt="job.jobName" class="portrait-cover" />
+          <!-- 纯文字展示岗位名称，无图片 -->
+          <div class="portrait-text-content">
+            <span class="portrait-job-name">{{ job.jobName }}</span>
+          </div>
           
-          <!-- 悬浮时显示岗位名称 -->
+          <!-- 悬浮提示 -->
           <div class="portrait-name-tooltip" v-if="hoverPortrait === job.jobName">
             {{ job.jobName }}
           </div>
+        </div>
+
+        <!-- 空数据提示 -->
+        <div v-if="jobPortraitList.length === 0 && !loading" class="empty-portrait-container">
+          <p class="empty-text">暂无岗位画像数据</p>
         </div>
       </div>
     </section>
@@ -459,6 +471,9 @@ const handleImageUpload = (e) => {
   reader.readAsDataURL(file)
   e.target.value = ''
 }
+
+// ========== 搜索功能核心 ==========
+const searchKeyword = ref('')
 
 // ========== 招聘岗位数据（适配新的Flask接口） ==========
 const jobList = ref([])
@@ -588,7 +603,7 @@ const fetchJobProfile = async (jobId) => {
   }
 }
 
-// 获取所有岗位分类
+// 获取岗位分类
 const fetchJobCategories = async () => {
   try {
     const response = await axios.get(JOB_CATEGORIES_API_URL, {
@@ -713,6 +728,8 @@ const fetchAllJobData = async () => {
       jobList.value = jobDataWithBasicInfo
       // 获取岗位名称列表（从已加载的数据中提取）
       await fetchJobNames()
+      // 同步生成岗位画像数据（去重）
+      generateUniquePortraitList()
       initCardAnimateStates()
     } else {
       error.value = '未获取到任何岗位数据，请检查后端接口'
@@ -740,7 +757,7 @@ const fetchAllJobData = async () => {
   }
 }
 
-// 筛选逻辑 - 修改为按岗位名称筛选
+// 筛选逻辑 - 支持 精确筛选 + 模糊搜索
 const filterJobName = ref('')
 
 // 筛选并按薪资从高到低排序
@@ -748,10 +765,19 @@ const filteredJobList = computed(() => {
   // 复制原始数据，避免修改原数组
   let filtered = [...jobList.value]
   
-  // 按岗位名称筛选
+  // 1. 按岗位名称精确筛选
   if (filterJobName.value && filterJobName.value !== '') {
     filtered = filtered.filter(item => {
       return item.job_name === filterJobName.value
+    })
+  }
+
+  // 2. 导航栏搜索：模糊匹配岗位名称
+  if (searchKeyword.value && searchKeyword.value.trim() !== '') {
+    const keyword = searchKeyword.value.trim().toLowerCase()
+    filtered = filtered.filter(item => {
+      return (item.job_name && item.job_name.toLowerCase().includes(keyword)) ||
+             (item.company && item.company.toLowerCase().includes(keyword))
     })
   }
   
@@ -833,8 +859,45 @@ const changePage = (pageNum) => {
 
 // 筛选时重置页码
 const filterJobs = () => {
+  searchKeyword.value = ''
   currentPage.value = 1
   initCardAnimateStates()
+}
+
+// 重置所有筛选（回到全部岗位）
+const resetAllFilter = () => {
+  filterJobName.value = ''
+  searchKeyword.value = ''
+  currentPage.value = 1
+  initCardAnimateStates()
+}
+
+// ========== 热门岗位画像 - 从数据库生成【全部去重】数据 ==========
+const jobPortraitList = ref([])
+
+// 从岗位列表生成【全部】唯一的岗位画像数据（无重复、纯文字）
+const generateUniquePortraitList = () => {
+  if (!jobList.value || jobList.value.length === 0) return
+  
+  // 提取所有岗位名称并去重
+  const uniqueJobNames = Array.from(new Set(
+    jobList.value
+      .map(item => item.job_name)
+      .filter(name => name && name.trim() && name !== '未知岗位')
+  ))
+
+  // ✅ 关键修改：生成【全部】岗位画像，不再限制数量
+  jobPortraitList.value = uniqueJobNames.map(name => ({
+    jobName: name
+  }))
+}
+
+// 双击跳转到岗位画像页面
+const goToJobPortraitDetail = (jobName) => {
+  router.push({
+    path: '/job-portrait',
+    query: { jobName: encodeURIComponent(jobName) }
+  })
 }
 
 // ========== 保留原有悬浮状态逻辑 ==========
@@ -856,19 +919,26 @@ const goToFeature = (type) => {
       break
     case '导出':
       router.push('/report-export')
-      break
+      break;
     default:
       break
   }
 }
 
+// 搜索执行
 const handleSearch = () => {
-  const searchInput = document.querySelector('.nav-search-input')
-  const keyword = searchInput.value.trim()
+  const keyword = searchKeyword.value.trim()
   if (keyword) {
-    router.push(`/search?keyword=${encodeURIComponent(keyword)}`)
-    searchInput.value = ''
-    ElMessage.success(`正在搜索：${keyword}`)
+    filterJobName.value = ''
+    currentPage.value = 1
+    initCardAnimateStates()
+    ElMessage.success(`已搜索：${keyword}`)
+    
+    // 自动滚动到岗位列表
+    const jobSection = document.querySelector('.job-section')
+    if (jobSection) {
+      jobSection.scrollIntoView({ behavior: 'smooth' })
+    }
   } else {
     ElMessage.warning('请输入搜索关键词')
   }
@@ -913,70 +983,6 @@ const cardAnimateStates = ref([])
 const jobCardAnimateStates = ref([])
 const animateTimers = ref([])
 const jobAnimateTimers = ref([])
-
-// 保留原有岗位画像数据
-const jobPortraitList = ref([
-  {
-    jobName: '数据分析师',
-    skills: ['Python', 'SQL', 'Tableau', 'Excel'],
-    cover: 'https://picsum.photos/seed/data-analyst/200/280'
-  },
-  {
-    jobName: '前端开发工程师',
-    skills: ['HTML/CSS', 'JavaScript', 'Vue', 'React'],
-    cover: 'https://picsum.photos/seed/frontend-dev/200/280'
-  },
-  {
-    jobName: '产品经理',
-    skills: ['Axure', 'PRD', '用户调研', '数据分析'],
-    cover: 'https://picsum.photos/seed/product-manager/200/280'
-  },
-  {
-    jobName: 'UI设计师',
-    skills: ['PS', 'AI', 'Figma', '交互设计'],
-    cover: 'https://picsum.photos/seed/ui-designer/200/280'
-  },
-  {
-    jobName: '电商运营',
-    skills: ['淘宝运营', '数据分析', '文案写作'],
-    cover: 'https://picsum.photos/seed/e-commerce/200/280'
-  },
-  {
-    jobName: '后端开发工程师',
-    skills: ['Java', 'SpringBoot', 'MySQL', 'Redis'],
-    cover: 'https://picsum.photos/seed/backend-dev/200/280'
-  },
-  {
-    jobName: '测试开发工程师',
-    skills: ['Python', 'JUnit', 'Selenium', '接口测试'],
-    cover: 'https://picsum.photos/seed/test-dev/200/280'
-  },
-  {
-    jobName: '人工智能工程师',
-    skills: ['Python', 'TensorFlow', 'PyTorch', '机器学习'],
-    cover: 'https://picsum.photos/seed/ai-engineer/200/280'
-  },
-  {
-    jobName: '运维开发工程师',
-    skills: ['Linux', 'Docker', 'K8s', 'Shell'],
-    cover: 'https://picsum.photos/seed/devops/200/280'
-  },
-  {
-    jobName: '大数据开发工程师',
-    skills: ['Hadoop', 'Spark', 'Hive', 'Java'],
-    cover: 'https://picsum.photos/seed/bigdata-dev/200/280'
-  },
-  {
-    jobName: '网络安全工程师',
-    skills: ['渗透测试', '防火墙', '漏洞挖掘'],
-    cover: 'https://picsum.photos/seed/security-engineer/200/280'
-  },
-  {
-    jobName: '金融分析师',
-    skills: ['Excel', 'SQL', '金融建模', '行业分析'],
-    cover: 'https://picsum.photos/seed/finance-analyst/200/280'
-  }
-])
 
 // 保留原有初始化卡片动画状态逻辑
 const initCardAnimateStates = () => {
@@ -1030,7 +1036,7 @@ const handleMouseMove = (e) => {
   }
 }
 
-// 保留原有计算卡片样式逻辑
+// 【修改 1】只有鼠标下移时偏移量增大，上移保持正常，解决顶部空白
 const getCardStyle = (index) => {
   const { x, y } = mousePos.value
   const { width, height } = containerRect.value
@@ -1039,9 +1045,9 @@ const getCardStyle = (index) => {
   const col = index % 6
   const row = Math.floor(index / 6)
   const cardWidth = 200
-  const cardHeight = 280
+  const cardHeight = 140
   const gapX = 60
-  const gapY = 60
+  const gapY = 30
   
   const colOffset = col % 2 === 1 ? cardHeight / 2 : 0
   
@@ -1050,8 +1056,17 @@ const getCardStyle = (index) => {
 
   const ratioX = x / width
   const ratioY = y / height
-  const followX = -(ratioX - 0.5) * 300
-  const followY = -(ratioY - 0.5) * 300
+
+  // 核心修改：下移才增大偏移，上移保持小偏移
+  let followY = 0
+  if (ratioY > 0.5) {
+    // 鼠标在下方，增大偏移
+    followY = -(ratioY - 0.5) * 1800
+  } else {
+    // 鼠标在上半部分，正常偏移，不放大
+    followY = -(ratioY - 0.5) * 600
+  }
+  const followX = -(ratioX - 0.5) * 1200
 
   return {
     left: `${baseX + followX}px`,
@@ -1873,19 +1888,19 @@ onUnmounted(() => {
 .slider-card-match {
   font-size: 14px;
   color: #2f54eb;
-  font-weight: 500;
+  font-weight: 50;
 }
 
-/* 岗位画像卡片区域样式 */
+/* 【修改 2】热门岗位画像容器放大 1/3 */
 .job-portrait-card-section {
-  padding: 40px 0;
+  padding: 53px 0;
   background: #f5f5f0;
   width: 100%;
 }
 .job-portrait-card-section .section-header {
   width: 90%;
   max-width: 1400px;
-  margin: 0 auto 30px;
+  margin: 0 auto 40px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1896,23 +1911,25 @@ onUnmounted(() => {
   color: #000;
   margin: 0;
 }
-/* 容器高度适配6列瀑布流 */
+/* 容器高度放大 1/3 */
 .portrait-card-container {
   width: 100%;
-  min-height: 800px;
+  min-height: 667px;
   margin: 0 auto;
   position: relative;
   overflow: hidden;
-  padding: 20px 0;
+  padding: 27px 0;
 }
 
-/* 岗位画像卡片基础样式 */
+/* ====================== ✅ 仅这里优化：岗位画像卡片美化 ====================== */
 .portrait-card {
   width: 200px;
-  height: 280px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  height: 140px;
+  /* 柔和渐变背景 + 随机色彩 */
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+  border-radius: 16px;
+  border: 2px solid transparent;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.08);
   overflow: hidden;
   cursor: pointer;
   position: absolute;
@@ -1920,33 +1937,103 @@ onUnmounted(() => {
   opacity: 0;
   transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  box-sizing: border-box;
 }
-/* 飞入动画激活状态 */
+/* 卡片颜色系列（柔和不刺眼） */
+.portrait-card:nth-child(5n+1) {
+  background: linear-gradient(135deg, #e6f7ff 0%, #f0f9ff 100%);
+  border-color: #91d5ff;
+}
+.portrait-card:nth-child(5n+2) {
+  background: linear-gradient(135deg, #f0f5ff 0%, #f5f8ff 100%);
+  border-color: #adc6ff;
+}
+.portrait-card:nth-child(5n+3) {
+  background: linear-gradient(135deg, #fff7e6 0%, #fffbf0 100%);
+  border-color: #ffd591;
+}
+.portrait-card:nth-child(5n+4) {
+  background: linear-gradient(135deg, #f0f2f5 0%, #f7f8fa 100%);
+  border-color: #d9d9d9;
+}
+.portrait-card:nth-child(5n+5) {
+  background: linear-gradient(135deg, #f6ffed 0%, #fcffe6 100%);
+  border-color: #b7eb8f;
+}
+
+/* 飞入动画激活状态（不变） */
 .portrait-card.animate-in {
   transform: translateX(0) translateY(0);
   opacity: 1;
 }
-/* 悬浮时浮起效果 */
+/* 悬浮效果（保留并优化） */
 .portrait-card:hover {
   transform: translateY(-12px) scale(1.05);
-  box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+  box-shadow: 0 15px 30px rgba(0,0,0,0.15);
   z-index: 10;
+  border-color: #2f54eb;
 }
-/* 岗位名称提示框样式 */
+
+/* 纯文字内容 + 图标样式 */
+.portrait-text-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: 8px;
+}
+/* 职业图标（自动匹配风格） */
+.portrait-text-content::before {
+  content: "💼";
+  font-size: 24px;
+  opacity: 0.8;
+}
+.portrait-card:nth-child(3n+1) .portrait-text-content::before { content: "💻"; }
+.portrait-card:nth-child(3n+2) .portrait-text-content::before { content: "📊"; }
+.portrait-card:nth-child(3n+3) .portrait-text-content::before { content: "🎨"; }
+
+.portrait-job-name {
+  font-size: 17px;
+  font-weight: 600;
+  color: #222;
+  text-align: center;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+/* 提示框（不变） */
 .portrait-name-tooltip {
   position: absolute;
-  bottom: 20px;
+  bottom: 10px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(255,255,255,0.9);
-  color: #000;
-  padding: 8px 15px;
+  background: rgba(255,255,255,0.95);
+  color: #2f54eb;
+  padding: 4px 12px;
   border-radius: 20px;
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
   z-index: 11;
   animation: fadeInUp 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+/* ======================================================================== */
+
+/* 空数据样式 */
+.empty-portrait-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #999;
 }
 
 /* 通用动画 */

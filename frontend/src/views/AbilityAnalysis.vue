@@ -93,12 +93,9 @@
             </div>
             <div class="score-card card-effect">
               <span class="score-type">综合竞争力</span>
-              <!-- 修改1：显示--或数值 -->
               <span class="score-num">{{ isCompetitiveScoreValid ? getCompetitiveScore() + '%' : '--' }}</span>
               <div class="score-bar">
-                <!-- 修改2：无数据时隐藏进度条填充 -->
                 <div class="bar-fill" v-if="isCompetitiveScoreValid" :style="{ width: getCompetitiveScore() + '%', background: getScoreColor(getCompetitiveScore()) }"></div>
-                <!-- 无数据时显示空进度条 -->
                 <div v-else class="bar-empty" style="width: 100%; height: 100%; background: #e2e8f0;"></div>
               </div>
               <p class="score-desc">{{ isCompetitiveScoreValid ? getCompetitiveDesc(getCompetitiveScore()) : '暂无足够简历信息评估综合竞争力' }}</p>
@@ -116,7 +113,7 @@
                 <div class="dimension-bar">
                   <div class="bar-fill" :style="{ width: (item.score * 20) + '%', background: getScoreColor(item.score * 20) }"></div>
                 </div>
-                <div class="dimension-score">{{ item.score === 0 ? '--' : item.score * 20 }}分</div>
+                <div class="dimension-score">{{ item.score * 20 }}分</div>
                 <div class="dimension-tip">{{ item.description || '暂无评价' }}</div>
               </div>
             </div>
@@ -193,10 +190,8 @@
 
           <div class="profile-actions">
             <el-button class="btn-effect" @click="regenerateProfile" :loading="generatingProfile">重新生成画像</el-button>
-            <!-- 新增：重新填写学生信息按钮 -->
             <el-button class="btn-effect" type="info" @click="goToEditInfo">重新填写学生信息</el-button>
             <el-button class="btn-effect" type="primary" @click="exportProfile">导出能力画像</el-button>
-            <!-- 修改：按钮文字改为兴趣测试 -->
             <el-button class="btn-effect" type="success" @click="goToInterestTest">兴趣测试</el-button>
           </div>
         </div>
@@ -244,10 +239,8 @@ const profile = reactive({
   project_text: '', project_json: [], aiEvaluation: ''
 })
 
-// 修改3：计算属性 - 判断综合竞争力是否有效
 const isCompetitiveScoreValid = computed(() => {
   const softAbilities = getSoftAbilityList()
-  // 检查是否有至少一个软能力分数大于0
   return Object.values(softAbilities).some(item => item.score > 0)
 })
 
@@ -320,43 +313,63 @@ const getProfileData = async () => {
   }
 }
 
-// 核心修改：信息不足时软能力默认0分，不再给3分（60分）兜底
+// 核心修复：去重 + 0分自动给保底分，不再显示--
 const getSoftAbilityList = () => {
-  const result = {}
-  
-  // 1. 优先使用后端返回的软能力数据（大模型分析结果）
+  // 固定5个基础维度
+  const baseAbilities = {
+    '沟通协作能力': { score: 1, description: '根据基础信息评估' },
+    '创新思考能力': { score: 1, description: '根据基础信息评估' },
+    '学习适应能力': { score: 1, description: '根据基础信息评估' },
+    '抗压应变能力': { score: 1, description: '根据基础信息评估' },
+    '实践执行能力': { score: 1, description: '建议补充实习/项目经历提升评分' }
+  }
+
+  // 字段映射 + 去重
+  const fieldMap = {
+    '实习能力': '实践执行能力',
+    '沟通能力': '沟通协作能力',
+    '创新能力': '创新思考能力',
+    '学习能力': '学习适应能力',
+    '抗压能力': '抗压应变能力',
+    '创新思考': '创新思考能力'
+  }
+
+  const backendData = {}
   if (typeof profile.soft_abilities === 'object' && profile.soft_abilities !== null) {
     Object.entries(profile.soft_abilities).forEach(([key, value]) => {
-      // 兼容后端两种返回格式：直接数字 或 {score, description} 对象
+      const displayName = fieldMap[key] || key
+      let score = 0
       if (typeof value === 'number') {
-        // 后端返回1-5分制，直接使用
-        const score = Math.min(5, Math.max(0, value)) // 允许0分
-        result[key] = { 
-          score: score, 
-          description: score === 0 ? '暂无足够简历信息评估该能力' : 'AI分析简历得出的能力评估' 
+        score = Math.min(5, Math.max(0, value))
+      } else if (value?.score != null) {
+        score = Math.min(5, Math.max(0, value.score))
+      }
+      const desc = typeof value === 'object' && value.description
+        ? value.description
+        : (score > 0 ? 'AI分析简历得出的能力评估' : '建议补充相关经历')
+
+      if (backendData[displayName]) {
+        if (score > backendData[displayName].score) {
+          backendData[displayName] = { score, description: desc }
         }
-      } else if (value && typeof value === 'object' && 'score' in value) {
-        // 后端返回完整对象，直接使用
-        const score = Math.min(5, Math.max(0, value.score))
-        result[key] = {
-          score: score,
-          description: value.description || (score === 0 ? '暂无足够简历信息评估该能力' : 'AI分析暂无详细描述')
-        }
+      } else {
+        backendData[displayName] = { score, description: desc }
       }
     })
   }
 
-  // 2. 兜底逻辑：如果后端没有返回任何软能力数据，使用默认维度且分数为0
-  if (Object.keys(result).length === 0) {
-    const defaultAbilities = {
-      '创新能力': { score: 0, description: '暂无足够简历信息评估该能力' },
-      '学习能力': { score: 0, description: '暂无足够简历信息评估该能力' },
-      '抗压能力': { score: 0, description: '暂无足够简历信息评估该能力' },
-      '沟通能力': { score: 0, description: '暂无足够简历信息评估该能力' },
-      '实习能力': { score: 0, description: '暂无足够简历信息评估该能力' }
+  // 保底逻辑：后端0分就用前端保底分，保证永远有分数
+  const result = {}
+  Object.keys({ ...baseAbilities, ...backendData }).forEach(key => {
+    const base = baseAbilities[key] || { score: 1, description: '基础评分' }
+    const back = backendData[key] || { score: 0, description: '' }
+
+    if (back.score > 0) {
+      result[key] = back
+    } else {
+      result[key] = base
     }
-    Object.assign(result, defaultAbilities)
-  }
+  })
 
   return result
 }
@@ -415,11 +428,8 @@ const getCompletenessDesc = (s)=>{
   return '信息偏低，优先完善技能与实践'
 }
 
-// 修改4：综合竞争力计算函数（仅在有效时返回数值）
 const getCompetitiveScore = () => {
-  // 如果无效，返回0（实际不会显示）
   if (!isCompetitiveScoreValid.value) return 0
-  
   const soft = getSoftAbilityList()
   const avg = Object.values(soft).reduce((p,c)=>p+c.score,0)/Object.keys(soft).length*20
   return Math.round(profile.completeness*0.6 + avg*0.4)
@@ -435,9 +445,7 @@ const getCompetitiveDesc = (s)=>{
 const getSkillProficiency = (sk) => ['Python','Java','SQL','Vue.js','Spring Boot','JavaScript'].includes(sk)?80+Math.random()*20:60+Math.random()*30
 
 const goBack = ()=>router.push('/student-ability')
-// 新增：跳转至重新填写学生信息页面
 const goToEditInfo = ()=>router.push('/student-ability')
-// 修改：兴趣测试跳转函数（保持原有逻辑，仅改名）
 const goToInterestTest = ()=>router.push({path:'/interest-test',query:{studentId:studentId.value}})
 const toggleUserMenu = ()=>isUserMenuOpen.value=!isUserMenuOpen.value
 const handleLogout = ()=>{localStorage.clear();isLogin.value=false;router.push('/');ElMessage.success('已退出')}
@@ -452,19 +460,16 @@ const handleSearch = ()=>{const i=document.querySelector('.nav-search-input');if
   position: relative;
   overflow: hidden;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  /* 渐变边框效果 */
   border: double 1px transparent;
   background-image: linear-gradient(#ffffff, #ffffff), 
                     linear-gradient(135deg, #e0f2fe, #dbeafe, #f0f9ff);
   background-origin: border-box;
   background-clip: padding-box, border-box;
 }
-/* 悬浮放大+阴影加深特效 */
 .card-effect:hover {
   transform: translateY(-5px) scale(1.01);
   box-shadow: 0 12px 24px rgba(0,0,0,0.08), 0 4px 8px rgba(37, 99, 235, 0.1);
 }
-/* 按钮强化特效 */
 .btn-effect {
   position: relative;
   overflow: hidden;
@@ -484,7 +489,6 @@ const handleSearch = ()=>{const i=document.querySelector('.nav-search-input');if
   left: 100%;
 }
 
-/* 核心优化：基础信息横向卡片样式 */
 .basic-info-card {
   display: flex;
   align-items: center;
@@ -534,7 +538,6 @@ const handleSearch = ()=>{const i=document.querySelector('.nav-search-input');if
   background: rgba(37, 99, 235, 0.3);
 }
 
-/* 整体视觉优化 */
 .ability-profile-page {
   width: 100%;
   min-height: 100vh;
@@ -560,7 +563,6 @@ const handleSearch = ()=>{const i=document.querySelector('.nav-search-input');if
   border-radius: 24px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.9);
   padding: 40px;
-  /* 淡入动画 */
   animation: fadeInUp 0.8s ease-out;
 }
 
@@ -587,7 +589,6 @@ const handleSearch = ()=>{const i=document.querySelector('.nav-search-input');if
   border-radius: 2px;
 }
 
-/* 评分卡片优化 */
 .core-scores {
   display: flex;
   gap: 20px;
@@ -641,7 +642,6 @@ const handleSearch = ()=>{const i=document.querySelector('.nav-search-input');if
   transition: width 1s ease-in-out;
   background: linear-gradient(90deg, var(--fill-color), #3b82f6);
 }
-/* 修改5：新增空进度条样式 */
 .bar-empty {
   height: 100%;
   border-radius: 20px;
@@ -654,7 +654,6 @@ const handleSearch = ()=>{const i=document.querySelector('.nav-search-input');if
   line-height: 1.5;
 }
 
-/* 软能力维度优化 */
 .dimension-title {
   font-size: 19px;
   font-weight: 600;
@@ -723,7 +722,6 @@ const handleSearch = ()=>{const i=document.querySelector('.nav-search-input');if
   line-height: 1.4;
 }
 
-/* 技能证书区域优化 */
 .skill-cert-section {
   display: flex;
   gap: 20px;
@@ -807,7 +805,6 @@ const handleSearch = ()=>{const i=document.querySelector('.nav-search-input');if
   border: 1px solid #e2e8f0;
 }
 
-/* 经历区域优化 */
 .experience-section {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -868,7 +865,6 @@ const handleSearch = ()=>{const i=document.querySelector('.nav-search-input');if
   font-weight: 500;
 }
 
-/* AI评价区域优化 */
 .ai-evaluation {
   background: #ffffff;
   border-radius: 16px;
@@ -901,7 +897,6 @@ const handleSearch = ()=>{const i=document.querySelector('.nav-search-input');if
   border-left-color: #3b82f6;
 }
 
-/* 按钮区域优化 */
 .profile-actions {
   display: flex;
   gap: 16px;
@@ -934,7 +929,6 @@ const handleSearch = ()=>{const i=document.querySelector('.nav-search-input');if
   transform: translateY(-2px) !important;
   box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3) !important;
 }
-/* 新增：info类型按钮样式优化 */
 :deep(.el-button--info) {
   background: linear-gradient(135deg, #64748b, #94a3b8) !important;
   border: none !important;
@@ -946,7 +940,6 @@ const handleSearch = ()=>{const i=document.querySelector('.nav-search-input');if
   box-shadow: 0 6px 16px rgba(100, 116, 139, 0.3) !important;
 }
 
-/* 空状态优化 */
 .empty-profile {
   display: flex;
   flex-direction: column;
@@ -962,7 +955,6 @@ const handleSearch = ()=>{const i=document.querySelector('.nav-search-input');if
   line-height: 1.6;
 }
 
-/* 导航栏样式（保留原有） */
 .top-nav {
   height: 60px;
   background: #ffffff;
@@ -1019,7 +1011,6 @@ const handleSearch = ()=>{const i=document.querySelector('.nav-search-input');if
 .user-menu .menu-item:hover { background: #f0f7ff; color: #333; }
 .user-menu .logout { color: #ff4d4f; border-top: 1px solid #f0f0f0; }
 
-/* 响应式优化 */
 @media(max-width:768px) {
   .basic-info-card {
     flex-direction: column;
@@ -1043,28 +1034,18 @@ const handleSearch = ()=>{const i=document.querySelector('.nav-search-input');if
   .nav-wrap { width: 95%; }
   .nav-menu { display: none; }
   .radar-chart-container { height: 300px; }
-  /* 移动端弱化放大特效 */
   .card-effect:hover {
     transform: translateY(-3px) scale(1.005);
   }
-  /* 移动端按钮换行 */
   .profile-actions {
     flex-wrap: wrap;
   }
 }
 
-/* 新增动画 */
 @keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
