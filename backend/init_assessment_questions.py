@@ -57,14 +57,12 @@ def init_questions():
     conn = get_db()
     cur = conn.cursor()
     
-    # 检查是否已存在数据
-    cur.execute("SELECT count(*) as cnt FROM assessment_questions")
-    if cur.fetchone()['cnt'] > 0:
-        print("⚠️  测评题目已存在，跳过初始化")
-        conn.close()
-        return
+    # ==============================================
+    # 👇 这里是我帮你修改的核心：先清空所有旧题目
+    # ==============================================
+    cur.execute("DELETE FROM assessment_questions")
     
-    # 插入数据
+    # 插入 30 道全新题目
     for question, dimension, sort_order in questions:
         cur.execute('''
             INSERT INTO assessment_questions (question, dimension, sort_order)
@@ -72,8 +70,13 @@ def init_questions():
         ''', (question, dimension, sort_order))
     
     conn.commit()
+
+    # 验证是否真的插入了30题（可选，很稳）
+    cur.execute("SELECT COUNT(*) FROM assessment_questions")
+    total = cur.fetchone()[0]
+    
     conn.close()
-    print("✅ 测评题目初始化完成，共 30 道题")
+    print(f"✅ 测评题目初始化完成！数据库中总题数：{total}")
 
 
 if __name__ == '__main__':

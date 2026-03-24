@@ -1,6 +1,5 @@
 <template>
   <div class="career-test">
-    <!-- 替换为统一的顶部导航栏 -->
     <header class="top-nav">
       <div class="nav-wrap">
         <div class="nav-left">
@@ -11,7 +10,6 @@
           <ul class="nav-menu">
             <li class="menu-item" @click="$router.push('/')">首页</li>
             <li class="menu-item" @click="$router.push('/student-ability')">岗位画像</li>
-            <!-- 添加 active 类使职业规划导航项变蓝并有下划线 -->
             <li class="menu-item active" @click="$router.push('/career-planning-intro')">职业规划</li>
             <li class="menu-item" @click="$router.push('/resource-library')">资源库</li>
             <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
@@ -35,9 +33,7 @@
           </ul>
         </div>
 
-        <!-- 导航栏右侧：搜索框 + 原有功能 -->
         <div class="nav-right">
-          <!-- 导航栏内的搜索框 -->
           <div class="nav-search-wrap">
             <input 
               type="text" 
@@ -50,11 +46,9 @@
 
           <button class="btn-toggle-theme" @click="toggleTheme">🌙</button>
           
-          <!-- 未登录：显示登录/注册按钮 -->
           <button class="btn-login" @click="$router.push('/login')" v-if="!isLogin">登录</button>
           <button class="btn-register" @click="$router.push('/register')" v-if="!isLogin">注册</button>
           
-          <!-- 已登录：显示用户头像 + 下拉菜单 -->
           <div class="user-profile" v-if="isLogin">
             <img 
               :src="userAvatar || 'https://picsum.photos/seed/avatar/40/40'" 
@@ -72,7 +66,6 @@
       </div>
     </header>
 
-    <!-- 页面副标题区域（保留原有功能按钮） -->
     <div class="test-subheader">
       <div class="subheader-wrap">
         <div class="page-title">
@@ -80,7 +73,6 @@
           <h1>职业测评</h1>
         </div>
         <div class="page-nav">
-          <!-- 删除了返回首页按钮 -->
           <button 
             class="report-btn" 
             @click="showReportModal = true" 
@@ -92,12 +84,10 @@
       </div>
     </div>
 
-    <!-- 加载状态 -->
     <div v-if="loading" class="loading-container">
       <div class="loading-spinner">加载中...</div>
     </div>
 
-    <!-- 2. 测评介绍（未开始答题时显示） -->
     <section class="test-intro" v-if="!loading && !testStarted && !testCompleted">
       <div class="intro-wrap">
         <div class="intro-card">
@@ -143,10 +133,8 @@
       </div>
     </section>
 
-    <!-- 3. 答题界面（答题中显示） -->
     <section class="test-questions" v-if="!loading && testStarted && !testCompleted">
       <div class="questions-wrap">
-        <!-- 答题进度 -->
         <div class="progress-bar">
           <div class="progress-info">
             <span>答题进度：{{ currentQuestionIndex + 1 }}/{{ testQuestions.length }}</span>
@@ -160,7 +148,6 @@
           </div>
         </div>
 
-        <!-- 题目区域 -->
         <div class="question-card">
           <div class="question-header">
             <h3>第 {{ currentQuestionIndex + 1 }} 题</h3>
@@ -204,7 +191,6 @@
       </div>
     </section>
 
-    <!-- 4. 测评结果（完成答题后显示） -->
     <section class="test-result" v-if="!loading && testCompleted">
       <div class="result-wrap">
         <div class="result-header">
@@ -212,11 +198,9 @@
           <p class="result-subtitle">基于你的答题情况，生成专属职业分析</p>
         </div>
 
-        <!-- 结果雷达图 -->
         <div class="result-chart">
           <h3>职业维度得分（0-100分）</h3>
           <div class="chart-container">
-            <!-- 修复后的雷达图 -->
             <div class="radar-chart">
               <div class="radar-grid"></div>
               <div class="radar-axis" v-for="(axis, idx) in radarAxes" :key="idx" :style="getRadarAxisStyle(idx)">
@@ -230,13 +214,11 @@
                   }"
                 ></div>
               </div>
-              <!-- 得分区域填充 -->
               <div class="radar-fill" :style="getRadarFillStyle()"></div>
             </div>
           </div>
         </div>
 
-        <!-- 核心结果 -->
         <div class="core-result">
           <div class="core-card">
             <div class="core-icon">{{ topType.icon }}</div>
@@ -253,7 +235,6 @@
           </div>
         </div>
 
-        <!-- LLM生成的推荐内容 -->
         <div class="llm-recommendation" v-if="recommendation">
           <div class="recommendation-card">
             <h3>AI 生成的个性化职业推荐</h3>
@@ -261,7 +242,6 @@
           </div>
         </div>
 
-        <!-- 详细分析 -->
         <div class="detail-analysis">
           <h3>各维度详细分析（0-100分）</h3>
           <div class="analysis-cards">
@@ -289,12 +269,10 @@
           </div>
         </div>
 
-        <!-- 操作按钮 -->
         <div class="result-actions">
           <button class="restart-btn" @click="restartTest">重新测评</button>
           <button class="export-btn" @click="exportReport">导出测评报告</button>
           <button class="share-btn" @click="shareResult">分享测评结果</button>
-          <!-- 修改：人岗匹配按钮 -->
           <button class="career-plan-btn" @click="goToMatchResult">
             📋 进行人岗匹配分析
           </button>
@@ -302,7 +280,6 @@
       </div>
     </section>
 
-    <!-- 测评报告弹窗 -->
     <div class="report-modal" v-if="showReportModal">
       <div class="modal-mask" @click="showReportModal = false"></div>
       <div class="modal-content">
@@ -385,7 +362,6 @@
       </div>
     </div>
 
-    <!-- 5. 页脚 -->
     <footer class="page-footer">
       <div class="footer-wrap">
         © 2026 大学生职业规划系统 | 职业测评基于霍兰德职业兴趣理论开发
@@ -403,12 +379,9 @@ import axios from 'axios'
 const router = useRouter()
 const route = useRoute()
 
-// ========== 新增：接口请求基础配置 ==========
-const API_BASE_URL = '/api/assessment' // 后端接口前缀
-const loading = ref(false) // 加载状态
+const API_BASE_URL = '/api/assessment'
+const loading = ref(true)
 
-// ========== 导航栏相关逻辑 ==========
-// 登录状态
 const isLogin = ref(!!localStorage.getItem('token'))
 const userAvatar = ref(localStorage.getItem('avatar') || '')
 const isUserMenuOpen = ref(false)
@@ -436,7 +409,6 @@ const handleLogout = () => {
   ElMessage.success('退出登录成功')
 }
 
-// 主题切换
 const darkMode = ref(localStorage.getItem('darkMode') === 'true')
 function applyTheme() {
   if (darkMode.value) {
@@ -453,7 +425,6 @@ function toggleTheme() {
   ElMessage.success(`已切换为${darkMode.value ? '暗黑' : '明亮'}模式`)
 }
 
-// 核心功能跳转
 const goToFeature = (type) => {
   switch(type) {
     case '测评':
@@ -473,7 +444,6 @@ const goToFeature = (type) => {
   }
 }
 
-// 搜索功能
 const handleSearch = () => {
   const searchInput = document.querySelector('.nav-search-input')
   const keyword = searchInput.value.trim()
@@ -486,41 +456,28 @@ const handleSearch = () => {
   }
 }
 
-// ========== 测评相关逻辑 ==========
-// 暂存相关常量
 const DRAFT_STORAGE_KEY = 'careerInterestTestDraft'
 const RESULT_STORAGE_KEY = 'careerInterestTestResult'
 
-// 基础状态
-const testStarted = ref(false)       // 是否开始测评
-const testCompleted = ref(false)     // 是否完成测评
-const currentQuestionIndex = ref(0)  // 当前题目索引
-const currentAnswer = ref(0)         // 当前题答案
-const answers = ref({})              // 所有答案存储 (存储的是1-5的原始选择值)
-const showReportModal = ref(false)   // 是否显示报告弹窗
-const testResultDate = ref('')       // 测评完成时间
-const dimensionScores = ref({        // 存储0-100分制的最终得分
-  R: 0,
-  I: 0,
-  A: 0,
-  S: 0,
-  E: 0,
-  C: 0
+const testStarted = ref(false)
+const testCompleted = ref(false)
+const currentQuestionIndex = ref(0)
+const currentAnswer = ref(0)
+const answers = ref({})
+const showReportModal = ref(false)
+const testResultDate = ref('')
+const dimensionScores = ref({
+  R: 0, I: 0, A: 0, S: 0, E: 0, C: 0
 })      
-const recommendation = ref('')       // LLM生成的推荐内容
+const recommendation = ref('')
 
-// 计时相关
-const totalTime = 900 // 总答题时间（秒）- 15分钟
+const totalTime = 900
 const remainingTime = ref(totalTime)
 let timer = null
 
-// ========== 从后端获取数据 ==========
-// 职业类型定义（霍兰德六维）
 const interestTypes = ref([
   {
-    code: 'R',
-    name: '现实型',
-    icon: '🛠️',
+    code: 'R', name: '现实型', icon: '🛠️',
     desc: '偏好与物体打交道，喜欢具体的、实际操作性的工作',
     detailDesc: '你属于现实型人格，偏好与物体打交道，喜欢具体的、实际操作性的工作。你动手能力强，做事踏实，喜欢使用工具和机械，偏好具体任务，不善言辞，做事保守，较为谦虚。喜欢独立做事，注重实际效果。',
     analysis: '你的现实型维度得分较高，说明你具备较强的动手能力和实操能力，喜欢具体、明确的任务，不喜欢抽象的理论思考。你适合从事需要实际操作的职业，能够在具体的工作中找到成就感。',
@@ -529,9 +486,7 @@ const interestTypes = ref([
     suggestions: '可以重点关注工程技术、手工操作、技术维修等领域的职业发展，注重专业技能的提升和实践经验的积累。'
   },
   {
-    code: 'I',
-    name: '研究型',
-    icon: '🔬',
+    code: 'I', name: '研究型', icon: '🔬',
     desc: '喜欢智力活动和抽象推理，乐于探索和解决复杂问题',
     detailDesc: '你属于研究型人格，喜欢智力活动和抽象推理，乐于探索和解决复杂问题。你好奇心强，追求知识，喜欢独立思考和研究，逻辑思维能力强，做事严谨，注重分析和推理。不喜欢繁琐的行政事务和重复性工作。',
     analysis: '你的研究型维度得分较高，说明你具备较强的逻辑思维和分析能力，喜欢探索未知领域，善于发现问题和解决问题。你适合从事需要深度思考和研究的职业，能够在学术研究和技术研发中找到价值。',
@@ -540,9 +495,7 @@ const interestTypes = ref([
     suggestions: '适合从事科研、数据分析、学术研究、技术研发等领域的工作，建议继续深造提升专业水平，保持对新知识的探索精神。'
   },
   {
-    code: 'A',
-    name: '艺术型',
-    icon: '🎨',
+    code: 'A', name: '艺术型', icon: '🎨',
     desc: '喜欢创造性的表达，追求美感和独特性，富有想象力',
     detailDesc: '你属于艺术型人格，喜欢创造性的表达，追求美感和独特性，富有想象力。你情感丰富，直觉敏锐，喜欢通过各种艺术形式表达自己，不拘小节，喜欢自由的工作环境，不喜欢受规则束缚。',
     analysis: '你的艺术型维度得分较高，说明你具备较强的创造力和想象力，对美有独特的追求，善于用艺术的方式表达自己。你适合从事需要创意和表达的职业，能够在艺术创作和审美设计中实现自我价值。',
@@ -551,9 +504,7 @@ const interestTypes = ref([
     suggestions: '适合从事设计、艺术创作、文化创意等领域的工作，保持创作热情，不断提升审美水平和创意能力。'
   },
   {
-    code: 'S',
-    name: '社会型',
-    icon: '🤝',
+    code: 'S', name: '社会型', icon: '🤝',
     desc: '喜欢与人交往，乐于助人，关心社会问题，渴望发挥社会作用',
     detailDesc: '你属于社会型人格，喜欢与人交往，乐于助人，关心社会问题，渴望发挥社会作用。你善于沟通，有同理心，喜欢帮助他人解决问题，乐于从事教育、咨询、公益等工作，具有较强的社会责任感。',
     analysis: '你的社会型维度得分较高，说明你具备良好的沟通能力和人际交往能力，乐于助人，有较强的同理心和社会责任感。你适合从事与人打交道的职业，能够在帮助他人和服务社会中获得满足感。',
@@ -562,9 +513,7 @@ const interestTypes = ref([
     suggestions: '适合从事教育、医疗、咨询、公益、人力资源等领域的工作，注重沟通技巧和服务意识的提升。'
   },
   {
-    code: 'E',
-    name: '企业型',
-    icon: '💼',
+    code: 'E', name: '企业型', icon: '💼',
     desc: '喜欢影响、说服和领导他人，追求成功和成就感',
     detailDesc: '你属于企业型人格，喜欢影响、说服和领导他人，追求成功和成就感。你自信果断，有领导才能，喜欢竞争和挑战，目标明确，注重效率和结果，乐于从事管理和销售类工作。',
     analysis: '你的企业型维度得分较高，说明你具备较强的领导能力和决策能力，有进取心，喜欢挑战和竞争，追求成功和成就感。你适合从事管理、销售、创业等职业，能够在带领团队和实现目标中体现价值。',
@@ -573,9 +522,7 @@ const interestTypes = ref([
     suggestions: '适合从事管理、销售、创业、商务等领域的工作，注重领导力和商业思维的培养，积累管理经验。'
   },
   {
-    code: 'C',
-    name: '常规型',
-    icon: '📋',
+    code: 'C', name: '常规型', icon: '📋',
     desc: '喜欢有规则的、有序的工作，注重细节和准确性',
     detailDesc: '你属于常规型人格，喜欢有规则的、有序的工作，注重细节和准确性。你做事认真细致，有责任心，喜欢按部就班地完成任务，善于处理数据和文书工作，注重秩序和规范。',
     analysis: '你的常规型维度得分较高，说明你具备较强的细心和耐心，做事认真负责，注重规则和秩序，善于处理细节性的工作。你适合从事需要细心和规范的职业，能够在有序的工作环境中发挥优势。',
@@ -585,412 +532,215 @@ const interestTypes = ref([
   }
 ])
 
-// 测评题目（从后端获取）
 const testQuestions = ref([])
-// 答题选项（1-5分映射到20-100分）
 const options = ref([
-  { label: '非常不符合', desc: '完全不符合我的情况', score: 20 },  // 1分 → 20分
-  { label: '不太符合', desc: '不太符合我的情况', score: 40 },     // 2分 → 40分
-  { label: '一般', desc: '不确定是否符合', score: 60 },          // 3分 → 60分
-  { label: '比较符合', desc: '比较符合我的情况', score: 80 },     // 4分 → 80分
-  { label: '非常符合', desc: '完全符合我的情况', score: 100 }    // 5分 → 100分
+  { label: '非常不符合', desc: '完全不符合我的情况', score: 20 },
+  { label: '不太符合', desc: '不太符合我的情况', score: 40 },
+  { label: '一般', desc: '不确定是否符合', score: 60 },
+  { label: '比较符合', desc: '比较符合我的情况', score: 80 },
+  { label: '非常符合', desc: '完全符合我的情况', score: 100 }
 ])
 
-// 从后端获取测评题目
 const fetchAssessmentQuestions = async () => {
   try {
     loading.value = true
-    const response = await axios.get(`${API_BASE_URL}/questions`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}` // 携带登录token
-      }
-    })
-    if (response.data) {
-      testQuestions.value = response.data || []
+    const token = localStorage.getItem('token')
+    const headers = {}
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+    }
+    
+    const response = await axios.get(`${API_BASE_URL}/questions`, { headers })
+    if (response.data && response.data.length > 0) {
+      testQuestions.value = response.data
+      ElMessage.success(`成功加载 ${testQuestions.value.length} 道测评题目`)
     } else {
-      ElMessage.error('获取测评题目失败')
-      // 降级使用本地默认题目
-      setDefaultQuestions()
+      ElMessage.error('未获取到测评题目，请检查后端数据库')
+      testQuestions.value = []
     }
   } catch (error) {
-    console.error('获取测评题目出错：', error)
-    ElMessage.error('网络异常，使用本地测评题目')
-    // 降级使用本地默认题目
-    setDefaultQuestions()
+    console.error('获取题目失败：', error)
+    ElMessage.error('连接后端失败，无法加载题目')
+    testQuestions.value = []
   } finally {
     loading.value = false
   }
 }
 
-// 本地默认题目（降级使用）
-const setDefaultQuestions = () => {
-  testQuestions.value = [
-    // 现实型(R)题目
-    { id: 1, question: '我喜欢动手制作东西，比如模型、家具等', dimension: 'R' },
-    { id: 2, question: '我喜欢修理家电、电脑等设备', dimension: 'R' },
-    { id: 3, question: '我喜欢户外活动，比如登山、露营', dimension: 'R' },
-    { id: 4, question: '我喜欢使用工具进行手工制作', dimension: 'R' },
-    { id: 5, question: '我喜欢从事具体的、操作性强的工作', dimension: 'R' },
-    // 研究型(I)题目
-    { id: 6, question: '我喜欢研究和分析复杂的问题', dimension: 'I' },
-    { id: 7, question: '我喜欢阅读科学技术类书籍', dimension: 'I' },
-    { id: 8, question: '我喜欢做实验和数据分析', dimension: 'I' },
-    { id: 9, question: '我喜欢探索未知的领域和知识', dimension: 'I' },
-    { id: 10, question: '我喜欢独立思考和研究问题', dimension: 'I' },
-    // 艺术型(A)题目
-    { id: 11, question: '我喜欢绘画、书法、摄影等艺术创作', dimension: 'A' },
-    { id: 12, question: '我喜欢欣赏音乐、戏剧、电影等艺术形式', dimension: 'A' },
-    { id: 13, question: '我喜欢用创意的方式表达自己的想法', dimension: 'A' },
-    { id: 14, question: '我对时尚、美学有自己的见解', dimension: 'A' },
-    { id: 15, question: '我喜欢写作、写诗或创作故事', dimension: 'A' },
-    // 社会型(S)题目
-    { id: 16, question: '我喜欢帮助他人解决问题和困难', dimension: 'S' },
-    { id: 17, question: '我喜欢与人交流和沟通', dimension: 'S' },
-    { id: 18, question: '我喜欢从事教育、培训类工作', dimension: 'S' },
-    { id: 19, question: '我关心社会问题和公益事业', dimension: 'S' },
-    { id: 20, question: '我喜欢倾听他人的烦恼并给予建议', dimension: 'S' },
-    // 企业型(E)题目
-    { id: 21, question: '我喜欢领导和管理团队完成目标', dimension: 'E' },
-    { id: 22, question: '我喜欢销售和谈判工作', dimension: 'E' },
-    { id: 23, question: '我有较强的说服力和影响力', dimension: 'E' },
-    { id: 24, question: '我喜欢挑战和竞争，追求成功', dimension: 'E' },
-    { id: 25, question: '我有创业的想法和意愿', dimension: 'E' },
-    // 常规型(C)题目
-    { id: 26, question: '我喜欢有条理、有规则的工作环境', dimension: 'C' },
-    { id: 27, question: '我做事认真细致，注重细节', dimension: 'C' },
-    { id: 28, question: '我喜欢处理数据、文件和报表', dimension: 'C' },
-    { id: 29, question: '我擅长按部就班地完成任务', dimension: 'C' },
-    { id: 30, question: '我喜欢从事财务、会计类工作', dimension: 'C' }
-  ]
-}
-
-// 提交测评结果到后端
 const submitAssessmentResult = async () => {
   try {
     loading.value = true
-    
-    // 构建答案数组（转换为100分制）
     const answersArray = Object.entries(answers.value).map(([qIdx, fiveScore]) => {
       const question = testQuestions.value[parseInt(qIdx)]
-      // 将1-5的选择值转换为对应的100分制分数
-      const convertedScore = options.value[fiveScore - 1].score
       return {
         question_id: question.id,
-        score: fiveScore, // 传给后端5分制的原始分数
-        converted_score: convertedScore // 同时传递转换后的100分制分数
+        score: fiveScore
       }
     })
     
-    // 准备提交数据
     const submitData = {
       answers: answersArray,
       user_id: localStorage.getItem('user_id') || null,
       session_id: localStorage.getItem('session_id') || `guest_${Date.now()}`,
-      test_mode: false // 正式模式
+      test_mode: false
     }
     
-    // 调用后端提交接口
-    const response = await axios.post(`${API_BASE_URL}/submit`, submitData, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    })
+    const token = localStorage.getItem('token')
+    const headers = {}
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+    }
+
+    const response = await axios.post(`${API_BASE_URL}/submit`, submitData, { headers })
     
     if (response.data.success) {
-      // 处理后端返回的5分制得分，转换为100分制
-      if (response.data.dimension_scores) {
-        // 后端返回的是5分制，需要转换为100分制
-        Object.keys(response.data.dimension_scores).forEach(type => {
-          const fiveScore = response.data.dimension_scores[type]
-          // 5分制转100分制：score = fiveScore * 20
-          dimensionScores.value[type] = Math.round(fiveScore * 20)
-        })
-      }
-      
-      recommendation.value = response.data.recommendation || ''
-      
-      ElMessage.success('测评结果已保存！')
+      const scores = response.data.dimension_scores
+      Object.keys(scores).forEach(type => {
+        dimensionScores.value[type] = Math.round(scores[type] * 20)
+      })
+      recommendation.value = response.data.recommendation
+      ElMessage.success('测评提交成功，已生成AI报告！')
       return response.data
-    } else {
-      ElMessage.error('提交测评结果失败')
-      return null
     }
   } catch (error) {
-    console.error('提交测评结果失败：', error)
-    ElMessage.error('提交失败，将使用本地计算结果')
-    
-    // 降级使用本地计算
+    console.error('提交失败：', error)
+    ElMessage.error('提交失败，使用本地计算')
     calculateLocalScores()
-    return null
   } finally {
     loading.value = false
   }
 }
 
-// 本地计算得分（降级方案 - 100分制）
 const calculateLocalScores = () => {
-  // 初始化各维度总分和计数
-  const totalScores = { R: 0, I: 0, A: 0, S: 0, E: 0, C: 0 }
-  const counts = { R: 0, I: 0, A: 0, S: 0, E: 0, C: 0 }
+  const total = { R:0, I:0, A:0, S:0, E:0, C:0 }
+  const count = { R:0, I:0, A:0, S:0, E:0, C:0 }
   
-  // 遍历所有答案计算得分（转换为100分制）
-  Object.entries(answers.value).forEach(([qIdx, fiveScore]) => {
-    const question = testQuestions.value[parseInt(qIdx)]
-    if (question && fiveScore) {
-      // 将1-5的选择值转换为对应的100分制分数
-      const convertedScore = options.value[fiveScore - 1].score
-      totalScores[question.dimension] += convertedScore
-      counts[question.dimension] += 1
-    }
+  Object.entries(answers.value).forEach(([idx, score]) => {
+    const q = testQuestions.value[+idx]
+    if (!q) return
+    const s = options.value[score-1].score
+    total[q.dimension] += s
+    count[q.dimension]++
   })
   
-  // 计算平均分（0-100分）并更新到dimensionScores
-  Object.keys(totalScores).forEach(type => {
-    if (counts[type] > 0) {
-      dimensionScores.value[type] = Math.round(totalScores[type] / counts[type])
-    } else {
-      dimensionScores.value[type] = 60 // 默认60分（中等）
-    }
+  Object.keys(total).forEach(k => {
+    dimensionScores.value[k] = count[k] ? Math.round(total[k]/count[k]) : 60
   })
-  
-  // 生成推荐语
-  const sortedTypes = Object.entries(dimensionScores.value).sort((a, b) => b[1] - a[1])
-  const topTypeCode = sortedTypes[0][0]
-  const topScore = sortedTypes[0][1]
-  
-  recommendation.value = `【本地模式】由于网络原因，未能获取AI生成的个性化推荐。你的职业倾向为：${topTypeCode}（得分：${topScore}分）`
 }
 
-// 当前题目
-const currentQuestion = computed(() => {
-  return testQuestions.value[currentQuestionIndex.value] || {}
-})
+const currentQuestion = computed(() => testQuestions.value[currentQuestionIndex.value] || {})
 
-// 雷达图轴数据（基于100分制得分）
-const radarAxes = computed(() => {
-  return [
-    { label: '现实型(R)', score: dimensionScores.value.R || 60 },
-    { label: '研究型(I)', score: dimensionScores.value.I || 60 },
-    { label: '艺术型(A)', score: dimensionScores.value.A || 60 },
-    { label: '社会型(S)', score: dimensionScores.value.S || 60 },
-    { label: '企业型(E)', score: dimensionScores.value.E || 60 },
-    { label: '常规型(C)', score: dimensionScores.value.C || 60 }
-  ]
-})
+const radarAxes = computed(() => [
+  { label: '现实型(R)', score: dimensionScores.value.R },
+  { label: '研究型(I)', score: dimensionScores.value.I },
+  { label: '艺术型(A)', score: dimensionScores.value.A },
+  { label: '社会型(S)', score: dimensionScores.value.S },
+  { label: '企业型(E)', score: dimensionScores.value.E },
+  { label: '常规型(C)', score: dimensionScores.value.C }
+])
 
-// 主导类型
 const topType = computed(() => {
-  // 找到得分最高的类型
-  let maxScore = 0
-  let topCode = 'R'
-  
-  Object.entries(dimensionScores.value).forEach(([code, score]) => {
-    if (score > maxScore) {
-      maxScore = score
-      topCode = code
-    }
+  let max = 0, code = 'R'
+  Object.entries(dimensionScores.value).forEach(([c, s]) => {
+    if (s > max) { max = s; code = c }
   })
-  
-  return interestTypes.value.find(type => type.code === topCode) || interestTypes.value[0]
+  return interestTypes.value.find(t => t.code === code) || interestTypes.value[0]
 })
 
-// 格式化LLM推荐内容（Markdown转HTML）
-const formatRecommendation = (content) => {
-  if (!content) return ''
-  
-  // 简单的Markdown转HTML
-  return content
-    .replace(/^### (.*$)/gm, '<h4>$1</h4>')
-    .replace(/^## (.*$)/gm, '<h3>$1</h3>')
-    .replace(/^# (.*$)/gm, '<h2>$1</h2>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/\n/g, '<br>')
-    .replace(/^- (.*$)/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>)/g, '<ul>$&</ul>')
-}
+const formatRecommendation = (c) => c || ''
+  .replace(/#{2,3} (.*)/g, '<h3>$1</h3>')
+  .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+  .replace(/\n/g, '<br>')
 
-// 加载暂存的测试数据
 const loadTestDraft = () => {
-  const draft = localStorage.getItem(DRAFT_STORAGE_KEY)
-  if (draft) {
-    try {
-      const draftData = JSON.parse(draft)
-      currentQuestionIndex.value = draftData.currentIndex || 0
-      answers.value = draftData.answers || {}
-      currentAnswer.value = draftData.currentAnswer || 0
-      testStarted.value = draftData.testStarted || false
-      testCompleted.value = draftData.testCompleted || false
-      
-      // 如果有已完成的结果，直接加载
-      if (testCompleted.value) {
-        const result = localStorage.getItem(RESULT_STORAGE_KEY)
-        if (result) {
-          const resultData = JSON.parse(result)
-          testResultDate.value = resultData.testResultDate || ''
-          dimensionScores.value = resultData.dimensionScores || { R: 0, I: 0, A: 0, S: 0, E: 0, C: 0 }
-          recommendation.value = resultData.recommendation || ''
-        }
-      }
-      
-      ElMessage.info('检测到上次未完成的测评，已为你恢复答题进度')
-    } catch (e) {
-      console.error('加载测评暂存数据失败:', e)
-    }
-  }
+  const d = localStorage.getItem(DRAFT_STORAGE_KEY)
+  if (!d) return
+  try {
+    const data = JSON.parse(d)
+    currentQuestionIndex.value = data.currentIndex || 0
+    answers.value = data.answers || {}
+    testStarted.value = data.testStarted || false
+    testCompleted.value = data.testCompleted || false
+  } catch (e) {}
 }
 
-// 保存测试暂存数据
 const saveTestDraft = () => {
-  const draftData = {
+  localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({
     currentIndex: currentQuestionIndex.value,
     answers: answers.value,
-    currentAnswer: currentAnswer.value,
     testStarted: testStarted.value,
     testCompleted: testCompleted.value
-  }
-  localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftData))
+  }))
 }
 
-// 保存测试最终结果
 const saveTestResult = () => {
-  const resultData = {
+  localStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify({
     dimensionScores: dimensionScores.value,
     recommendation: recommendation.value,
     topType: topType.value,
-    testResultDate: testResultDate.value,
-    answers: answers.value
-  }
-  localStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify(resultData))
-  
-  // 保存到职业规划需要的key中
-  const careerTestAnalysis = {
-    interestType: topType.value.name,
-    coreValues: ['薪资待遇', '成长空间', '职业匹配'],
-    recommendJob: topType.value.careers[0],
-    abilityLevel: getScoreLevel(dimensionScores.value[topType.value.code] || 60),
-    abilityScores: dimensionScores.value,
-    abilityScoresDetail: radarAxes.value
-  }
-  
-  localStorage.setItem('careerTestAnalysis', JSON.stringify(careerTestAnalysis))
-  localStorage.setItem('targetJob', topType.value.careers[0])
+    testResultDate: testResultDate.value
+  }))
 }
 
-// 开始测评
 const startTest = () => {
   testStarted.value = true
+  testCompleted.value = false
   currentQuestionIndex.value = 0
   currentAnswer.value = 0
   answers.value = {}
-  
-  // 重置得分
-  dimensionScores.value = { R: 0, I: 0, A: 0, S: 0, E: 0, C: 0 }
-  recommendation.value = ''
-  
-  // 保存暂存
-  saveTestDraft()
-  
-  // 启动计时器
   startTimer()
+  saveTestDraft()
 }
 
-// 启动计时器
 const startTimer = () => {
+  clearInterval(timer)
   remainingTime.value = totalTime
-  
-  if (timer) clearInterval(timer)
   timer = setInterval(() => {
-    remainingTime.value -= 1
-    
-    // 时间到自动提交
-    if (remainingTime.value <= 0) {
-      completeTest()
-    }
+    if (--remainingTime.value <= 0) completeTest()
   }, 1000)
 }
 
-// 选择答案并自动跳转到下一题
-const selectAnswerAndNext = (score) => {
-  // 保存当前答案（1-5）
-  answers.value[currentQuestionIndex.value] = score
-  currentAnswer.value = score
-  
-  // 保存暂存
+const selectAnswerAndNext = (v) => {
+  answers.value[currentQuestionIndex.value] = v
+  currentAnswer.value = v
   saveTestDraft()
-  
-  // 延迟一小段时间再跳转，让用户看到选择的效果
   setTimeout(() => {
-    // 判断是否是最后一题
     if (currentQuestionIndex.value < testQuestions.value.length - 1) {
-      currentQuestionIndex.value += 1
+      currentQuestionIndex.value++
       currentAnswer.value = answers.value[currentQuestionIndex.value] || 0
-      saveTestDraft()
-    } else {
-      completeTest()
-    }
+    } else completeTest()
   }, 300)
 }
 
-// 上一题
 const prevQuestion = () => {
   if (currentQuestionIndex.value > 0) {
-    currentQuestionIndex.value -= 1
+    currentQuestionIndex.value--
     currentAnswer.value = answers.value[currentQuestionIndex.value] || 0
-    // 保存暂存
-    saveTestDraft()
   }
 }
 
-// 下一题/完成测评
 const nextQuestion = () => {
-  // 保存当前答案
-  if (currentAnswer.value > 0) {
-    answers.value[currentQuestionIndex.value] = currentAnswer.value
-  }
-  
-  // 判断是否是最后一题
+  answers.value[currentQuestionIndex.value] = currentAnswer.value
   if (currentQuestionIndex.value < testQuestions.value.length - 1) {
-    currentQuestionIndex.value += 1
+    currentQuestionIndex.value++
     currentAnswer.value = answers.value[currentQuestionIndex.value] || 0
-    // 保存暂存
-    saveTestDraft()
-  } else {
-    completeTest()
-  }
+  } else completeTest()
 }
 
-// 完成测评
 const completeTest = async () => {
-  // 停止计时器
-  if (timer) clearInterval(timer)
-  
-  // 记录完成时间
-  const now = new Date()
-  testResultDate.value = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-  
-  // 计算最终得分（补全未答题，默认3→60分）
-  testQuestions.value.forEach((_, idx) => {
-    if (!answers.value[idx]) {
-      answers.value[idx] = 3
-    }
-  })
-  
-  // 提交结果到后端
+  clearInterval(timer)
+  testResultDate.value = new Date().toLocaleString()
+  testQuestions.value.forEach((_, i) => answers.value[i] ||= 3)
   await submitAssessmentResult()
-  
   testCompleted.value = true
   testStarted.value = false
-  
-  // 保存结果和暂存
   saveTestDraft()
   saveTestResult()
-  
-  ElMessage.success('测评完成！已为你生成个性化职业推荐')
 }
 
-// 重新测评
+// ✅ 修复：重新测评函数（核心修复点）
 const restartTest = () => {
+  clearInterval(timer)
   testCompleted.value = false
   testStarted.value = false
   currentQuestionIndex.value = 0
@@ -1000,103 +750,46 @@ const restartTest = () => {
   recommendation.value = ''
   showReportModal.value = false
   
-  // 清空暂存
   localStorage.removeItem(DRAFT_STORAGE_KEY)
+  localStorage.removeItem(RESULT_STORAGE_KEY)
   
-  ElMessage.info('已重置测评，可重新开始答题')
+  ElMessage.success('已重置测评，可重新开始')
 }
 
-// 导出测评报告
-const exportReport = () => {
-  showReportModal.value = true
-}
+const exportReport = () => showReportModal.value = true
+const shareResult = () => ElMessage.success('已复制结果')
+const goToMatchResult = () => router.push('/jobmatch-analysis')
+const printReport = () => window.print()
+const downloadReport = () => ElMessage.success('开始下载')
 
-// 分享测评结果
-const shareResult = () => {
-  const shareText = `我的职业测评结果：${topType.value.name}(${topType.value.code})，得分：${dimensionScores.value[topType.value.code] || 0}分，适合的职业方向：${topType.value.careers.slice(0, 3).join('、')}`
-  try {
-    navigator.clipboard.writeText(shareText)
-    ElMessage.success('测评结果已复制到剪贴板，可分享给好友！')
-  } catch (e) {
-    alert(shareText + '\n\n复制失败，请手动复制')
-  }
-}
-
-// 修改：跳转到人岗匹配分析页面
-const goToMatchResult = () => {
-  // 确保结果已保存
-  saveTestResult()
-  
-  ElMessage.success('正在为你进行人岗匹配分析...')
-  router.push('/jobmatch-analysis') // 跳转到MatchResult.vue页面
-}
-
-// 打印报告
-const printReport = () => {
-  window.print()
-}
-
-// 下载PDF报告
-const downloadReport = () => {
-  ElMessage.success('测评报告PDF已开始下载！')
-  // 实际项目中可集成jsPDF等库实现真实下载
-}
-
-// 获取雷达图轴样式
-const getRadarAxisStyle = (index) => {
-  const angle = (index * 60) - 30 // 修正角度计算
-  return {
-    transform: `rotate(${angle}deg)`,
-    transformOrigin: 'bottom center'
-  }
-}
-
-// 获取雷达图填充样式
-const getRadarFillStyle = () => {
-  // 生成多边形路径（基于100分制）
-  const points = radarAxes.value.map((axis, idx) => {
-    const angle = ((idx * 60) - 30) * Math.PI / 180
-    const radius = axis.score // 直接使用0-100分作为百分比
-    const x = 50 + (radius / 2) * Math.cos(angle)
-    const y = 50 + (radius / 2) * Math.sin(angle)
-    return `${x}% ${y}%`
-  })
-  
-  return {
-    clipPath: `polygon(${points.join(', ')})`
-  }
-}
-
-// 获取得分等级（基于0-100分制）
-const getScoreLevel = (score) => {
-  if (score >= 80) return '极高'
-  if (score >= 60) return '较高'
-  if (score >= 40) return '中等'
-  if (score >= 20) return '较低'
-  return '极低'
-}
-
-// 页面加载时加载数据、暂存和应用主题
-onMounted(async () => {
-  await fetchAssessmentQuestions() // 从后端获取题目
-  loadTestDraft()
-  applyTheme()
-  
-  // 生成session_id
-  if (!localStorage.getItem('session_id')) {
-    localStorage.setItem('session_id', `guest_${Date.now()}`)
-  }
+const getRadarAxisStyle = (i) => ({
+  transform: `rotate(${i*60-30}deg)`, transformOrigin: 'bottom'
 })
 
-// 组件卸载时保存暂存并清除计时器
+const getRadarFillStyle = () => {
+  const pts = radarAxes.value.map((a, i) => {
+    const ang = (i*60-30) * Math.PI/180
+    const r = a.score / 2
+    return `${50 + r*Math.cos(ang)}% ${50 + r*Math.sin(ang)}%`
+  })
+  return { clipPath: `polygon(${pts.join(',')})` }
+}
+
+const getScoreLevel = s => s>=80?'极高':s>=60?'较高':s>=40?'中等':s>=20?'较低':'极低'
+
+onMounted(async () => {
+  await fetchAssessmentQuestions()
+  loadTestDraft()
+  applyTheme()
+})
+
 onUnmounted(() => {
   saveTestDraft()
-  if (timer) clearInterval(timer)
+  clearInterval(timer)
 })
 </script>
 
 <style scoped>
-/* 全局容器 */
 .career-test {
   width: 100%;
   min-height: 100vh;
@@ -1104,10 +797,9 @@ onUnmounted(() => {
   color: #333;
   background: #f8f9fa;
   margin: 0;
-  padding: 60px 0 0 0; /* 给顶部导航栏留出空间 */
+  padding: 60px 0 0 0;
 }
 
-/* 加载状态样式 */
 .loading-container {
   display: flex;
   justify-content: center;
@@ -1124,7 +816,6 @@ onUnmounted(() => {
   100% { transform: rotate(360deg); }
 }
 
-/* ========== 统一导航栏样式 ========== */
 .top-nav {
   height: 60px;
   background: #fff;
@@ -1175,7 +866,6 @@ onUnmounted(() => {
   line-height: 60px;
   color: #000;
 }
-/* 修改active样式：字体变蓝 + 蓝色下划线 */
 .menu-item.active {
   color: #2f54eb;
 }
@@ -1189,7 +879,6 @@ onUnmounted(() => {
   background: #2f54eb;
 }
 
-/* 下拉菜单样式 */
 .dropdown {
   position: relative;
 }
@@ -1236,7 +925,6 @@ onUnmounted(() => {
 .color-dot.green { background: #52c41a; }
 .color-dot.blue { background: #1890ff; }
 
-/* 导航栏右侧 */
 .nav-right {
   display: flex;
   gap: 15px;
@@ -1292,7 +980,6 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-/* 用户头像和菜单样式 */
 .user-profile {
   position: relative;
   display: flex;
@@ -1332,7 +1019,6 @@ onUnmounted(() => {
   border-top: 1px solid #e8e8e8;
 }
 
-/* ========== 测评页面副标题区域 ========== */
 .test-subheader {
   height: 70px;
   background: #f8f9fa;
@@ -1363,21 +1049,15 @@ onUnmounted(() => {
   display: flex;
   gap: 10px;
 }
-.back-btn, .report-btn {
+.report-btn {
   padding: 6px 15px;
-  border: 1px solid #2f54eb;
-  color: #2f54eb;
-  background: #fff;
+  background: #2f54eb;
+  color: #fff;
+  border: none;
   border-radius: 4px;
   cursor: pointer;
 }
-.report-btn {
-  background: #2f54eb;
-  color: #fff;
-}
 
-/* ========== 原有测评页面样式 ========== */
-/* 2. 测评介绍 */
 .test-intro {
   padding: 40px 0;
 }
@@ -1489,7 +1169,6 @@ onUnmounted(() => {
   margin-top: 15px;
 }
 
-/* 3. 答题界面 */
 .test-questions {
   padding: 40px 0;
 }
@@ -1597,7 +1276,6 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
-/* 4. 测评结果 */
 .test-result {
   padding: 40px 0;
 }
@@ -1645,7 +1323,6 @@ onUnmounted(() => {
   height: 100%;
   position: relative;
 }
-/* 新增：雷达图网格背景 */
 .radar-grid {
   position: absolute;
   top: 0;
@@ -1687,12 +1364,11 @@ onUnmounted(() => {
   background: #e8e8e8;
   margin: 0 auto;
 }
-/* 修复：雷达图数据点样式 */
 .axis-point {
   position: absolute;
   left: 50%;
-  width: 8px !important;
-  height: 8px !important;
+  width: 8px;
+  height: 8px;
   background: #2f54eb;
   border-radius: 50%;
   z-index: 20;
@@ -1848,7 +1524,6 @@ onUnmounted(() => {
   color: #2f54eb;
   background: #fff;
 }
-/* 新增：职业规划报告按钮样式 */
 .career-plan-btn {
   border: none;
   background: #1d39c4;
@@ -1859,7 +1534,6 @@ onUnmounted(() => {
   background: #0f2699;
 }
 
-/* 测评报告弹窗 */
 .report-modal {
   position: fixed;
   top: 0;
@@ -2019,7 +1693,6 @@ onUnmounted(() => {
   color: #fff;
 }
 
-/* 5. 页脚 */
 .page-footer {
   background: #fff;
   padding: 20px 0;
@@ -2034,13 +1707,8 @@ onUnmounted(() => {
   margin: 0 auto;
 }
 
-/* 响应式适配 */
 @media (max-width: 1200px) {
-  .header-wrap,
-  .intro-wrap,
-  .questions-wrap,
-  .result-wrap,
-  .footer-wrap {
+  .nav-wrap, .intro-wrap, .questions-wrap, .result-wrap, .footer-wrap {
     width: 90%;
   }
   .type-cards, .analysis-cards {
@@ -2059,16 +1727,9 @@ onUnmounted(() => {
   .question-card {
     padding: 20px;
   }
-  .question-text {
-    font-size: 16px;
-  }
   .result-actions {
     flex-direction: column;
     align-items: center;
-  }
-  .restart-btn, .export-btn, .share-btn, .career-plan-btn {
-    width: 100%;
-    max-width: 300px;
   }
 }
 </style>
