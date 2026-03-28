@@ -1,65 +1,80 @@
 <template>
   <div class="ability-profile-page">
+    <!-- 顶部导航栏 -->
     <header class="top-nav">
       <div class="nav-wrap">
         <div class="nav-left">
           <div class="logo">
-            <span class="logo-icon">🎯</span>
-            <span class="logo-text">大学生职业规划系统</span>
+            <span class="logo-icon">🎓</span>
+            <span>学生就业能力平台</span>
           </div>
           <ul class="nav-menu">
             <li class="menu-item" @click="$router.push('/')">首页</li>
+            <li class="menu-item" @click="$router.push('/student-ability')">学生信息</li>
             <li class="menu-item active" @click="$router.push('/ability-analysis')">职业规划</li>
             <li class="menu-item" @click="$router.push('/resource-library')">资源库</li>
             <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
             <li class="menu-item dropdown">
-              核心功能 ▼
+              <span>功能中心</span>
               <ul class="dropdown-menu">
                 <li class="dropdown-item" @click="goToFeature('测评')">
-                  <span class="color-dot red"></span> 职业兴趣测评
+                  <span class="color-dot orange"></span>兴趣测评
                 </li>
                 <li class="dropdown-item" @click="goToFeature('分析')">
-                  <span class="color-dot orange"></span> 能力短板分析
+                  <span class="color-dot blue"></span>能力分析
                 </li>
                 <li class="dropdown-item" @click="goToFeature('规划')">
-                  <span class="color-dot green"></span> 发展路径规划
+                  <span class="color-dot green"></span>发展规划
                 </li>
                 <li class="dropdown-item" @click="goToFeature('导出')">
-                  <span class="color-dot blue"></span> 规划报告导出
+                  <span class="color-dot red"></span>报告导出
                 </li>
               </ul>
             </li>
           </ul>
         </div>
+
         <div class="nav-right">
           <div class="nav-search-wrap">
-            <input type="text" class="nav-search-input" placeholder="搜索..." @keyup.enter="handleSearch" />
+            <input class="nav-search-input" placeholder="搜索资源/岗位" />
             <button class="nav-search-btn" @click="handleSearch">搜索</button>
           </div>
-          <button class="btn-toggle-theme" @click="toggleTheme">🌙</button>
-          <button class="btn-login" @click="$router.push('/login')" v-if="!isLogin">登录</button>
-          <button class="btn-register" @click="$router.push('/register')" v-if="!isLogin">注册</button>
-          <div class="user-profile" v-if="isLogin">
-            <img :src="userAvatar || 'https://picsum.photos/seed/avatar/40/40'" alt="头像" class="avatar" @click="toggleUserMenu" />
-            <div class="user-menu" v-show="isUserMenuOpen">
-              <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
-              <div class="menu-item" @click="$router.push('/settings')">账号设置</div>
+          <button class="btn-toggle-theme" @click="toggleTheme">
+            {{ darkMode ? '☀️' : '🌙' }}
+          </button>
+
+          <div v-if="isLogin" class="user-profile">
+            <img
+              :src="userAvatar || 'https://picsum.photos/200/200'"
+              class="avatar"
+              @click="toggleUserMenu"
+            />
+            <div v-if="isUserMenuOpen" class="user-menu">
+              <div class="menu-item">个人中心</div>
+              <div class="menu-item">我的简历</div>
               <div class="menu-item logout" @click="handleLogout">退出登录</div>
             </div>
+          </div>
+          <div v-else>
+            <button class="btn-login" @click="$router.push('/login')">登录</button>
+            <button class="btn-register" @click="$router.push('/register')">注册</button>
           </div>
         </div>
       </div>
     </header>
 
+    <!-- AI能力画像核心展示区域 -->
     <div class="profile-container">
       <div class="step-content glass-panel">
         <h2 class="section-title">🤖 AI 学生就业能力画像</h2>
 
+        <!-- 加载状态 -->
         <div v-if="generatingProfile" class="loading-container">
           <div class="loading-spinner">🔄</div>
           <p class="loading-text">AI 正在分析你的简历数据，生成多维度能力画像...</p>
         </div>
 
+        <!-- 画像结果 -->
         <div v-else-if="profileGenerated" class="profile-result">
           <!-- 基础信息横向卡片 -->
           <div class="basic-info-card card-effect">
@@ -91,17 +106,19 @@
               </div>
               <p class="score-desc">{{ getCompletenessDesc(profile.completeness) }}</p>
             </div>
+
             <div class="score-card card-effect">
               <span class="score-type">综合竞争力</span>
               <span class="score-num">{{ isCompetitiveScoreValid ? getCompetitiveScore() + '%' : '--' }}</span>
               <div class="score-bar">
                 <div class="bar-fill" v-if="isCompetitiveScoreValid" :style="{ width: getCompetitiveScore() + '%', background: getScoreColor(getCompetitiveScore()) }"></div>
-                <div v-else class="bar-empty" style="width: 100%; height: 100%; background: #e2e8f0;"></div>
+                <div v-else class="bar-empty"></div>
               </div>
               <p class="score-desc">{{ isCompetitiveScoreValid ? getCompetitiveDesc(getCompetitiveScore()) : '暂无足够简历信息评估综合竞争力' }}</p>
             </div>
           </div>
 
+          <!-- 软能力维度 -->
           <div class="dimension-scores">
             <h3 class="dimension-title">📊 软能力维度评分</h3>
             <div class="radar-chart-container card-effect">
@@ -113,12 +130,13 @@
                 <div class="dimension-bar">
                   <div class="bar-fill" :style="{ width: (item.score * 20) + '%', background: getScoreColor(item.score * 20) }"></div>
                 </div>
-                <div class="dimension-score">{{ item.score * 20 }}分</div>
+                <div class="dimension-score">{{ item.score === 0 ? '--' : item.score * 20 }}分</div>
                 <div class="dimension-tip">{{ item.description || '暂无评价' }}</div>
               </div>
             </div>
           </div>
 
+          <!-- 技能 & 证书 -->
           <div class="skill-cert-section">
             <div class="skill-card card-effect">
               <h3 class="skill-title">💻 专业技能</h3>
@@ -140,6 +158,7 @@
             </div>
           </div>
 
+          <!-- 经历 -->
           <div class="experience-section">
             <div class="exp-card card-effect">
               <h3 class="exp-title">🎓 教育经历</h3>
@@ -160,7 +179,7 @@
                     <p class="work-header">{{ work.company }} {{ work.position }} <span class="date-range">({{ work.date_range || '时间未填写' }})</span></p>
                     <p class="work-content">职责：{{ work.responsibilities || '未填写' }}</p>
                     <p class="work-achievements">成果：{{ work.achievements || '无' }}</p>
-                    <hr v-if="idx < profile.work_json.length - 1">
+                    <hr v-if="idx < profile.work_json.length - 1" />
                   </div>
                 </div>
                 <p v-else>{{ profile.work_text || '暂无工作/实习经历' }}</p>
@@ -175,7 +194,7 @@
                     <p class="project-tech">技术栈：{{ proj.technology_stack || '未填写' }}</p>
                     <p class="project-desc">描述：{{ proj.description || '未填写' }}</p>
                     <p class="project-outcome">成果：{{ proj.outcome || '无' }}</p>
-                    <hr v-if="idx < profile.project_json.length - 1">
+                    <hr v-if="idx < profile.project_json.length - 1" />
                   </div>
                 </div>
                 <p v-else>{{ profile.project_text || '暂无项目经历' }}</p>
@@ -183,11 +202,13 @@
             </div>
           </div>
 
+          <!-- AI评价 -->
           <div class="ai-evaluation card-effect">
             <h3 class="eval-title">📝 AI 综合能力评价</h3>
             <div class="eval-content">{{ profile.aiEvaluation }}</div>
           </div>
 
+          <!-- 操作按钮 -->
           <div class="profile-actions">
             <el-button class="btn-effect" @click="regenerateProfile" :loading="generatingProfile">重新生成画像</el-button>
             <el-button class="btn-effect" type="info" @click="goToEditInfo">重新填写学生信息</el-button>
@@ -196,6 +217,7 @@
           </div>
         </div>
 
+        <!-- 未生成状态 -->
         <div v-else class="empty-profile">
           <p class="empty-text">暂无能力画像数据，请先完成简历上传/手动录入</p>
           <el-button class="btn-effect" type="primary" @click="goBack">返回填写信息</el-button>
@@ -215,11 +237,13 @@ import * as echarts from 'echarts'
 const router = useRouter()
 const route = useRoute()
 
+// 导航状态
 const isLogin = ref(!!localStorage.getItem('token'))
 const userAvatar = ref(localStorage.getItem('avatar') || '')
 const isUserMenuOpen = ref(false)
 const darkMode = ref(localStorage.getItem('darkMode') === 'true')
 
+// 请求配置
 const token = localStorage.getItem('token')
 const userId = ref(localStorage.getItem('userId') || 3)
 const studentId = ref(route.query.studentId || localStorage.getItem('studentId') || 1)
@@ -230,6 +254,7 @@ const api = axios.create({
   timeout: 30000
 })
 
+// 核心状态
 const generatingProfile = ref(false)
 const profileGenerated = ref(false)
 const profile = reactive({
@@ -239,13 +264,16 @@ const profile = reactive({
   project_text: '', project_json: [], aiEvaluation: ''
 })
 
-const isCompetitiveScoreValid = computed(() => {
-  const softAbilities = getSoftAbilityList()
-  return Object.values(softAbilities).some(item => item.score > 0)
-})
-
+// 雷达图实例
 let radarChartInstance = null
 
+// 计算竞争力是否有效
+const isCompetitiveScoreValid = computed(() => {
+  const soft = getSoftAbilityList()
+  return Object.values(soft).some(item => item.score > 0)
+})
+
+// 初始化
 onMounted(() => {
   getProfileData()
 })
@@ -254,46 +282,35 @@ watch(() => profile.soft_abilities, () => {
   if (profileGenerated.value) initRadarChart()
 }, { deep: true })
 
+// 初始化雷达图
 const initRadarChart = () => {
   const chartDom = document.getElementById('softAbilityRadarChart')
-  if (!chartDom) { return setTimeout(() => initRadarChart(), 120) }
+  if (!chartDom) return setTimeout(() => initRadarChart(), 150)
 
   if (radarChartInstance) radarChartInstance.dispose()
   radarChartInstance = echarts.init(chartDom)
 
-  const softAbilities = getSoftAbilityList()
-  const categories = Object.keys(softAbilities)
-  const values = Object.values(softAbilities).map(item => item.score * 20)
+  const soft = getSoftAbilityList()
+  const categories = Object.keys(soft)
+  const values = Object.values(soft).map(i => i.score * 20)
 
   const option = {
-    title: { text: '软能力维度分布', left: 'center', textStyle: { fontSize: 16, fontWeight: 600, color: '#1f2937' } },
+    title: { text: '软能力维度分布', left: 'center', textStyle: { fontSize: 16, fontWeight: 600 } },
     tooltip: { trigger: 'item', formatter: '{b}: {c}分' },
-    legend: { orient: 'vertical', right: 10, top: 'center', data: ['个人能力评分'] },
     radar: {
-      indicator: categories.map(name => ({ name, max: 100, min: 0 })),
-      shape: 'polygon', splitNumber: 5,
-      name: { textStyle: { color: '#334155', fontSize: 12 } },
-      splitLine: { lineStyle: { color: 'rgba(0,0,0,0.1)' } },
-      splitArea: { areaStyle: { color: ['rgba(255,255,255,0.8)', 'rgba(245,247,250,0.8)'] } }
+      indicator: categories.map(name => ({ name, max: 100 })),
+      shape: 'polygon', splitNumber: 5
     },
     series: [{
-      name: '个人能力评分', type: 'radar',
-      data: [{
-        value: values, name: '个人能力评分',
-        areaStyle: { color: 'rgba(37, 99, 235, 0.2)' },
-        lineStyle: { color: '#2563eb', width: 2 },
-        itemStyle: { color: '#2563eb', borderColor: '#fff', borderWidth: 2 },
-        symbol: 'circle', symbolSize: 8
-      }]
-    }],
-    backgroundColor: 'transparent'
+      name: '评分', type: 'radar',
+      data: [{ value: values, areaStyle: { color: 'rgba(37,99,235,0.2)' } }]
+    }]
   }
-
   radarChartInstance.setOption(option)
-  const resizeFn = () => radarChartInstance?.resize()
-  window.addEventListener('resize', resizeFn)
+  window.addEventListener('resize', () => radarChartInstance?.resize())
 }
 
+// 获取画像数据
 const getProfileData = async () => {
   try {
     generatingProfile.value = true
@@ -302,662 +319,152 @@ const getProfileData = async () => {
     Object.assign(profile, data)
     profile.aiEvaluation = generateAIEvaluation(data)
     profileGenerated.value = true
-    await nextTick()
-    initRadarChart()
+    nextTick(() => initRadarChart())
   } catch (err) {
-    console.error('获取画像失败', err)
-    ElMessage.error('获取能力画像失败：' + (err.response?.data?.error || '请先完成简历'))
+    console.error(err)
+    ElMessage.error('获取画像失败：请先完善简历')
     profileGenerated.value = false
   } finally {
     generatingProfile.value = false
   }
 }
 
-// 核心修复：去重 + 0分自动给保底分，不再显示--
+// 软能力列表
 const getSoftAbilityList = () => {
-  // 固定5个基础维度
-  const baseAbilities = {
-    '沟通协作能力': { score: 1, description: '根据基础信息评估' },
-    '创新思考能力': { score: 1, description: '根据基础信息评估' },
-    '学习适应能力': { score: 1, description: '根据基础信息评估' },
-    '抗压应变能力': { score: 1, description: '根据基础信息评估' },
-    '实践执行能力': { score: 1, description: '建议补充实习/项目经历提升评分' }
-  }
-
-  // 字段映射 + 去重
-  const fieldMap = {
-    '实习能力': '实践执行能力',
-    '沟通能力': '沟通协作能力',
-    '创新能力': '创新思考能力',
-    '学习能力': '学习适应能力',
-    '抗压能力': '抗压应变能力',
-    '创新思考': '创新思考能力'
-  }
-
-  const backendData = {}
-  if (typeof profile.soft_abilities === 'object' && profile.soft_abilities !== null) {
-    Object.entries(profile.soft_abilities).forEach(([key, value]) => {
-      const displayName = fieldMap[key] || key
-      let score = 0
-      if (typeof value === 'number') {
-        score = Math.min(5, Math.max(0, value))
-      } else if (value?.score != null) {
-        score = Math.min(5, Math.max(0, value.score))
-      }
-      const desc = typeof value === 'object' && value.description
-        ? value.description
-        : (score > 0 ? 'AI分析简历得出的能力评估' : '建议补充相关经历')
-
-      if (backendData[displayName]) {
-        if (score > backendData[displayName].score) {
-          backendData[displayName] = { score, description: desc }
-        }
-      } else {
-        backendData[displayName] = { score, description: desc }
+  const res = {}
+  if (profile.soft_abilities && typeof profile.soft_abilities === 'object') {
+    Object.entries(profile.soft_abilities).forEach(([k, v]) => {
+      const score = typeof v === 'number' ? v : (v?.score || 0)
+      res[k] = {
+        score: Math.min(5, Math.max(0, score)),
+        description: v?.description || (score === 0 ? '暂无信息评估' : 'AI已评估')
       }
     })
   }
-
-  // 保底逻辑：后端0分就用前端保底分，保证永远有分数
-  const result = {}
-  Object.keys({ ...baseAbilities, ...backendData }).forEach(key => {
-    const base = baseAbilities[key] || { score: 1, description: '基础评分' }
-    const back = backendData[key] || { score: 0, description: '' }
-
-    if (back.score > 0) {
-      result[key] = back
-    } else {
-      result[key] = base
+  if (Object.keys(res).length === 0) {
+    return {
+      '创新能力': { score: 0, description: '暂无足够简历信息评估该能力' },
+      '学习能力': { score: 0, description: '暂无足够简历信息评估该能力' },
+      '抗压能力': { score: 0, description: '暂无足够简历信息评估该能力' },
+      '沟通能力': { score: 0, description: '暂无足够简历信息评估该能力' },
+      '实习能力': { score: 0, description: '暂无足够简历信息评估该能力' }
     }
-  })
-
-  return result
-}
-
-const generateAIEvaluation = (data) => {
-  const skillsStr = data.skills?.length ? data.skills.join('、') : '无'
-  const certsStr = data.certificates?.length ? data.certificates.join('、') : '无'
-  const eduStr = data.education_text || '无'
-  const workStr = data.work_text || '无'
-  const completeness = data.completeness || 0
-
-  let baseEval = `简历完整度${completeness}%，教育背景：${eduStr}。掌握技能：${skillsStr}；证书：${certsStr}。${workStr ? '具备实习经历，' : '暂无实习经历，'}`
-
-  const soft = getSoftAbilityList()
-  const arr = Object.entries(soft).sort((a, b) => b[1].score - a[1].score)
-  const top = arr[0], low = arr[arr.length - 1]
-  
-  if (top[1].score === 0) {
-    baseEval += '当前简历信息不足，无法评估软能力强弱，建议补充完整经历后再生成画像。'
-  } else {
-    baseEval += `强项${top[0]}(${top[1].score*20}分)，${top[1].description}；需提升${low[0]}(${low[1].score*20}分)。`
   }
-
-  if (completeness >= 80) baseEval += '整体竞争力优秀，建议精准投递匹配岗位。'
-  else if (completeness >= 60) baseEval += '竞争力良好，补充项目/实习更有优势。'
-  else baseEval += '竞争力偏弱，优先补齐简历关键信息与实践。'
-  return baseEval
+  return res
 }
 
+// 生成AI评价
+const generateAIEvaluation = (data) => {
+  const skills = data.skills?.join('、') || '无'
+  const certs = data.certificates?.join('、') || '无'
+  const edu = data.education_text || '无'
+  const work = data.work_text ? '有实习经历' : '无实习经历'
+  const complete = data.completeness || 0
+
+  let text = `简历完整度${complete}%，教育背景：${edu}。技能：${skills}；证书：${certs}。${work}。`
+  const soft = getSoftAbilityList()
+  const list = Object.entries(soft).sort((a, b) => b[1].score - a[1].score)
+  const top = list[0], low = list.at(-1)
+
+  if (top[1].score > 0) {
+    text += `优势：${top[0]}(${top[1].score * 20}分)；待提升：${low[0]}。`
+  } else {
+    text += '当前信息不足，无法评估能力强弱，请补充完整简历。'
+  }
+  if (complete >= 80) text += '整体竞争力优秀。'
+  else if (complete >= 60) text += '整体良好，补充实践更具优势。'
+  else text += '信息偏少，建议优先补齐经历与技能。'
+  return text
+}
+
+// 重新生成
 const regenerateProfile = async () => {
   try {
-    await ElMessageBox.confirm('确定重新生成画像？当前数据将更新', '提示', { type: 'warning' })
-    generatingProfile.value = true
+    await ElMessageBox.confirm('确定重新生成？', '提示', { type: 'warning' })
     await getProfileData()
-    ElMessage.success('重新生成成功')
-  } catch (e) { if (e !== 'cancel') ElMessage.error('生成失败') } finally { generatingProfile.value = false }
+    ElMessage.success('生成成功')
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error('生成失败')
+  }
 }
 
+// 导出
 const exportProfile = async () => {
   try {
-    const res = await api.post('/profile/export', { student_id: studentId.value, format: 'pdf', profile_data: profile }, { responseType: 'blob' })
+    const res = await api.post('/profile/export', {
+      student_id: studentId.value, format: 'pdf', profile_data: profile
+    }, { responseType: 'blob' })
     const url = URL.createObjectURL(new Blob([res.data]))
     const a = document.createElement('a')
-    a.href = url; a.download = `能力画像_${profile.name||'用户'}.pdf`
-    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
+    a.href = url; a.download = `能力画像_${profile.name || '用户'}.pdf`
+    document.body.appendChild(a); a.click(); a.remove()
+    URL.revokeObjectURL(url)
     ElMessage.success('导出成功')
-  } catch (e) { ElMessage.error('导出失败：后端暂未实现或网络异常') }
+  } catch (e) {
+    ElMessage.error('导出失败：后端未实现或网络异常')
+  }
 }
 
-const getScoreColor = (s) => s>=80?'#10b981':s>=60?'#f59e0b':s>=40?'#f97316':'#ef4444'
-const getCompletenessDesc = (s)=>{
-  if(s>=90) return '信息极完整，覆盖全部核心维度'
-  if(s>=80) return '信息优秀，仅少量字段缺失'
-  if(s>=70) return '信息良好，建议补充亮点经历'
-  if(s>=60) return '信息一般，需补齐关键能力资料'
-  return '信息偏低，优先完善技能与实践'
-}
-
+// 工具方法
+const getScoreColor = s => s >= 80 ? '#10b981' : s >= 60 ? '#f59e0b' : s >= 40 ? '#f97316' : '#ef4444'
+const getCompletenessDesc = s => s >= 90 ? '极完整' : s >= 80 ? '优秀' : s >= 70 ? '良好' : s >= 60 ? '一般' : '偏低'
+const getCompetitiveDesc = s => s >= 90 ? '极强' : s >= 80 ? '优秀' : s >= 70 ? '良好' : s >= 60 ? '一般' : '偏弱'
+const getSkillProficiency = sk => ['Python', 'Java', 'SQL', 'Vue', 'Spring Boot'].includes(sk) ? 80 + Math.random() * 20 : 60 + Math.random() * 30
 const getCompetitiveScore = () => {
-  if (!isCompetitiveScoreValid.value) return 0
   const soft = getSoftAbilityList()
-  const avg = Object.values(soft).reduce((p,c)=>p+c.score,0)/Object.keys(soft).length*20
-  return Math.round(profile.completeness*0.6 + avg*0.4)
+  const avg = Object.values(soft).reduce((s, i) => s + i.score, 0) / Object.keys(soft).length * 20
+  return Math.round(profile.completeness * 0.6 + avg * 0.4)
 }
 
-const getCompetitiveDesc = (s)=>{
-  if(s>=90) return '同批次竞争力极强，具备明显核心优势'
-  if(s>=80) return '竞争力优秀，简历匹配度高'
-  if(s>=70) return '竞争力良好，针对性补强即可'
-  if(s>=60) return '竞争力一般，优先补齐短板软能力'
-  return '竞争力偏弱，建议重排能力规划与实习'
+// 路由跳转
+const goBack = () => router.push('/student-ability')
+const goToEditInfo = () => router.push('/student-ability')
+const goToInterestTest = async () => {
+  try {
+    // 自动保存当前能力画像
+    await api.post('/profile/save', {
+      student_id: studentId.value,
+      profile_data: profile
+    })
+    ElMessage.success('能力画像已自动保存')
+  } catch (e) {
+    ElMessage.warning('自动保存失败，将直接进入测试')
+  }
+  
+  // 再跳转
+  router.push({ 
+    path: '/interest-test', 
+    query: { studentId: studentId.value } 
+  })
 }
-const getSkillProficiency = (sk) => ['Python','Java','SQL','Vue.js','Spring Boot','JavaScript'].includes(sk)?80+Math.random()*20:60+Math.random()*30
-
-const goBack = ()=>router.push('/student-ability')
-const goToEditInfo = ()=>router.push('/student-ability')
-const goToInterestTest = ()=>router.push({path:'/interest-test',query:{studentId:studentId.value}})
-const toggleUserMenu = ()=>isUserMenuOpen.value=!isUserMenuOpen.value
-const handleLogout = ()=>{localStorage.clear();isLogin.value=false;router.push('/');ElMessage.success('已退出')}
-const toggleTheme = ()=>{darkMode.value=!darkMode.value;localStorage.setItem('darkMode',darkMode.value)}
-const goToFeature = (t)=>{const m={'测评':'/interest-test','分析':'/ability-analysis','规划':'/development-path','导出':'/report-export'};router.push(m[t]||'/')}
-const handleSearch = ()=>{const i=document.querySelector('.nav-search-input');if(i.value.trim())router.push(`/search?keyword=${encodeURIComponent(i.value.trim())}`)}
+const toggleUserMenu = () => isUserMenuOpen.value = !isUserMenuOpen.value
+const handleLogout = () => { localStorage.clear(); isLogin.value = false; router.push('/'); ElMessage.success('已退出') }
+const toggleTheme = () => { darkMode.value = !darkMode.value; localStorage.setItem('darkMode', darkMode.value) }
+const goToFeature = t => {
+  const map = { '测评': '/interest-test', '分析': '/ability-analysis', '规划': '/development-path', '导出': '/report-export' }
+  router.push(map[t] || '/')
+}
+const handleSearch = () => {
+  const i = document.querySelector('.nav-search-input')
+  if (i.value.trim()) router.push(`/search?keyword=${encodeURIComponent(i.value.trim())}`)
+}
 </script>
 
 <style scoped>
-/* 核心优化：卡片特效样式 */
-.card-effect {
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: double 1px transparent;
-  background-image: linear-gradient(#ffffff, #ffffff), 
-                    linear-gradient(135deg, #e0f2fe, #dbeafe, #f0f9ff);
-  background-origin: border-box;
-  background-clip: padding-box, border-box;
-}
-.card-effect:hover {
-  transform: translateY(-5px) scale(1.01);
-  box-shadow: 0 12px 24px rgba(0,0,0,0.08), 0 4px 8px rgba(37, 99, 235, 0.1);
-}
-.btn-effect {
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s ease !important;
-}
-.btn-effect::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-  transition: left 0.6s ease;
-}
-.btn-effect:hover::after {
-  left: 100%;
-}
-
-.basic-info-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: linear-gradient(135deg, #f8fafc 0%, #f0f9ff 100%);
-  border-radius: 16px;
-  padding: 20px 30px;
-  margin-bottom: 30px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-}
-.info-card-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  text-align: center;
-  justify-content: center;
-}
-.info-icon {
-  font-size: 18px;
-  color: #2563eb;
-  transition: transform 0.3s ease;
-}
-.card-effect:hover .info-icon {
-  transform: rotate(5deg) scale(1.1);
-}
-.info-label {
-  font-weight: 600;
-  color: #334155;
-  font-size: 14px;
-  min-width: 70px;
-}
-.info-value {
-  color: #1e293b;
-  font-size: 15px;
-  font-weight: 500;
-}
-.info-card-divider {
-  width: 1px;
-  height: 30px;
-  background: rgba(148, 163, 184, 0.2);
-  margin: 0 10px;
-  transition: opacity 0.3s ease;
-}
-.card-effect:hover .info-card-divider {
-  opacity: 1;
-  background: rgba(37, 99, 235, 0.3);
-}
-
 .ability-profile-page {
   width: 100%;
   min-height: 100vh;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Inter', sans-serif;
   background: linear-gradient(145deg, #f9fafc 0%, #eef2f7 100%);
   margin: 0;
-  padding: 60px 0 40px 0;
+  padding: 60px 0 40px;
   color: #1a2639;
 }
 
-.profile-container {
-  width: 100%;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 20px;
-}
-
-.glass-panel {
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 24px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.9);
-  padding: 40px;
-  animation: fadeInUp 0.8s ease-out;
-}
-
-.section-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1e293b;
-  margin: 0 0 30px 0;
-  padding-bottom: 20px;
-  border-bottom: 2px solid rgba(37, 99, 235, 0.1);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  position: relative;
-}
-.section-title::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  width: 80px;
-  height: 2px;
-  background: linear-gradient(90deg, #2563eb, #3b82f6);
-  border-radius: 2px;
-}
-
-.core-scores {
-  display: flex;
-  gap: 20px;
-  margin-bottom: 35px;
-}
-.score-card {
-  flex: 1;
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.04);
-}
-.score-type {
-  display: block;
-  font-size: 15px;
-  color: #64748b;
-  margin-bottom: 10px;
-}
-.score-num {
-  display: block;
-  font-size: 42px;
-  font-weight: 700;
-  color: #1e293b;
-  margin-bottom: 12px;
-  transition: color 0.3s ease;
-}
-.card-effect:hover .score-num {
-  color: #2563eb;
-}
-.score-bar {
-  height: 10px;
-  background: #f1f5f9;
-  border-radius: 20px;
-  overflow: hidden;
-  margin-bottom: 10px;
-  position: relative;
-}
-.score-bar::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, rgba(255,255,255,0.1), rgba(255,255,255,0.4));
-  pointer-events: none;
-}
-.bar-fill {
-  height: 100%;
-  border-radius: 20px;
-  transition: width 1s ease-in-out;
-  background: linear-gradient(90deg, var(--fill-color), #3b82f6);
-}
-.bar-empty {
-  height: 100%;
-  border-radius: 20px;
-  background: #e2e8f0;
-}
-.score-desc {
-  font-size: 14px;
-  color: #64748b;
-  margin: 0;
-  line-height: 1.5;
-}
-
-.dimension-title {
-  font-size: 19px;
-  font-weight: 600;
-  color: #1e293b;
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.radar-chart-container {
-  width: 100%;
-  height: 400px;
-  margin-bottom: 30px;
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.04);
-}
-.radar-chart {
-  width: 100%;
-  height: 100%;
-  transition: opacity 0.5s ease;
-}
-.card-effect:hover .radar-chart {
-  opacity: 0.98;
-}
-.dimension-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-  margin-bottom: 35px;
-}
-.dimension-item {
-  background: #ffffff;
-  border-radius: 12px;
-  padding: 18px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.02);
-}
-.dimension-name {
-  font-weight: 600;
-  color: #1e293b;
-  margin-bottom: 8px;
-  font-size: 15px;
-  transition: color 0.3s ease;
-}
-.card-effect:hover .dimension-name {
-  color: #2563eb;
-}
-.dimension-bar {
-  height: 8px;
-  background: #f1f5f9;
-  border-radius: 20px;
-  overflow: hidden;
-  margin-bottom: 8px;
-}
-.dimension-score {
-  font-weight: 600;
-  color: #1e293b;
-  font-size: 14px;
-  margin-bottom: 4px;
-}
-.dimension-tip {
-  font-size: 12px;
-  color: #94a3b8;
-  font-style: italic;
-  line-height: 1.4;
-}
-
-.skill-cert-section {
-  display: flex;
-  gap: 20px;
-  margin-bottom: 35px;
-}
-.skill-card, .cert-card {
-  flex: 1;
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.04);
-}
-.skill-title, .cert-title {
-  font-size: 17px;
-  font-weight: 600;
-  color: #1e293b;
-  margin-bottom: 18px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: color 0.3s ease;
-}
-.card-effect:hover .skill-title,
-.card-effect:hover .cert-title {
-  color: #2563eb;
-}
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.tag {
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-  transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
-}
-.tag::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: linear-gradient(90deg, #2563eb, #3b82f6);
-  transform: translateX(-100%);
-  transition: transform 0.3s ease;
-}
-.tag:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-}
-.tag:hover::before {
-  transform: translateX(0);
-}
-.skill-tag { 
-  background: #eff6ff; 
-  color: #1e40af; 
-  border: 1px solid #dbeafe;
-}
-.cert-tag { 
-  background: #f0fdf4; 
-  color: #166534;
-  border: 1px solid #dcfce7;
-}
-.tag small {
-  font-size: 12px;
-  opacity: 0.8;
-  font-weight: normal;
-}
-.empty-tag {
-  color: #94a3b8;
-  font-size: 14px;
-  padding: 8px 16px;
-  background: #f8fafc;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-}
-
-.experience-section {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 20px;
-  margin-bottom: 35px;
-}
-.exp-card {
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.04);
-}
-.exp-title {
-  font-size: 17px;
-  font-weight: 600;
-  color: #1e293b;
-  margin-bottom: 18px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: color 0.3s ease;
-}
-.card-effect:hover .exp-title {
-  color: #2563eb;
-}
-.exp-content {
-  font-size: 14px;
-  line-height: 1.6;
-  color: #334155;
-}
-.work-item, .project-item {
-  margin-bottom: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px dashed rgba(148, 163, 184, 0.1);
-  transition: border-color 0.3s ease;
-}
-.card-effect:hover .work-item,
-.card-effect:hover .project-item {
-  border-color: rgba(37, 99, 235, 0.2);
-}
-.work-header, .project-header {
-  font-weight: 600;
-  color: #1e293b;
-  margin-bottom: 4px;
-}
-.date-range, .role {
-  font-size: 12px;
-  color: #64748b;
-  font-weight: normal;
-}
-.work-content, .project-tech, .project-desc {
-  margin-bottom: 4px;
-  color: #475569;
-}
-.work-achievements, .project-outcome {
-  color: #0f766e;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.ai-evaluation {
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.04);
-  margin-bottom: 30px;
-}
-.eval-title {
-  font-size: 17px;
-  font-weight: 600;
-  color: #1e293b;
-  margin-bottom: 18px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.eval-content {
-  font-size: 15px;
-  line-height: 1.7;
-  color: #334155;
-  white-space: pre-line;
-  background: #f8fafc;
-  padding: 16px;
-  border-radius: 8px;
-  border-left: 3px solid #2563eb;
-  transition: all 0.3s ease;
-}
-.card-effect:hover .eval-content {
-  background: #f0f9ff;
-  border-left-color: #3b82f6;
-}
-
-.profile-actions {
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  margin-top: 20px;
-}
-:deep(.el-button) {
-  border-radius: 8px !important;
-  padding: 10px 24px !important;
-  font-weight: 500 !important;
-  transition: all 0.2s ease !important;
-  position: relative;
-  overflow: hidden;
-}
-:deep(.el-button--primary) {
-  background: linear-gradient(135deg, #2563eb, #3b82f6) !important;
-  border: none !important;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2) !important;
-}
-:deep(.el-button--primary:hover) {
-  transform: translateY(-2px) !important;
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3) !important;
-}
-:deep(.el-button--success) {
-  background: linear-gradient(135deg, #10b981, #34d399) !important;
-  border: none !important;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2) !important;
-}
-:deep(.el-button--success:hover) {
-  transform: translateY(-2px) !important;
-  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3) !important;
-}
-:deep(.el-button--info) {
-  background: linear-gradient(135deg, #64748b, #94a3b8) !important;
-  border: none !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 12px rgba(100, 116, 139, 0.2) !important;
-}
-:deep(.el-button--info:hover) {
-  transform: translateY(-2px) !important;
-  box-shadow: 0 6px 16px rgba(100, 116, 139, 0.3) !important;
-}
-
-.empty-profile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 80px 20px;
-  text-align: center;
-}
-.empty-text {
-  font-size: 16px;
-  color: #64748b;
-  margin-bottom: 24px;
-  line-height: 1.6;
-}
-
+/* 导航 */
 .top-nav {
   height: 60px;
-  background: #ffffff;
+  background: #fff;
   box-shadow: 0 2px 12px rgba(0,0,0,0.06);
   width: 100%;
   position: fixed;
@@ -974,80 +481,201 @@ const handleSearch = ()=>{const i=document.querySelector('.nav-search-input');if
   height: 100%;
 }
 .nav-left { display: flex; align-items: center; }
-.logo { display: flex; align-items: center; margin-right: 40px; font-size: 18px; font-weight: bold; color: #000; }
+.logo { display: flex; align-items: center; margin-right: 40px; font-size: 18px; font-weight: bold; }
 .logo-icon { font-size: 24px; margin-right: 8px; }
 .nav-menu { display: flex; list-style: none; margin: 0; padding: 0; }
-.menu-item { margin: 0 15px; font-size: 14px; cursor: pointer; padding: 0 5px; position: relative; height: 60px; line-height: 60px; color: #000; transition: color 0.3s ease; }
+.menu-item { margin: 0 15px; font-size: 14px; cursor: pointer; height: 60px; line-height: 60px; position: relative; }
 .menu-item:hover { color: #2f54eb; }
 .menu-item.active { color: #2f54eb; }
-.menu-item.active::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 3px; background: #2f54eb; border-radius: 3px 3px 0 0; }
+.menu-item.active::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 3px; background: #2f54eb; }
 .dropdown { position: relative; }
-.dropdown-menu { position: absolute; top: 100%; left: 0; width: 200px; background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.12); border-radius: 8px; list-style: none; padding: 8px 0; margin: 0; display: none; z-index: 9999; }
-.dropdown:hover .dropdown-menu { display: block; animation: fadeIn 0.3s ease; }
-.dropdown-item { padding: 12px 20px; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; height: auto; line-height: normal; color: #333; transition: background 0.3s ease; }
+.dropdown-menu { position: absolute; top: 100%; left: 0; width: 200px; background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.12); border-radius: 8px; list-style: none; padding: 8px 0; display: none; }
+.dropdown:hover .dropdown-menu { display: block; animation: fadeIn 0.3s; }
+.dropdown-item { padding: 12px 20px; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
 .dropdown-item:hover { background: #f0f7ff; }
-.color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.color-dot { width: 8px; height: 8px; border-radius: 50%; }
 .color-dot.red { background: #ff7a45; }
 .color-dot.orange { background: #faad14; }
 .color-dot.green { background: #52c41a; }
 .color-dot.blue { background: #1890ff; }
 .nav-right { display: flex; gap: 15px; align-items: center; }
-.nav-search-wrap { display: flex; width: 200px; height: 24px; border-radius: 12px; overflow: hidden; border: 1px solid #e8e8e8; transition: border 0.3s ease; }
-.nav-search-wrap:focus-within { border-color: #2f54eb; }
-.nav-search-input { flex: 1; height: 100%; padding: 0 12px; border: none; outline: none; font-size: 12px; background: transparent; }
-.nav-search-btn { width: 53px; height: 100%; background: #2f54eb; color: #fff; border: none; cursor: pointer; font-size: 12px; transition: background 0.3s ease; }
-.nav-search-btn:hover { background: #1d39c4; }
-.btn-toggle-theme { padding: 6px 10px; border: none; background: #f5f7fa; border-radius: 4px; cursor: pointer; color: #000; transition: all 0.3s ease; }
-.btn-toggle-theme:hover { background: #e8e8e8; }
-.btn-login { padding: 6px 15px; border: 1px solid #2f54eb; color: #2f54eb; background: #fff; border-radius: 4px; cursor: pointer; transition: all 0.3s ease; }
-.btn-login:hover { background: #f0f7ff; }
-.btn-register { padding: 6px 15px; border: none; color: #fff; background: #2f54eb; border-radius: 4px; cursor: pointer; transition: all 0.3s ease; }
-.btn-register:hover { background: #1d39c4; }
-.user-profile { position: relative; display: flex; align-items: center; }
-.avatar { width: 36px; height: 36px; border-radius: 50%; cursor: pointer; border: 2px solid #f0f0f0; transition: border 0.3s ease, transform 0.3s ease; }
+.nav-search-wrap { display: flex; width: 200px; height: 24px; border-radius: 12px; border: 1px solid #e8e8e8; }
+.nav-search-input { flex: 1; padding: 0 12px; border: none; outline: none; font-size: 12px; }
+.nav-search-btn { width: 53px; background: #2f54eb; color: #fff; border: none; cursor: pointer; font-size: 12px; }
+.btn-toggle-theme { padding: 6px 10px; border: none; background: #f5f7fa; border-radius: 4px; cursor: pointer; }
+.btn-login { padding: 6px 15px; border: 1px solid #2f54eb; color: #2f54eb; background: #fff; border-radius: 4px; cursor: pointer; }
+.btn-register { padding: 6px 15px; border: none; color: #fff; background: #2f54eb; border-radius: 4px; cursor: pointer; }
+.user-profile { position: relative; }
+.avatar { width: 36px; height: 36px; border-radius: 50%; cursor: pointer; border: 2px solid #f0f0f0; }
 .avatar:hover { border-color: #2f54eb; transform: scale(1.05); }
-.user-menu { position: absolute; top: 50px; right: 0; width: 120px; background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.12); border-radius: 8px; z-index: 9999; animation: fadeIn 0.3s ease; }
-.user-menu .menu-item { padding: 10px 15px; font-size: 14px; cursor: pointer; height: auto; line-height: normal; margin: 0; color: #333; transition: background 0.3s ease; }
-.user-menu .menu-item:hover { background: #f0f7ff; color: #333; }
+.user-menu { position: absolute; top: 50px; right: 0; width: 120px; background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.12); border-radius: 8px; animation: fadeIn 0.3s; }
+.user-menu .menu-item { padding: 10px 15px; font-size: 14px; cursor: pointer; color: #333; }
+.user-menu .menu-item:hover { background: #f0f7ff; }
 .user-menu .logout { color: #ff4d4f; border-top: 1px solid #f0f0f0; }
 
-@media(max-width:768px) {
-  .basic-info-card {
-    flex-direction: column;
-    gap: 15px;
-    padding: 20px;
-  }
-  .info-card-divider {
-    width: 80%;
-    height: 1px;
-    margin: 10px 0;
-  }
-  .info-card-item {
-    width: 100%;
-    justify-content: flex-start;
-  }
-  .core-scores { flex-direction: column; }
-  .skill-cert-section { flex-direction: column; }
-  .experience-section { grid-template-columns: 1fr; }
-  .dimension-grid { grid-template-columns: 1fr; }
-  .glass-panel { padding: 24px; }
-  .nav-wrap { width: 95%; }
-  .nav-menu { display: none; }
-  .radar-chart-container { height: 300px; }
-  .card-effect:hover {
-    transform: translateY(-3px) scale(1.005);
-  }
-  .profile-actions {
-    flex-wrap: wrap;
-  }
+/* 容器 */
+.profile-container {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px;
+}
+.glass-panel {
+  background: rgba(255,255,255,0.9);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+  padding: 40px;
+  animation: fadeInUp 0.8s;
+}
+.section-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid rgba(37,99,235,0.1);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+.section-title::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 80px;
+  height: 2px;
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
 }
 
+/* 卡片特效 */
+.card-effect {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s;
+  border: double 1px transparent;
+  background-image: linear-gradient(#fff, #fff), linear-gradient(135deg, #e0f2fe, #dbeafe);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+.card-effect:hover {
+  transform: translateY(-5px) scale(1.01);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.08);
+}
+
+/* 基础信息卡片 */
+.basic-info-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #f8fafc, #f0f9ff);
+  border-radius: 16px;
+  padding: 20px 30px;
+  margin-bottom: 30px;
+}
+.info-card-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  justify-content: center;
+}
+.info-icon { font-size: 18px; color: #2563eb; }
+.info-label { font-weight: 600; color: #334155; font-size: 14px; }
+.info-value { color: #1e293b; font-size: 15px; font-weight: 500; }
+.info-card-divider { width: 1px; height: 30px; background: rgba(148,163,184,0.2); margin: 0 10px; }
+
+/* 评分 */
+.core-scores { display: flex; gap: 20px; margin-bottom: 35px; }
+.score-card { flex: 1; background: #fff; border-radius: 16px; padding: 24px; }
+.score-type { font-size: 15px; color: #64748b; margin-bottom: 10px; }
+.score-num { font-size: 42px; font-weight: 700; color: #1e293b; margin-bottom: 10px; }
+.score-bar { height: 10px; background: #f1f5f9; border-radius: 20px; overflow: hidden; margin-bottom: 10px; }
+.bar-fill { height: 100%; border-radius: 20px; transition: width 1s; }
+.bar-empty { height: 100%; background: #e2e8f0; border-radius: 20px; }
+.score-desc { font-size: 14px; color: #64748b; line-height: 1.5; }
+
+/* 维度 */
+.dimension-title { font-size: 19px; font-weight: 600; color: #1e293b; margin-bottom: 20px; }
+.radar-chart-container { width: 100%; height: 400px; margin-bottom: 30px; padding: 24px; border-radius: 16px; }
+.radar-chart { width: 100%; height: 100%; }
+.dimension-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 16px; margin-bottom: 35px; }
+.dimension-item { background: #fff; border-radius: 12px; padding: 18px; }
+.dimension-name { font-weight: 600; color: #1e293b; font-size: 15px; margin-bottom: 8px; }
+.dimension-bar { height: 8px; background: #f1f5f9; border-radius: 20px; overflow: hidden; margin-bottom: 8px; }
+.dimension-score { font-weight: 600; color: #1e293b; font-size: 14px; }
+.dimension-tip { font-size: 12px; color: #94a3b8; font-style: italic; }
+
+/* 技能证书 */
+.skill-cert-section { display: flex; gap: 20px; margin-bottom: 35px; }
+.skill-card, .cert-card { flex: 1; background: #fff; border-radius: 16px; padding: 24px; }
+.skill-title, .cert-title { font-size: 17px; font-weight: 600; color: #1e293b; margin-bottom: 18px; }
+.tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag { padding: 8px 16px; border-radius: 8px; font-size: 14px; transition: all 0.2s; }
+.tag:hover { transform: translateY(-2px); }
+.skill-tag { background: #eff6ff; color: #1e40af; border: 1px solid #dbeafe; }
+.cert-tag { background: #f0fdf4; color: #166534; border: 1px solid #dcfce7; }
+.empty-tag { color: #94a3b8; background: #f8fafc; border: 1px solid #e2e8f0; }
+
+/* 经历 */
+.experience-section { display: grid; grid-template-columns: repeat(auto-fill,minmax(320px,1fr)); gap: 20px; margin-bottom: 35px; }
+.exp-card { background: #fff; border-radius: 16px; padding: 24px; }
+.exp-title { font-size: 17px; font-weight: 600; color: #1e293b; margin-bottom: 18px; }
+.exp-content { font-size: 14px; line-height: 1.6; color: #334155; }
+.work-item, .project-item { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed rgba(148,163,184,0.1); }
+.work-header, .project-header { font-weight: 600; color: #1e293b; margin-bottom: 4px; }
+.date-range, .role { font-size: 12px; color: #64748b; }
+.work-achievements, .project-outcome { color: #0f766e; font-size: 13px; font-weight: 500; }
+
+/* AI评价 */
+.ai-evaluation { background: #fff; border-radius: 16px; padding: 24px; margin-bottom: 30px; }
+.eval-title { font-size: 17px; font-weight: 600; color: #1e293b; margin-bottom: 18px; }
+.eval-content { font-size: 15px; line-height: 1.7; color: #334155; background: #f8fafc; padding: 16px; border-radius: 8px; border-left: 3px solid #2563eb; }
+
+/* 按钮 */
+.profile-actions { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+.btn-effect { position: relative; overflow: hidden; transition: all 0.3s ease !important; }
+.btn-effect::after { content: ''; position: absolute; top:0; left:-100%; width:100%; height:100%; background: linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent); transition: left 0.6s; }
+.btn-effect:hover::after { left:100%; }
+:deep(.el-button) { border-radius: 8px !important; padding:10px 24px !important; font-weight:500 !important; }
+:deep(.el-button--primary) { background: linear-gradient(135deg,#2563eb,#3b82f6) !important; border:none !important; }
+:deep(.el-button--success) { background: linear-gradient(135deg,#10b981,#34d399) !important; border:none !important; }
+:deep(.el-button--info) { background: linear-gradient(135deg,#64748b,#94a3b8) !important; border:none !important; color:#fff !important; }
+
+/* 加载 & 空状态 */
+.loading-container { display: flex; flex-direction: column; align-items: center; padding:60px 20px; }
+.loading-spinner { font-size:48px; animation:spin 2s linear infinite; margin-bottom:20px; }
+.loading-text { font-size:16px; color:#64748b; }
+.empty-profile { display: flex; flex-direction: column; align-items: center; padding:80px 20px; text-align:center; }
+.empty-text { font-size:16px; color:#64748b; margin-bottom:24px; line-height:1.6; }
+
+/* 动画 */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity:0; transform:translateY(20px); }
+  to { opacity:1; transform:translateY(0); }
 }
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity:0; transform:translateY(10px); }
+  to { opacity:1; transform:translateY(0); }
+}
+@keyframes spin {
+  0% { transform:rotate(0deg); }
+  100% { transform:rotate(360deg); }
+}
+
+/* 响应式 */
+@media(max-width:768px) {
+  .basic-info-card { flex-direction: column; gap:15px; padding:20px; }
+  .info-card-divider { width:80%; height:1px; margin:10px 0; }
+  .core-scores { flex-direction: column; }
+  .skill-cert-section { flex-direction: column; }
+  .experience-section { grid-template-columns:1fr; }
+  .dimension-grid { grid-template-columns:1fr; }
+  .glass-panel { padding:24px; }
+  .nav-menu { display: none; }
+  .radar-chart-container { height:300px; }
 }
 </style>
