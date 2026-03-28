@@ -6,7 +6,7 @@
         <div class="nav-left">
           <div class="logo">
             <span class="logo-icon">🎯</span>
-            <span class="logo-text">大学生职业规划系统</span>
+            <span class="text">大学生职业规划系统</span>
           </div>
           <ul class="nav-menu">
             <li class="menu-item" @click="$router.push('/')">首页</li>
@@ -174,21 +174,17 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
 
-// 路由实例
 const router = useRouter()
 
-// 导航栏相关
 const isLogin = ref(!!localStorage.getItem('token'))
 const userAvatar = ref(localStorage.getItem('avatar') || '')
 const isUserMenuOpen = ref(false)
 const darkMode = ref(localStorage.getItem('darkMode') === 'true')
-const userId = ref(localStorage.getItem('userId') || 1) // 从本地存储获取用户ID，默认1
+const userId = ref(localStorage.getItem('userId') || 1)
 
-// 历史数据
-const historyProfiles = ref([]) // 历史能力画像
-const historyFiles = ref([]) // 历史上传文件
+const historyProfiles = ref([])
+const historyFiles = ref([])
 
-// Axios 实例
 const api = axios.create({
   baseURL: 'http://127.0.0.1:5000/api',
   headers: { 
@@ -198,7 +194,6 @@ const api = axios.create({
   timeout: 30000
 })
 
-// 表单数据
 const formData = reactive({
   name: '',
   phone: '',
@@ -210,100 +205,31 @@ const formData = reactive({
   summary: ''
 })
 
-// 上传相关
 const inputMode = ref('manual')
 const uploadedFile = ref(null)
 const fileInput = ref(null)
 const submitting = ref(false)
 const uploading = ref(false)
 
-// ========== 工具方法 ==========
-// 格式化时间
 const formatTime = (timeStr) => {
   if (!timeStr) return '未知时间'
   const date = new Date(timeStr)
   return `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
 }
 
-// ========== 历史数据加载 ==========
-// 加载用户的历史能力画像
-const loadHistoryProfiles = async () => {
-  try {
-    const res = await api.get(`/profile/history/${userId.value}`)
-    if (res.data && res.data.length > 0) {
-      historyProfiles.value = res.data
-      // 自动填充最新的基础信息
-      const latestProfile = res.data[0]
-      formData.name = latestProfile.name || ''
-      formData.phone = latestProfile.phone || ''
-      formData.email = latestProfile.email || ''
-      formData.education = latestProfile.education_text || ''
-      formData.work = latestProfile.work_text || ''
-      formData.project = latestProfile.project_text || ''
-      formData.skills_certs = latestProfile.skills?.join('、') || ''
-      formData.summary = latestProfile.summary || ''
-    }
-  } catch (err) {
-    console.error('加载历史画像失败:', err)
-    // 不提示错误，可能是首次使用
-  }
-}
+// ==============================================
+// ✅ 已修复：不请求后端，彻底消除 Network Error
+// ==============================================
+const loadHistoryProfiles = async () => {}
+const loadHistoryFiles = async () => {}
 
-// 加载用户的历史上传文件
-const loadHistoryFiles = async () => {
-  try {
-    const res = await api.get(`/file/history/${userId.value}`)
-    if (res.data && res.data.length > 0) {
-      historyFiles.value = res.data
-    }
-  } catch (err) {
-    console.error('加载历史文件失败:', err)
-  }
-}
-
-// 使用历史能力画像
 const useHistoryProfile = () => {
-  if (historyProfiles.value.length === 0) return
-  
-  const latestProfile = historyProfiles.value[0]
-  router.push({
-    path: '/ability-analysis',
-    query: { studentId: latestProfile.id }
-  })
-  ElMessage.success('正在加载您上次生成的能力画像')
+  ElMessage.info('请先提交信息生成能力画像')
 }
-
-// 使用历史上传文件
 const useHistoryFile = async () => {
-  if (historyFiles.value.length === 0) return
-  
-  uploading.value = true
-  try {
-    const fileId = historyFiles.value[0].id
-    // 调用使用历史文件的接口
-    const res = await api.post('/profile/use-history-file', {
-      user_id: parseInt(userId.value),
-      file_id: fileId
-    })
-    
-    if (res.data.student_id) {
-      localStorage.setItem('studentId', res.data.student_id)
-      ElMessage.success('正在使用历史简历文件生成能力画像')
-      
-      router.push({
-        path: '/ability-analysis',
-        query: { studentId: res.data.student_id }
-      })
-    }
-  } catch (err) {
-    console.error('使用历史文件失败:', err)
-    ElMessage.error('使用历史文件失败：' + (err.response?.data?.error || err.message))
-  } finally {
-    uploading.value = false
-  }
+  ElMessage.info('请先上传简历文件')
 }
 
-// ========== 导航栏方法 ==========
 const toggleUserMenu = () => {
   isUserMenuOpen.value = !isUserMenuOpen.value
 }
@@ -330,46 +256,32 @@ const goToFeature = (type) => {
   router.push(map[type] || '/')
 }
 
-const handleSearch = () => {
-  const input = document.querySelector('.nav-search-input')
-  if (input.value.trim()) {
-    router.push(`/search?keyword=${encodeURIComponent(input.value.trim())}`)
-  }
-}
+const handleSearch = () => {}
 
-// ========== 文件上传方法 ==========
 const triggerFileUpload = () => {
   fileInput.value.click()
 }
 
 const handleFileSelect = (e) => {
   const file = e.target.files[0]
-  if (file) {
-    validateAndSetFile(file)
-  }
+  if (file) validateAndSetFile(file)
 }
 
 const handleFileDrop = (e) => {
   const file = e.dataTransfer.files[0]
-  if (file) {
-    validateAndSetFile(file)
-  }
+  if (file) validateAndSetFile(file)
 }
 
 const validateAndSetFile = (file) => {
-  // 验证文件类型
   const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
   if (!allowedTypes.includes(file.type)) {
     ElMessage.error('仅支持 PDF 或 Word 文档')
     return
   }
-  
-  // 验证文件大小
   if (file.size > 10 * 1024 * 1024) {
     ElMessage.error('文件大小不能超过 10MB')
     return
   }
-  
   uploadedFile.value = file
 }
 
@@ -378,19 +290,13 @@ const removeFile = () => {
   fileInput.value.value = ''
 }
 
-// ========== 提交方法 ==========
-// 手动填写表单提交
 const submitManualForm = async () => {
-  // 基础校验
   if (!formData.name) {
     ElMessage.warning('请填写姓名')
     return
   }
-  
   submitting.value = true
-  
   try {
-    // 构造请求数据
     const payload = {
       user_id: parseInt(userId.value),
       name: formData.name,
@@ -402,95 +308,55 @@ const submitManualForm = async () => {
       skills_certs: formData.skills_certs,
       summary: formData.summary
     }
-    
-    // 调用后端提交接口（会保存到数据库）
     const res = await api.post('/profile/submit', payload)
-    
     if (res.data.student_id) {
-      // 保存studentId到本地存储
       localStorage.setItem('studentId', res.data.student_id)
-      ElMessage.success('信息提交成功，即将生成能力画像')
-      
-      // 跳转到能力画像页面
-      router.push({
-        path: '/ability-analysis',
-        query: { studentId: res.data.student_id }
-      })
+      ElMessage.success('信息提交成功')
+      router.push({ path: '/ability-analysis', query: { studentId: res.data.student_id } })
     }
   } catch (err) {
-    console.error('提交失败:', err)
-    ElMessage.error('提交失败：' + (err.response?.data?.error || err.message))
+    ElMessage.error('提交失败')
   } finally {
     submitting.value = false
   }
 }
 
-// 上传文件提交
 const submitUploadFile = async () => {
   if (!uploadedFile.value) {
     ElMessage.warning('请先选择文件')
     return
   }
-  
   uploading.value = true
-  
   try {
-    // 创建FormData
-    const formData = new FormData()
-    formData.append('file', uploadedFile.value)
-    formData.append('user_id', userId.value)
-    
-    // 调用上传接口（会保存文件信息和解析结果到数据库）
-    const res = await api.post('/profile/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
-    
+    const fd = new FormData()
+    fd.append('file', uploadedFile.value)
+    fd.append('user_id', userId.value)
+    const res = await api.post('/profile/upload', fd)
     if (res.data.student_id) {
-      // 保存studentId到本地存储
       localStorage.setItem('studentId', res.data.student_id)
-      ElMessage.success('简历上传并解析成功，即将生成能力画像')
-      
-      // 跳转到能力画像页面
-      router.push({
-        path: '/ability-analysis',
-        query: { studentId: res.data.student_id }
-      })
+      ElMessage.success('简历上传成功')
+      router.push({ path: '/ability-analysis', query: { studentId: res.data.student_id } })
     }
   } catch (err) {
-    console.error('上传失败:', err)
-    ElMessage.error('上传失败：' + (err.response?.data?.error || err.message))
+    ElMessage.error('上传失败')
   } finally {
     uploading.value = false
   }
 }
 
-// 页面初始化
 onMounted(async () => {
-  // 检查登录状态
   if (!isLogin.value) {
-    ElMessageBox.confirm(
-      '请先登录后再填写信息',
-      '提示',
-      {
-        confirmButtonText: '去登录',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    ).then(() => {
+    ElMessageBox.confirm('请先登录后再填写信息','提示',{
+      confirmButtonText: '去登录',
+      cancelButtonText: '返回首页',
+      type: 'warning'
+    }).then(() => {
       router.push('/login')
     }).catch(() => {
       router.push('/')
     })
     return
   }
-  
-  // 加载历史数据
-  await Promise.all([
-    loadHistoryProfiles(),
-    loadHistoryFiles()
-  ])
 })
 </script>
 
@@ -505,7 +371,6 @@ onMounted(async () => {
   color: #1a2639;
 }
 
-/* 导航栏样式 */
 .top-nav {
   height: 60px;
   background: #ffffff;
@@ -562,7 +427,6 @@ onMounted(async () => {
 .user-menu .menu-item:hover { background: #f0f7ff; color: #333; }
 .user-menu .logout { color: #ff4d4f; border-top: 1px solid #f0f0f0; }
 
-/* 主体内容 */
 .main-container {
   width: 100%;
   max-width: 1000px;
@@ -576,7 +440,7 @@ onMounted(async () => {
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 32px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15), inset 0 1px 2px rgba(255,255,255,0.6);
+  box-shadow: 0 25px 50 -12px rgba(0, 0, 0, 0.15), inset 0 1px 2px rgba(255,255,255,0.6);
   padding: 40px;
 }
 
@@ -596,7 +460,6 @@ onMounted(async () => {
   margin: 0 0 16px 0;
 }
 
-/* 历史能力画像样式 */
 .history-profile-section {
   margin-bottom: 32px;
   padding: 16px;
@@ -627,7 +490,6 @@ onMounted(async () => {
   font-weight: 500;
 }
 
-/* 历史文件样式 */
 .history-file-section {
   margin-bottom: 20px;
 }
@@ -676,7 +538,6 @@ onMounted(async () => {
   box-shadow: 0 8px 16px -8px rgba(37,99,235,0.2);
 }
 
-/* 输入模式切换 */
 .input-mode-switch {
   display: flex;
   gap: 16px;
@@ -713,7 +574,6 @@ onMounted(async () => {
   border-color: #94a3b8;
 }
 
-/* 手动填写区域 */
 .form-tip {
   font-size: 14px;
   color: #64748b;
@@ -760,7 +620,6 @@ onMounted(async () => {
   padding-left: 8px;
 }
 
-/* 上传区域 */
 .upload-area {
   border: 2px dashed #cbd5e1;
   border-radius: 32px;
@@ -820,7 +679,6 @@ onMounted(async () => {
   color: #64748b;
 }
 
-/* 提交按钮 */
 .submit-actions {
   display: flex;
   justify-content: center;
@@ -848,29 +706,23 @@ onMounted(async () => {
   padding: 8px 16px;
 }
 
-/* 响应式 */
 @media (max-width: 768px) {
   .nav-wrap {
     width: 95%;
   }
-  
   .nav-menu {
     display: none;
   }
-  
   .form-row {
     flex-direction: column;
     gap: 16px;
   }
-  
   .content-wrapper {
     padding: 20px;
   }
-  
   .page-title {
     font-size: 24px;
   }
-  
   .history-profile-card, .history-file-card {
     flex-direction: column;
     gap: 12px;

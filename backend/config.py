@@ -23,4 +23,4 @@ ALIYUN_API_KEY = os.getenv('ALIYUN_API_KEY')
 # - local：永远不调用外部，使用简易本地模板
 LLM_MODE = os.getenv('LLM_MODE', 'auto').lower()
 LLM_FORCE_REAL = os.getenv('LLM_FORCE_REAL', '0') == '1'
-LLM_MAX_CALLS_PER_RUN = int(os.getenv('LLM_MAX_CALLS_PER_RUN', '10'))
+LLM_MAX_CALLS_PER_RUN = int(os.getenv('LLM_MAX_CALLS_PER_RUN', '100'))
