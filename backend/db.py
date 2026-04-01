@@ -488,6 +488,27 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+        # ========== 个人中心相关表 ==========
+    # 用户头像字段（如果未添加）
+    cursor.execute("PRAGMA table_info(users)")
+    users_cols = [row['name'] for row in cursor.fetchall()]
+    if 'avatar' not in users_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN avatar TEXT")
+
+    # 浏览历史表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_browse_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            item_type TEXT NOT NULL,
+            item_id INTEGER,
+            title TEXT,
+            cover TEXT,
+            description TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
 
     # 岗位标签表（细分技能）
     cursor.execute('''

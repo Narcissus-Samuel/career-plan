@@ -7,9 +7,14 @@ import subprocess
 import tempfile
 import os
 import logging
+import datetime
+
 # 显式导入，方便测试时通过模块名拦截
 from services.llm_service import call_llm
 import markdown
+
+# 导入 token 验证装饰器（从 auth 模块复用）
+from .auth import token_required
 
 report_bp = Blueprint('report', __name__, url_prefix='/api/report')
 
@@ -149,6 +154,8 @@ def generate_report_with_llm(student_ability, job_profile, job_name, path_sugges
         # 降级返回简单提示，避免程序崩溃
         return "# 职业生涯发展报告\n\n报告生成服务暂时不可用（API 调用异常），请稍后再试。"
 
+# ========== 原有接口 ==========
+
 @report_bp.route('/generate', methods=['POST'])
 def generate():
     data = request.json
@@ -198,7 +205,7 @@ def generate():
     # 调用 LLM 生成报告 (真实调用或测试拦截)
     report_md = generate_report_with_llm(student_ability, job_profile, job_name, path_suggestions)
 
-    # 存储报告到数据库
+    # 存储报告到数据库，使用 ISO 字符串格式的时间
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
@@ -209,7 +216,7 @@ def generate():
         job_name,
         report_md,
         'markdown',
-        int(time.time())
+        datetime.datetime.now().isoformat()   # 改为 ISO 字符串，与默认值一致
     ))
     report_id = cursor.lastrowid
     conn.commit()
@@ -323,3 +330,158 @@ def get_report(report_id):
     if not row:
         return jsonify({'error': '报告不存在'}), 404
     return jsonify(dict(row))
+
+# ========== 新增接口（个人中心报告详情与更新） ==========
+
+@report_bp.route('/career/<int:report_id>', methods=['GET'])
+@token_required
+def get_career_report(report_id):
+    """获取职业规划报告详情（report_history）"""
+    user = request.user
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # 查询报告并关联学生用户ID
+    cursor.execute('''
+        SELECT r.id, r.student_id, r.job_name, r.content, r.format_type, r.created_at,
+               s.user_id
+        FROM report_history r
+        JOIN student s ON r.student_id = s.id
+        WHERE r.id = ?
+    ''', (report_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return jsonify({'error': '报告不存在'}), 404
+    if row['user_id'] != user['id']:
+        return jsonify({'error': '无权访问此报告'}), 403
+
+    return jsonify({
+        'id': row['id'],
+        'title': f"{row['job_name']} 职业规划报告",
+        'type': 'career_plan',
+        'content': row['content'],
+        'format': row['format_type'],
+        'created_at': row['created_at']
+    })
+
+@report_bp.route('/interest/<int:result_id>', methods=['GET'])
+@token_required
+def get_interest_report(result_id):
+    """获取兴趣测试报告详情（assessment_results）"""
+    user = request.user
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT id, dimension_scores, recommendation, created_at, user_id
+        FROM assessment_results
+        WHERE id = ?
+    ''', (result_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return jsonify({'error': '报告不存在'}), 404
+    if row['user_id'] != user['id']:
+        return jsonify({'error': '无权访问此报告'}), 403
+
+    # 解析维度得分（JSON）
+    try:
+        scores = json.loads(row['dimension_scores']) if row['dimension_scores'] else {}
+    except:
+        scores = {}
+
+    return jsonify({
+        'id': row['id'],
+        'title': '霍兰德职业兴趣测评报告',
+        'type': 'interest_test',
+        'content': row['recommendation'] or '',
+        'scores': scores,
+        'created_at': row['created_at']
+    })
+
+@report_bp.route('/match/<int:match_id>', methods=['GET'])
+@token_required
+def get_match_report(match_id):
+    """获取人岗匹配报告详情（match_history）"""
+    user = request.user
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT m.id, m.student_id, m.job_name, m.match_score, m.details, m.created_at,
+               s.user_id
+        FROM match_history m
+        JOIN student s ON m.student_id = s.id
+        WHERE m.id = ?
+    ''', (match_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return jsonify({'error': '报告不存在'}), 404
+    if row['user_id'] != user['id']:
+        return jsonify({'error': '无权访问此报告'}), 403
+
+    # 解析详细数据（JSON）
+    try:
+        details = json.loads(row['details']) if row['details'] else {}
+    except:
+        details = {}
+
+    return jsonify({
+        'id': row['id'],
+        'title': f"{row['job_name']} 人岗匹配报告",
+        'type': 'job_match',
+        'content': details.get('gap_analysis', ''),
+        'score': row['match_score'],
+        'job_name': row['job_name'],
+        'created_at': row['created_at']
+    })
+
+@report_bp.route('/career/<int:report_id>', methods=['PUT'])
+@token_required
+def update_career_report(report_id):
+    """更新职业规划报告内容（仅允许修改 content 和 title）"""
+    user = request.user
+    data = request.json or {}
+    title = data.get('title')
+    content = data.get('content')
+
+    if not content:
+        return jsonify({'error': '内容不能为空'}), 400
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # 权限验证：报告属于当前用户
+    cursor.execute('''
+        SELECT r.id
+        FROM report_history r
+        JOIN student s ON r.student_id = s.id
+        WHERE r.id = ? AND s.user_id = ?
+    ''', (report_id, user['id']))
+    if not cursor.fetchone():
+        conn.close()
+        return jsonify({'error': '无权修改此报告'}), 403
+
+    # 动态构建更新语句，仅更新提供的字段
+    updates = []
+    params = []
+    if title:
+        updates.append("job_name = ?")
+        params.append(title)
+    updates.append("content = ?")
+    params.append(content)
+    params.append(report_id)
+
+    cursor.execute(f'''
+        UPDATE report_history
+        SET {', '.join(updates)}
+        WHERE id = ?
+    ''', params)
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
