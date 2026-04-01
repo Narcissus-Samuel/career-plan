@@ -117,9 +117,13 @@
                 <span class="nav-icon">📝</span>
                 <span class="nav-text">我的职业规划</span>
               </li>
-              <li class="nav-item" :class="{ active: activeTab === 'collection' }" @click="switchTab('collection')">
-                <span class="nav-icon">⭐</span>
-                <span class="nav-text">我的收藏</span>
+              <li class="nav-item" :class="{ active: activeTab === 'interest' }" @click="switchTab('interest')">
+                <span class="nav-icon">📊</span>
+                <span class="nav-text">兴趣测试报告</span>
+              </li>
+              <li class="nav-item" :class="{ active: activeTab === 'match' }" @click="switchTab('match')">
+                <span class="nav-icon">🎯</span>
+                <span class="nav-text">人岗匹配报告</span>
               </li>
               <li class="nav-item" :class="{ active: activeTab === 'history' }" @click="switchTab('history')">
                 <span class="nav-icon">🕒</span>
@@ -131,130 +135,105 @@
 
         <!-- 右侧内容区 -->
         <div class="profile-content">
-          <!-- 基本资料标签页 -->
+          <!-- 基本资料标签页 → 多用户卡片模式 -->
           <div class="tab-content" v-show="activeTab === 'basic'">
             <div class="content-header">
               <h2 class="content-title">基本资料</h2>
               <button class="edit-btn" @click="isEditingBasic = !isEditingBasic">
-                {{ isEditingBasic ? '取消' : '编辑资料' }}
+                {{ isEditingBasic ? '取消编辑' : '编辑资料' }}
               </button>
             </div>
 
-            <form class="basic-info-form" @submit.prevent="saveBasicInfo">
-              <div class="form-row">
-                <label class="form-label">用户名</label>
-                <input 
-                  type="text" 
-                  class="form-input" 
-                  v-model="editForm.nickname" 
-                  :disabled="!isEditingBasic"
-                  placeholder="请输入用户名"
-                >
-              </div>
-              
-              <div class="form-row">
-                <label class="form-label">真实姓名</label>
-                <input 
-                  type="text" 
-                  class="form-input" 
-                  v-model="editForm.realName" 
-                  :disabled="!isEditingBasic"
-                  placeholder="请输入真实姓名"
-                >
-              </div>
-              
-              <div class="form-row">
-                <label class="form-label">性别</label>
-                <div class="radio-group" :class="{ disabled: !isEditingBasic }">
-                  <label class="radio-item">
-                    <input type="radio" v-model="editForm.gender" value="男" :disabled="!isEditingBasic">
-                    男
-                  </label>
-                  <label class="radio-item">
-                    <input type="radio" v-model="editForm.gender" value="女" :disabled="!isEditingBasic">
-                    女
-                  </label>
-                  <label class="radio-item">
-                    <input type="radio" v-model="editForm.gender" value="保密" :disabled="!isEditingBasic">
-                    保密
-                  </label>
+            <!-- 多用户卡片列表 -->
+            <div class="user-card-list">
+              <div 
+                class="user-summary-card" 
+                v-for="item in userList" 
+                :key="item.id"
+                @dblclick="item.expanded = !item.expanded"
+              >
+                <!-- 卡片头部：姓名 + 头像 -->
+                <div class="card-head">
+                  <img :src="item.avatar" alt="头像" class="card-avatar">
+                  <div class="card-name">{{ item.name }}</div>
+                </div>
+
+                <!-- 简要信息 -->
+                <div class="card-brief">
+                  <div class="brief-item">
+                    <label>专业：</label>
+                    <span>{{ item.education_text.split(' ')[2] || '未填写' }}</span>
+                  </div>
+                  <div class="brief-item">
+                    <label>手机：</label>
+                    <span>{{ item.phone || '未填写' }}</span>
+                  </div>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="card-actions">
+                  <button class="view-btn" @click="viewUserDetail(item)">查看详情</button>
+                </div>
+
+                <!-- 双击展开 → 完整信息（原样式） -->
+                <div class="card-detail" v-show="item.expanded">
+                  <div class="basic-info-card">
+                    <div class="card-row">
+                      <label class="card-label">姓名</label>
+                      <div class="card-value">{{ item.name || '未填写' }}</div>
+                    </div>
+                    <div class="card-row">
+                      <label class="card-label">手机号</label>
+                      <div class="card-value">{{ item.phone || '未填写' }}</div>
+                    </div>
+                    <div class="card-row">
+                      <label class="card-label">邮箱</label>
+                      <div class="card-value">{{ item.email || '未填写' }}</div>
+                    </div>
+                    <div class="card-row">
+                      <label class="card-label">教育经历</label>
+                      <div class="card-value">{{ item.education_text || '未填写' }}</div>
+                    </div>
+                    <div class="card-row">
+                      <label class="card-label">工作/实习经历</label>
+                      <div class="card-value">{{ item.work_text || '未填写' }}</div>
+                    </div>
+                    <div class="card-row">
+                      <label class="card-label">项目经历</label>
+                      <div class="card-value">{{ item.project_text || '未填写' }}</div>
+                    </div>
+                    <div class="card-row">
+                      <label class="card-label">技能与证书描述</label>
+                      <div class="card-value">{{ item.skills_certs_text || '未填写' }}</div>
+                    </div>
+                    <div class="card-row">
+                      <label class="card-label">个人总结</label>
+                      <div class="card-value">{{ item.summary || '未填写' }}</div>
+                    </div>
+                    <div class="card-row">
+                      <label class="card-label">专业技能</label>
+                      <div class="card-value">{{ item.skills || '未填写' }}</div>
+                    </div>
+                    <div class="card-row">
+                      <label class="card-label">证书资质</label>
+                      <div class="card-value">{{ item.certificates || '未填写' }}</div>
+                    </div>
+                    <div class="card-row">
+                      <label class="card-label">软能力</label>
+                      <div class="card-value">{{ item.soft_abilities || '未填写' }}</div>
+                    </div>
+                    <div class="card-row">
+                      <label class="card-label">资料完整度</label>
+                      <div class="card-value">{{ item.completeness || 0 }}%</div>
+                    </div>
+                    <div class="card-row">
+                      <label class="card-label">创建时间</label>
+                      <div class="card-value">{{ formatDate(item.created_at) || '未记录' }}</div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              
-              <div class="form-row">
-                <label class="form-label">学校</label>
-                <input 
-                  type="text" 
-                  class="form-input" 
-                  v-model="editForm.school" 
-                  :disabled="!isEditingBasic"
-                  placeholder="请输入所在学校"
-                >
-              </div>
-              
-              <div class="form-row">
-                <label class="form-label">专业</label>
-                <input 
-                  type="text" 
-                  class="form-input" 
-                  v-model="editForm.major" 
-                  :disabled="!isEditingBasic"
-                  placeholder="请输入所学专业"
-                >
-              </div>
-              
-              <div class="form-row">
-                <label class="form-label">年级</label>
-                <select class="form-select" v-model="editForm.grade" :disabled="!isEditingBasic">
-                  <option value="">请选择年级</option>
-                  <option value="大一">大一</option>
-                  <option value="大二">大二</option>
-                  <option value="大三">大三</option>
-                  <option value="大四">大四</option>
-                  <option value="研一">研一</option>
-                  <option value="研二">研二</option>
-                  <option value="研三">研三</option>
-                </select>
-              </div>
-              
-              <div class="form-row">
-                <label class="form-label">联系方式</label>
-                <input 
-                  type="tel" 
-                  class="form-input" 
-                  v-model="editForm.phone" 
-                  :disabled="!isEditingBasic"
-                  placeholder="请输入手机号码"
-                >
-              </div>
-              
-              <div class="form-row">
-                <label class="form-label">邮箱</label>
-                <input 
-                  type="email" 
-                  class="form-input" 
-                  v-model="editForm.email" 
-                  :disabled="!isEditingBasic"
-                  placeholder="请输入邮箱地址"
-                >
-              </div>
-              
-              <div class="form-row">
-                <label class="form-label">自我介绍</label>
-                <textarea 
-                  class="form-textarea" 
-                  v-model="editForm.introduction" 
-                  :disabled="!isEditingBasic"
-                  placeholder="请输入自我介绍（选填）"
-                  rows="4"
-                ></textarea>
-              </div>
-              
-              <div class="form-actions" v-show="isEditingBasic">
-                <button type="button" class="cancel-btn" @click="cancelEdit">取消</button>
-                <button type="submit" class="save-btn">保存修改</button>
-              </div>
-            </form>
+            </div>
           </div>
 
           <!-- 账号安全标签页 -->
@@ -264,6 +243,21 @@
             </div>
 
             <div class="security-settings">
+              <!-- 绑定手机号 -->
+              <div class="security-item">
+                <div class="item-left">
+                  <span class="item-icon">📱</span>
+                  <div class="item-text">
+                    <span class="item-title">绑定手机号</span>
+                    <span class="item-desc">{{ userInfo.phone || '未绑定' }}</span>
+                  </div>
+                </div>
+                <button class="operate-btn" @click="showBindPhoneModal = true">
+                  {{ userInfo.phone ? '修改' : '绑定' }}
+                </button>
+              </div>
+
+              <!-- 修改密码 -->
               <div class="security-item">
                 <div class="item-left">
                   <span class="item-icon">🔑</span>
@@ -273,58 +267,6 @@
                   </div>
                 </div>
                 <button class="operate-btn" @click="showChangePwdModal = true">修改</button>
-              </div>
-              
-              <div class="security-item">
-                <div class="item-left">
-                  <span class="item-icon">📱</span>
-                  <div class="item-text">
-                    <span class="item-title">绑定手机号</span>
-                    <span class="item-desc" :class="{ unbound: !userInfo.phone }">
-                      {{ userInfo.phone || '未绑定' }}
-                    </span>
-                  </div>
-                </div>
-                <button class="operate-btn" @click="showBindPhoneModal = true">
-                  {{ userInfo.phone ? '更换' : '绑定' }}
-                </button>
-              </div>
-              
-              <div class="security-item">
-                <div class="item-left">
-                  <span class="item-icon">📧</span>
-                  <div class="item-text">
-                    <span class="item-title">绑定邮箱</span>
-                    <span class="item-desc" :class="{ unbound: !userInfo.email }">
-                      {{ userInfo.email || '未绑定' }}
-                    </span>
-                  </div>
-                </div>
-                <button class="operate-btn" @click="showBindEmailModal = true">
-                  {{ userInfo.email ? '更换' : '绑定' }}
-                </button>
-              </div>
-              
-              <div class="security-item">
-                <div class="item-left">
-                  <span class="item-icon">🔔</span>
-                  <div class="item-text">
-                    <span class="item-title">消息通知</span>
-                    <span class="item-desc">设置接收系统消息的方式</span>
-                  </div>
-                </div>
-                <button class="operate-btn" @click="$router.push('/notification-settings')">设置</button>
-              </div>
-              
-              <div class="security-item">
-                <div class="item-left">
-                  <span class="item-icon">📱</span>
-                  <div class="item-text">
-                    <span class="item-title">登录设备管理</span>
-                    <span class="item-desc">查看并管理登录过的设备</span>
-                  </div>
-                </div>
-                <button class="operate-btn" @click="$router.push('/device-management')">查看</button>
               </div>
             </div>
           </div>
@@ -372,46 +314,92 @@
               </div>
             </div>
           </div>
-
-          <!-- 我的收藏标签页 -->
-          <div class="tab-content" v-show="activeTab === 'collection'">
+          
+          <!-- 兴趣测试报告标签页 -->
+          <div class="tab-content" v-show="activeTab === 'interest'">
             <div class="content-header">
-              <h2 class="content-title">我的收藏</h2>
-              <div class="filter-controls">
-                <button class="filter-btn" :class="{ active: collectionFilter === 'all' }" @click="collectionFilter = 'all'">
-                  全部
-                </button>
-                <button class="filter-btn" :class="{ active: collectionFilter === 'job' }" @click="collectionFilter = 'job'">
-                  岗位
-                </button>
-                <button class="filter-btn" :class="{ active: collectionFilter === 'resource' }" @click="collectionFilter = 'resource'">
-                  资源
-                </button>
-              </div>
+              <h2 class="content-title">兴趣测试报告</h2>
+              <button class="create-btn" @click="$router.push('/interest-test')">
+                前往测评
+              </button>
             </div>
 
-            <div v-if="filteredCollections.length === 0" class="empty-state">
-              <div class="empty-icon">⭐</div>
-              <div class="empty-text">暂无收藏内容</div>
-              <div class="empty-desc">快去收藏你感兴趣的岗位或资源吧</div>
+            <div v-if="interestReports.length === 0" class="empty-state">
+              <div class="empty-icon">📊</div>
+              <div class="empty-text">暂无兴趣测试报告</div>
+              <button class="empty-btn" @click="$router.push('/interest-test')">立即测评</button>
             </div>
 
-            <div class="collection-list" v-else>
-              <div class="collection-card" v-for="item in filteredCollections" :key="item.id">
-                <div class="card-left">
-                  <img :src="item.cover || 'https://picsum.photos/seed/collection/100/100'" alt="" class="collection-cover">
+            <div class="report-list" v-else>
+              <div class="report-card" v-for="item in interestReports" :key="item.id">
+                <div class="report-header">
+                  <h3 class="report-title">{{ item.title }}</h3>
+                  <div class="report-date">{{ formatDate(item.createTime) }}</div>
                 </div>
-                <div class="card-middle">
-                  <h3 class="collection-title">{{ item.title }}</h3>
-                  <p class="collection-desc">{{ item.desc }}</p>
-                  <div class="collection-meta">
-                    <span class="meta-item">{{ item.type === 'job' ? '岗位' : '资源' }}</span>
-                    <span class="meta-item">{{ formatDate(item.collectTime) }}</span>
+                <div class="report-content">
+                  <div class="report-item">
+                    <span class="item-label">测试类型：</span>
+                    <span class="item-value">{{ item.type }}</span>
+                  </div>
+                  <div class="report-item">
+                    <span class="item-label">职业倾向：</span>
+                    <span class="item-value">{{ item.result }}</span>
+                  </div>
+                  <div class="report-item">
+                    <span class="item-label">适合岗位：</span>
+                    <span class="item-value">{{ item.suitableJobs }}</span>
                   </div>
                 </div>
-                <div class="card-right">
-                  <button class="view-btn" @click="viewCollection(item)">查看</button>
-                  <button class="delete-btn" @click="removeCollection(item.id)">取消收藏</button>
+                <div class="report-actions">
+                  <button class="view-btn" @click="viewReport('interest', item.id)">查看报告</button>
+                  <button class="export-btn" @click="exportReport('interest', item.id)">导出报告</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 人岗匹配结果报告标签页 -->
+          <div class="tab-content" v-show="activeTab === 'match'">
+            <div class="content-header">
+              <h2 class="content-title">人岗匹配结果报告</h2>
+              <button class="create-btn" @click="$router.push('/ability-analysis')">
+                开始匹配
+              </button>
+            </div>
+
+            <div v-if="matchReports.length === 0" class="empty-state">
+              <div class="empty-icon">🎯</div>
+              <div class="empty-text">暂无人岗匹配报告</div>
+              <button class="empty-btn" @click="$router.push('/ability-analysis')">立即匹配</button>
+            </div>
+
+            <div class="report-list" v-else>
+              <div class="report-card" v-for="item in matchReports" :key="item.id">
+                <div class="report-header">
+                  <h3 class="report-title">{{ item.title }}</h3>
+                  <div class="report-date">{{ formatDate(item.createTime) }}</div>
+                </div>
+                <div class="report-content">
+                  <div class="report-item">
+                    <span class="item-label">目标岗位：</span>
+                    <span class="item-value">{{ item.targetJob }}</span>
+                  </div>
+                  <div class="report-item">
+                    <span class="item-label">匹配得分：</span>
+                    <span class="item-value">{{ item.score }}分</span>
+                  </div>
+                  <div class="report-item">
+                    <span class="item-label">匹配结果：</span>
+                    <span class="item-value">{{ item.result }}</span>
+                  </div>
+                  <div class="report-item">
+                    <span class="item-label">提升建议：</span>
+                    <span class="item-value">{{ item.suggestion }}</span>
+                  </div>
+                </div>
+                <div class="report-actions">
+                  <button class="view-btn" @click="viewReport('match', item.id)">查看报告</button>
+                  <button class="export-btn" @click="exportReport('match', item.id)">导出报告</button>
                 </div>
               </div>
             </div>
@@ -478,151 +466,28 @@
       </div>
     </div>
 
-    <!-- 绑定手机号弹窗 -->
-    <div class="modal-overlay" v-show="showBindPhoneModal" @click="closeModal('phone')">
-      <div class="modal-content" @click.stop style="width: 450px;">
+    <!-- 绑定/修改手机号弹窗 -->
+    <div class="modal-overlay" v-show="showBindPhoneModal" @click="closeModal('bindPhone')">
+      <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h3 class="modal-title">{{ userInfo.phone ? '更换手机号' : '绑定手机号' }}</h3>
-          <button class="close-btn" @click="closeModal('phone')">×</button>
+          <h3 class="modal-title">{{ userInfo.phone ? '修改手机号' : '绑定手机号' }}</h3>
+          <button class="close-btn" @click="closeModal('bindPhone')">×</button>
         </div>
         <form class="modal-form" @submit.prevent="bindPhone">
-          <!-- 原有手机号验证（更换时显示） -->
-          <div class="form-row" v-if="userInfo.phone">
-            <label class="form-label">原手机号</label>
-            <!-- 修复：移除v-model，只保留value绑定 -->
-            <input type="tel" class="form-input" :value="userInfo.phone" disabled>
-          </div>
-          
-          <!-- 新手机号 -->
           <div class="form-row">
-            <label class="form-label">{{ userInfo.phone ? '新手机号' : '手机号' }}</label>
-            <input 
-              type="tel" 
-              class="form-input" 
-              v-model="phoneForm.newPhone" 
-              placeholder="请输入11位手机号码"
-              :class="{ 'error-input': phoneForm.phoneError }"
-            >
-            <div class="error-tip" v-show="phoneForm.phoneError">{{ phoneForm.phoneError }}</div>
+            <label class="form-label">手机号</label>
+            <input type="text" class="form-input" v-model="phoneForm.phone" placeholder="请输入手机号">
           </div>
-          
-          <!-- 验证码 -->
           <div class="form-row">
             <label class="form-label">验证码</label>
             <div class="code-input-wrap">
-              <input 
-                type="text" 
-                class="form-input code-input" 
-                v-model="phoneForm.code" 
-                placeholder="请输入6位验证码"
-                :class="{ 'error-input': phoneForm.codeError }"
-              >
-              <button 
-                type="button" 
-                class="get-code-btn" 
-                @click="getPhoneCode"
-                :disabled="phoneForm.countdown > 0 || !phoneForm.newPhone"
-              >
-                {{ phoneForm.countdown > 0 ? `${phoneForm.countdown}秒后重新获取` : '获取验证码' }}
-              </button>
+              <input type="text" class="form-input code-input" v-model="phoneForm.code" placeholder="请输入验证码">
+              <button type="button" class="code-btn" @click="sendCode">{{ codeText }}</button>
             </div>
-            <div class="error-tip" v-show="phoneForm.codeError">{{ phoneForm.codeError }}</div>
           </div>
-          
-          <!-- 密码验证（更换时需要） -->
-          <div class="form-row" v-if="userInfo.phone">
-            <label class="form-label">登录密码</label>
-            <input 
-              type="password" 
-              class="form-input" 
-              v-model="phoneForm.password" 
-              placeholder="请输入登录密码验证身份"
-              :class="{ 'error-input': phoneForm.pwdError }"
-            >
-            <div class="error-tip" v-show="phoneForm.pwdError">{{ phoneForm.pwdError }}</div>
-          </div>
-          
           <div class="modal-actions">
-            <button type="button" class="cancel-btn" @click="closeModal('phone')">取消</button>
-            <button type="submit" class="confirm-btn" :disabled="phoneForm.submitting">
-              <span v-if="phoneForm.submitting">处理中...</span>
-              <span v-else>{{ userInfo.phone ? '确认更换' : '确认绑定' }}</span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- 绑定邮箱弹窗 -->
-    <div class="modal-overlay" v-show="showBindEmailModal" @click="closeModal('email')">
-      <div class="modal-content" @click.stop style="width: 450px;">
-        <div class="modal-header">
-          <h3 class="modal-title">{{ userInfo.email ? '更换邮箱' : '绑定邮箱' }}</h3>
-          <button class="close-btn" @click="closeModal('email')">×</button>
-        </div>
-        <form class="modal-form" @submit.prevent="bindEmail">
-          <!-- 原有邮箱验证（更换时显示） -->
-          <div class="form-row" v-if="userInfo.email">
-            <label class="form-label">原邮箱</label>
-            <!-- 修复：移除v-model，只保留value绑定 -->
-            <input type="email" class="form-input" :value="userInfo.email" disabled>
-          </div>
-          
-          <!-- 新邮箱 -->
-          <div class="form-row">
-            <label class="form-label">{{ userInfo.email ? '新邮箱' : '邮箱' }}</label>
-            <input 
-              type="email" 
-              class="form-input" 
-              v-model="emailForm.newEmail" 
-              placeholder="请输入邮箱地址"
-              :class="{ 'error-input': emailForm.emailError }"
-            >
-            <div class="error-tip" v-show="emailForm.emailError">{{ emailForm.emailError }}</div>
-          </div>
-          
-          <!-- 验证码 -->
-          <div class="form-row">
-            <label class="form-label">验证码</label>
-            <div class="code-input-wrap">
-              <input 
-                type="text" 
-                class="form-input code-input" 
-                v-model="emailForm.code" 
-                placeholder="请输入6位验证码"
-                :class="{ 'error-input': emailForm.codeError }"
-              >
-              <button 
-                type="button" 
-                class="get-code-btn" 
-                @click="getEmailCode"
-                :disabled="emailForm.countdown > 0 || !emailForm.newEmail"
-              >
-                {{ emailForm.countdown > 0 ? `${emailForm.countdown}秒后重新获取` : '获取验证码' }}
-              </button>
-            </div>
-            <div class="error-tip" v-show="emailForm.codeError">{{ emailForm.codeError }}</div>
-          </div>
-          
-          <!-- 密码验证（更换时需要） -->
-          <div class="form-row" v-if="userInfo.email">
-            <label class="form-label">登录密码</label>
-            <input 
-              type="password" 
-              class="form-input" 
-              v-model="emailForm.password" 
-              placeholder="请输入登录密码验证身份"
-              :class="{ 'error-input': emailForm.pwdError }"
-            >
-            <div class="error-tip" v-show="emailForm.pwdError">{{ emailForm.pwdError }}</div>
-          </div>
-          
-          <div class="modal-actions">
-            <button type="button" class="cancel-btn" @click="closeModal('email')">取消</button>
-            <button type="submit" class="confirm-btn" :disabled="emailForm.submitting">
-              <span v-if="emailForm.submitting">处理中...</span>
-              <span v-else>{{ userInfo.email ? '确认更换' : '确认绑定' }}</span>
-            </button>
+            <button type="button" class="cancel-btn" @click="closeModal('bindPhone')">取消</button>
+            <button type="submit" class="confirm-btn">确认绑定</button>
           </div>
         </form>
       </div>
@@ -644,6 +509,36 @@ import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 
+// ✅ 第一步：先声明 userInfo（修复核心）
+const userInfo = ref({
+  avatar: localStorage.getItem('avatar') || 'https://picsum.photos/seed/avatar/200/200',
+  nickname: localStorage.getItem('nickname') || '用户' + Math.floor(Math.random() * 10000),
+  realName: '',
+  gender: '保密',
+  school: '',
+  major: '',
+  grade: '',
+  phone: localStorage.getItem('phone') || '',
+  email: '',
+  introduction: '',
+  role: '普通用户',
+  joinTime: '2026-01-15',
+  name: '张三',
+  education_text: 'XX大学 计算机科学与技术 本科',
+  work_text: 'XX科技有限公司 前端开发实习生',
+  project_text: '校园招聘系统、个人简历平台',
+  skills_certs_text: '英语四级、计算机二级、Vue开发认证',
+  summary: '热爱前端开发，具备扎实的编程基础与项目经验',
+  skills: 'HTML/CSS/JS、Vue、React、小程序',
+  certificates: '英语四级、计算机二级',
+  soft_abilities: '沟通能力、学习能力、团队协作',
+  education_json: '',
+  work_json: '',
+  project_json: '',
+  completeness: 85,
+  created_at: '2026-01-15'
+})
+
 // ========== 基础状态管理 ==========
 const isLogin = ref(!!localStorage.getItem('token'))
 const userAvatar = ref(localStorage.getItem('avatar') || '')
@@ -657,24 +552,56 @@ const isEditingBasic = ref(false)
 // 弹窗状态
 const showChangePwdModal = ref(false)
 const showBindPhoneModal = ref(false)
-const showBindEmailModal = ref(false)
 
-// ========== 模拟数据 ==========
-// 用户信息
-const userInfo = ref({
-  avatar: localStorage.getItem('avatar') || 'https://picsum.photos/seed/avatar/200/200',
-  nickname: localStorage.getItem('nickname') || '用户' + Math.floor(Math.random() * 10000),
-  realName: '',
-  gender: '保密',
-  school: '',
-  major: '',
-  grade: '',
-  phone: '',
-  email: '',
-  introduction: '',
-  role: '普通用户',
-  joinTime: '2026-01-15'
+// 绑定手机号表单
+const phoneForm = ref({
+  phone: userInfo.value.phone || '',
+  code: ''
 })
+
+// 验证码倒计时
+const codeText = ref('获取验证码')
+const codeTimer = ref(null)
+
+// ========== 多用户卡片数据 ==========
+const userList = ref([
+  {
+    id: 1,
+    name: '张三',
+    avatar: 'https://picsum.photos/seed/user1/200/200',
+    phone: '13800138000',
+    email: 'zhangsan@xxx.com',
+    education_text: 'XX大学 计算机科学与技术 本科',
+    work_text: 'XX科技有限公司 前端开发实习生',
+    project_text: '校园招聘系统、个人简历平台',
+    skills_certs_text: '英语四级、计算机二级、Vue开发认证',
+    summary: '热爱前端开发，具备扎实的编程基础与项目经验',
+    skills: 'HTML/CSS/JS、Vue、React、小程序',
+    certificates: '英语四级、计算机二级',
+    soft_abilities: '沟通能力、学习能力、团队协作',
+    completeness: 85,
+    created_at: '2026-01-15',
+    expanded: false
+  },
+  {
+    id: 2,
+    name: '李四',
+    avatar: 'https://picsum.photos/seed/user2/200/200',
+    phone: '13900139000',
+    email: 'lisi@xxx.com',
+    education_text: 'XX大学 软件工程 本科',
+    work_text: 'XX互联网公司 后端开发实习生',
+    project_text: '用户管理系统、数据统计平台',
+    skills_certs_text: '英语六级、计算机二级、Java认证',
+    summary: '专注后端开发，熟悉数据库与服务端技术',
+    skills: 'Java、SpringBoot、MySQL、Redis',
+    certificates: '英语六级、计算机二级',
+    soft_abilities: '逻辑思维、问题解决、责任心',
+    completeness: 90,
+    created_at: '2026-02-20',
+    expanded: false
+  }
+])
 
 // 编辑表单
 const editForm = ref({
@@ -696,32 +623,6 @@ const pwdForm = ref({
   confirmPwd: ''
 })
 
-// 手机号绑定表单
-const phoneForm = ref({
-  oldPhone: '',
-  newPhone: '',
-  code: '',
-  password: '',
-  phoneError: '',
-  codeError: '',
-  pwdError: '',
-  countdown: 0,
-  submitting: false
-})
-
-// 邮箱绑定表单
-const emailForm = ref({
-  oldEmail: '',
-  newEmail: '',
-  code: '',
-  password: '',
-  emailError: '',
-  codeError: '',
-  pwdError: '',
-  countdown: 0,
-  submitting: false
-})
-
 // 用户统计数据
 const userStats = ref({
   assessmentCount: 2,
@@ -731,80 +632,34 @@ const userStats = ref({
 
 // 职业规划列表
 const careerPlans = ref([
-  {
-    id: 1,
-    title: '前端开发工程师职业规划',
-    createTime: '2026-02-10',
-    targetJob: '前端开发工程师',
-    cycle: '3年',
-    matchRate: 92
-  },
-  {
-    id: 2,
-    title: '产品经理职业规划',
-    createTime: '2026-01-20',
-    targetJob: '产品经理',
-    cycle: '2年',
-    matchRate: 85
-  }
+  { id: 1, title: '前端开发工程师职业规划', createTime: '2026-02-10', targetJob: '前端开发工程师', cycle: '3年', matchRate: 92 },
+  { id: 2, title: '产品经理职业规划', createTime: '2026-01-20', targetJob: '产品经理', cycle: '2年', matchRate: 85 }
 ])
 
-// 收藏列表
-const collections = ref([
-  {
-    id: 1,
-    title: '字节跳动-前端开发工程师',
-    desc: '负责公司核心产品的前端开发工作',
-    cover: 'https://picsum.photos/seed/job1/100/100',
-    type: 'job',
-    collectTime: '2026-03-01'
-  },
-  {
-    id: 2,
-    title: '2026前端面试题大全',
-    desc: '包含HTML、CSS、JavaScript、Vue、React等面试题',
-    cover: 'https://picsum.photos/seed/resource1/100/100',
-    type: 'resource',
-    collectTime: '2026-02-28'
-  },
-  {
-    id: 3,
-    title: '阿里巴巴-产品经理',
-    desc: '负责电商产品的规划和设计',
-    cover: 'https://picsum.photos/seed/job2/100/100',
-    type: 'job',
-    collectTime: '2026-02-20'
-  }
+// 兴趣测试报告数据
+const interestReports = ref([
+  { id: 1, title: '霍兰德职业兴趣测试报告', createTime: '2026-03-10', type: '霍兰德测试', result: '社会型 + 企业型', suitableJobs: '产品经理、运营、人力资源' },
+  { id: 2, title: 'MBTI性格测试报告', createTime: '2026-02-25', type: 'MBTI测试', result: 'INTJ 专家型', suitableJobs: '架构师、数据分析师、研发主管' }
 ])
 
-// 收藏筛选
-const collectionFilter = ref('all')
-const filteredCollections = computed(() => {
-  if (collectionFilter.value === 'all') {
-    return collections.value
-  }
-  return collections.value.filter(item => item.type === collectionFilter.value)
-})
+// 人岗匹配报告数据
+const matchReports = ref([
+  { id: 1, title: '前端开发工程师-人岗匹配报告', createTime: '2026-03-15', targetJob: '前端开发工程师', score: 88, result: '高度匹配', suggestion: '加强工程化与性能优化能力' },
+  { id: 2, title: 'Java开发工程师-人岗匹配报告', createTime: '2026-03-05', targetJob: 'Java开发工程师', score: 72, result: '中度匹配', suggestion: '补充微服务与分布式知识' }
+])
 
 // 浏览历史
 const browseHistory = ref([
-  {
-    id: 1,
-    title: '数据分析师岗位画像',
-    desc: '数据分析师的岗位要求、技能要求、薪资水平等',
-    cover: 'https://picsum.photos/seed/history1/80/80',
-    browseTime: '2026-03-15'
-  },
-  {
-    id: 2,
-    title: 'Python数据分析实战教程',
-    desc: '从入门到精通的Python数据分析教程',
-    cover: 'https://picsum.photos/seed/history2/80/80',
-    browseTime: '2026-03-14'
-  }
+  { id: 1, title: '数据分析师岗位画像', desc: '数据分析师的岗位要求、技能要求、薪资水平等', cover: 'https://picsum.photos/seed/history1/80/80', browseTime: '2026-03-15' },
+  { id: 2, title: 'Python数据分析实战教程', desc: '从入门到精通的Python数据分析教程', cover: 'https://picsum.photos/seed/history2/80/80', browseTime: '2026-03-14' }
 ])
 
 // ========== 方法定义 ==========
+// 查看用户详情
+const viewUserDetail = (item) => {
+  ElMessage.info(`查看【${item.name}】的详细资料`)
+}
+
 // 切换标签页
 const switchTab = (tab) => {
   activeTab.value = tab
@@ -813,7 +668,6 @@ const switchTab = (tab) => {
 // 编辑资料相关
 const cancelEdit = () => {
   isEditingBasic.value = false
-  // 重置表单
   editForm.value = {
     nickname: userInfo.value.nickname,
     realName: userInfo.value.realName,
@@ -828,11 +682,8 @@ const cancelEdit = () => {
 }
 
 const saveBasicInfo = () => {
-  // 保存用户信息
   userInfo.value = { ...editForm.value, role: userInfo.value.role, joinTime: userInfo.value.joinTime }
-  // 更新本地存储
   localStorage.setItem('nickname', editForm.value.nickname)
-  // 关闭编辑状态
   isEditingBasic.value = false
   ElMessage.success('基本资料修改成功')
 }
@@ -848,16 +699,10 @@ const handleAvatarUpload = (e) => {
   if (!file) return
   
   const isImage = file.type.startsWith('image/')
-  if (!isImage) {
-    ElMessage.error('请选择图片文件')
-    return
-  }
+  if (!isImage) { ElMessage.error('请选择图片文件'); return }
   
   const isLt5M = file.size / 1024 / 1024 < 5
-  if (!isLt5M) {
-    ElMessage.error('图片大小不能超过5MB')
-    return
-  }
+  if (!isLt5M) { ElMessage.error('图片大小不能超过5MB'); return }
   
   const reader = new FileReader()
   reader.onload = (event) => {
@@ -871,24 +716,54 @@ const handleAvatarUpload = (e) => {
 
 // 密码修改相关
 const changePassword = () => {
-  if (!pwdForm.value.oldPwd) {
-    ElMessage.warning('请输入原密码')
-    return
-  }
-  if (!pwdForm.value.newPwd) {
-    ElMessage.warning('请输入新密码')
-    return
-  }
-  if (pwdForm.value.newPwd !== pwdForm.value.confirmPwd) {
-    ElMessage.warning('两次输入的密码不一致')
-    return
-  }
+  if (!pwdForm.value.oldPwd) { ElMessage.warning('请输入原密码'); return }
+  if (!pwdForm.value.newPwd) { ElMessage.warning('请输入新密码'); return }
+  if (pwdForm.value.newPwd !== pwdForm.value.confirmPwd) { ElMessage.warning('两次输入的密码不一致'); return }
   
-  // 模拟修改密码
   showChangePwdModal.value = false
   pwdForm.value = { oldPwd: '', newPwd: '', confirmPwd: '' }
   ElMessage.success('密码修改成功，请重新登录')
-  // 这里可以添加退出登录逻辑
+}
+
+// 绑定手机号相关
+const sendCode = () => {
+  if (!phoneForm.value.phone) {
+    ElMessage.warning('请输入手机号')
+    return
+  }
+  if (!/^1[3-9]\d{9}$/.test(phoneForm.value.phone)) {
+    ElMessage.error('手机号格式不正确')
+    return
+  }
+  
+  // 倒计时逻辑
+  let second = 60
+  codeText.value = `${second}秒后重新获取`
+  codeTimer.value = setInterval(() => {
+    second--
+    codeText.value = `${second}秒后重新获取`
+    if (second <= 0) {
+      clearInterval(codeTimer.value)
+      codeText.value = '获取验证码'
+    }
+  }, 1000)
+  
+  ElMessage.success('验证码已发送，请注意查收')
+}
+
+const bindPhone = () => {
+  if (!phoneForm.value.phone) { ElMessage.warning('请输入手机号'); return }
+  if (!/^1[3-9]\d{9}$/.test(phoneForm.value.phone)) { ElMessage.error('手机号格式不正确'); return }
+  if (!phoneForm.value.code) { ElMessage.warning('请输入验证码'); return }
+  
+  // 保存手机号
+  userInfo.value.phone = phoneForm.value.phone
+  localStorage.setItem('phone', phoneForm.value.phone)
+  editForm.value.phone = phoneForm.value.phone
+  
+  showBindPhoneModal.value = false
+  phoneForm.value.code = ''
+  ElMessage.success(userInfo.value.phone ? '手机号修改成功' : '手机号绑定成功')
 }
 
 // 关闭弹窗
@@ -896,244 +771,14 @@ const closeModal = (type) => {
   if (type === 'changePwd') {
     showChangePwdModal.value = false
     pwdForm.value = { oldPwd: '', newPwd: '', confirmPwd: '' }
-  } else if (type === 'phone') {
+  } else if (type === 'bindPhone') {
     showBindPhoneModal.value = false
-    // 重置手机号表单
-    phoneForm.value = {
-      oldPhone: '',
-      newPhone: '',
-      code: '',
-      password: '',
-      phoneError: '',
-      codeError: '',
-      pwdError: '',
-      countdown: 0,
-      submitting: false
-    }
-  } else if (type === 'email') {
-    showBindEmailModal.value = false
-    // 重置邮箱表单
-    emailForm.value = {
-      oldEmail: '',
-      newEmail: '',
-      code: '',
-      password: '',
-      emailError: '',
-      codeError: '',
-      pwdError: '',
-      countdown: 0,
-      submitting: false
+    phoneForm.value.code = ''
+    if (codeTimer.value) {
+      clearInterval(codeTimer.value)
+      codeText.value = '获取验证码'
     }
   }
-}
-
-// 验证码倒计时函数
-const startCountdown = (form) => {
-  form.countdown = 60
-  const timer = setInterval(() => {
-    form.countdown--
-    if (form.countdown <= 0) {
-      clearInterval(timer)
-    }
-  }, 1000)
-}
-
-// 获取手机验证码
-const getPhoneCode = () => {
-  // 清空之前的错误提示
-  phoneForm.value.phoneError = ''
-  
-  // 验证手机号格式
-  const phone = phoneForm.value.newPhone.trim()
-  if (!phone) {
-    phoneForm.value.phoneError = '请输入手机号码'
-    return
-  }
-  
-  const phoneReg = /^1[3-9]\d{9}$/
-  if (!phoneReg.test(phone)) {
-    phoneForm.value.phoneError = '请输入有效的11位手机号码'
-    return
-  }
-  
-  // 模拟发送验证码
-  ElMessage.success('验证码已发送，请注意查收')
-  startCountdown(phoneForm.value)
-}
-
-// 获取邮箱验证码
-const getEmailCode = () => {
-  // 清空之前的错误提示
-  emailForm.value.emailError = ''
-  
-  // 验证邮箱格式
-  const email = emailForm.value.newEmail.trim()
-  if (!email) {
-    emailForm.value.emailError = '请输入邮箱地址'
-    return
-  }
-  
-  const emailReg = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/
-  if (!emailReg.test(email)) {
-    emailForm.value.emailError = '请输入有效的邮箱地址'
-    return
-  }
-  
-  // 模拟发送验证码
-  ElMessage.success('验证码已发送至您的邮箱，请注意查收')
-  startCountdown(emailForm.value)
-}
-
-// 绑定/更换手机号
-const bindPhone = () => {
-  // 清空之前的错误提示
-  phoneForm.value.phoneError = ''
-  phoneForm.value.codeError = ''
-  phoneForm.value.pwdError = ''
-  
-  // 验证手机号
-  const phone = phoneForm.value.newPhone.trim()
-  if (!phone) {
-    phoneForm.value.phoneError = '请输入手机号码'
-    return
-  }
-  
-  const phoneReg = /^1[3-9]\d{9}$/
-  if (!phoneReg.test(phone)) {
-    phoneForm.value.phoneError = '请输入有效的11位手机号码'
-    return
-  }
-  
-  // 验证验证码
-  const code = phoneForm.value.code.trim()
-  if (!code) {
-    phoneForm.value.codeError = '请输入验证码'
-    return
-  }
-  
-  if (!/^\d{6}$/.test(code)) {
-    phoneForm.value.codeError = '请输入6位数字验证码'
-    return
-  }
-  
-  // 更换手机号时验证密码
-  if (userInfo.value.phone) {
-    const password = phoneForm.value.password.trim()
-    if (!password) {
-      phoneForm.value.pwdError = '请输入登录密码'
-      return
-    }
-    
-    // 简单密码验证（实际项目中应该调用接口）
-    if (password.length < 6) {
-      phoneForm.value.pwdError = '密码长度不能少于6位'
-      return
-    }
-  }
-  
-  // 模拟提交
-  phoneForm.value.submitting = true
-  
-  setTimeout(() => {
-    // 更新用户信息
-    userInfo.value.phone = phone
-    editForm.value.phone = phone
-    
-    // 更新表单状态
-    phoneForm.value.submitting = false
-    showBindPhoneModal.value = false
-    
-    // 重置表单
-    phoneForm.value = {
-      oldPhone: '',
-      newPhone: '',
-      code: '',
-      password: '',
-      phoneError: '',
-      codeError: '',
-      pwdError: '',
-      countdown: 0,
-      submitting: false
-    }
-    
-    ElMessage.success(userInfo.value.phone ? '手机号更换成功' : '手机号绑定成功')
-  }, 1500)
-}
-
-// 绑定/更换邮箱
-const bindEmail = () => {
-  // 清空之前的错误提示
-  emailForm.value.emailError = ''
-  emailForm.value.codeError = ''
-  emailForm.value.pwdError = ''
-  
-  // 验证邮箱
-  const email = emailForm.value.newEmail.trim()
-  if (!email) {
-    emailForm.value.emailError = '请输入邮箱地址'
-    return
-  }
-  
-  const emailReg = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/
-  if (!emailReg.test(email)) {
-    emailForm.value.emailError = '请输入有效的邮箱地址'
-    return
-  }
-  
-  // 验证验证码
-  const code = emailForm.value.code.trim()
-  if (!code) {
-    emailForm.value.codeError = '请输入验证码'
-    return
-  }
-  
-  if (!/^\d{6}$/.test(code)) {
-    emailForm.value.codeError = '请输入6位数字验证码'
-    return
-  }
-  
-  // 更换邮箱时验证密码
-  if (userInfo.value.email) {
-    const password = emailForm.value.password.trim()
-    if (!password) {
-      emailForm.value.pwdError = '请输入登录密码'
-      return
-    }
-    
-    // 简单密码验证
-    if (password.length < 6) {
-      emailForm.value.pwdError = '密码长度不能少于6位'
-      return
-    }
-  }
-  
-  // 模拟提交
-  emailForm.value.submitting = true
-  
-  setTimeout(() => {
-    // 更新用户信息
-    userInfo.value.email = email
-    editForm.value.email = email
-    
-    // 更新表单状态
-    emailForm.value.submitting = false
-    showBindEmailModal.value = false
-    
-    // 重置表单
-    emailForm.value = {
-      oldEmail: '',
-      newEmail: '',
-      code: '',
-      password: '',
-      emailError: '',
-      codeError: '',
-      pwdError: '',
-      countdown: 0,
-      submitting: false
-    }
-    
-    ElMessage.success(userInfo.value.email ? '邮箱更换成功' : '邮箱绑定成功')
-  }, 1500)
 }
 
 // 职业规划相关
@@ -1141,18 +786,13 @@ const exportPlan = (id) => {
   ElMessage.success(`规划方案${id}导出成功`)
 }
 
-// 收藏相关
-const viewCollection = (item) => {
-  if (item.type === 'job') {
-    router.push(`/job-detail?id=${item.id}`)
-  } else {
-    router.push(`/resource-detail?id=${item.id}`)
-  }
+// 报告相关
+const viewReport = (type, id) => {
+  ElMessage.success(`查看${type === 'interest' ? '兴趣测试' : '人岗匹配'}报告 ${id}`)
 }
 
-const removeCollection = (id) => {
-  collections.value = collections.value.filter(item => item.id !== id)
-  ElMessage.success('取消收藏成功')
+const exportReport = (type, id) => {
+  ElMessage.success(`${type === 'interest' ? '兴趣测试' : '人岗匹配'}报告 ${id} 导出成功`)
 }
 
 // 历史记录相关
@@ -1160,12 +800,9 @@ const clearHistory = () => {
   browseHistory.value = []
   ElMessage.success('浏览历史已清空')
 }
-
 const viewHistory = (item) => {
-  // 根据类型跳转对应页面
   ElMessage.info('正在打开历史记录')
 }
-
 const removeHistory = (id) => {
   browseHistory.value = browseHistory.value.filter(item => item.id !== id)
   ElMessage.success('删除成功')
@@ -1180,13 +817,9 @@ const formatDate = (dateStr) => {
 
 // 主题切换
 const applyTheme = () => {
-  if (darkMode.value) {
-    document.body.classList.add('dark')
-  } else {
-    document.body.classList.remove('dark')
-  }
+  if (darkMode.value) document.body.classList.add('dark')
+  else document.body.classList.remove('dark')
 }
-
 const toggleTheme = () => {
   darkMode.value = !darkMode.value
   localStorage.setItem('darkMode', darkMode.value)
@@ -1199,6 +832,7 @@ const handleLogout = () => {
   localStorage.removeItem('token')
   localStorage.removeItem('avatar')
   localStorage.removeItem('nickname')
+  localStorage.removeItem('phone')
   isLogin.value = false
   isUserMenuOpen.value = false
   router.push('/')
@@ -1213,20 +847,11 @@ const toggleUserMenu = () => {
 // 导航到功能页面
 const goToFeature = (type) => {
   switch(type) {
-    case '测评':
-      router.push('/interest-test')
-      break
-    case '分析':
-      router.push('/ability-analysis')
-      break
-    case '规划':
-      router.push('/development-path')
-      break
-    case '导出':
-      router.push('/report-export')
-      break
-    default:
-      break
+    case '测评': router.push('/interest-test'); break
+    case '分析': router.push('/ability-analysis'); break
+    case '规划': router.push('/development-path'); break
+    case '导出': router.push('/report-export'); break
+    default: break
   }
 }
 
@@ -1246,7 +871,6 @@ const handleSearch = () => {
 // 生命周期
 onMounted(() => {
   applyTheme()
-  // 检查登录状态
   if (!isLogin.value) {
     router.push('/login')
     ElMessage.warning('请先登录')
@@ -1651,6 +1275,118 @@ onMounted(() => {
   border-color: #2f54eb;
 }
 
+/* ========== 新增：多用户卡片样式 ========== */
+.user-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 用户简要卡片 */
+.user-summary-card {
+  background: #f9f9f9;
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid #e8e8e8;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.user-summary-card:hover {
+  border-color: #2f54eb;
+  background: #f5f7ff;
+}
+
+/* 卡片头部 */
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.card-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #fff;
+}
+.card-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* 简要信息 */
+.card-brief {
+  margin-bottom: 15px;
+}
+.brief-item {
+  display: flex;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+.brief-item label {
+  width: 50px;
+  color: #666;
+  font-weight: 500;
+}
+.brief-item span {
+  color: #333;
+}
+
+/* 卡片按钮 */
+.card-actions {
+  margin-bottom: 15px;
+}
+.view-btn {
+  padding: 6px 15px;
+  background: #2f54eb;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* 双击展开的详情（完全沿用你原来的样式） */
+.card-detail {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px dashed #eee;
+}
+
+/* ========== 原有基础信息卡片样式（完全保留） ========== */
+.basic-info-card {
+  background: #f9f9f9;
+  border-radius: 8px;
+  padding: 24px;
+  border: 1px solid #e8e8e8;
+}
+.card-row {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed #eee;
+}
+.card-row:last-child {
+  margin-bottom: 0;
+  border-bottom: none;
+}
+.card-label {
+  width: 140px;
+  flex-shrink: 0;
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+.card-value {
+  flex: 1;
+  font-size: 14px;
+  color: #333;
+  line-height: 1.6;
+}
+
 /* 表单样式 */
 .basic-info-form {
   width: 100%;
@@ -1787,6 +1523,27 @@ onMounted(() => {
   font-size: 14px;
 }
 
+/* 验证码输入框样式 */
+.code-input-wrap {
+  display: flex;
+  gap: 10px;
+  flex: 1;
+}
+.code-input {
+  flex: 1;
+}
+.code-btn {
+  width: 120px;
+  padding: 0 10px;
+  background: #2f54eb;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 /* 职业规划列表 */
 .career-plan-list {
   display: flex;
@@ -1864,60 +1621,47 @@ onMounted(() => {
   font-size: 12px;
 }
 
-/* 收藏列表 */
-.collection-list {
+/* 报告列表样式 */
+.report-list {
   display: flex;
   flex-direction: column;
   gap: 15px;
 }
-.collection-card {
-  display: flex;
-  align-items: center;
-  padding: 15px;
+.report-card {
   background: #f9f9f9;
   border-radius: 8px;
+  padding: 20px;
   border: 1px solid #e8e8e8;
 }
-.card-left {
-  width: 80px;
-  flex-shrink: 0;
+.report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e8e8e8;
 }
-.collection-cover {
-  width: 80px;
-  height: 80px;
-  object-fit: cover;
-  border-radius: 4px;
-}
-.card-middle {
-  flex: 1;
-  padding: 0 15px;
-}
-.collection-title {
+.report-title {
   font-size: 16px;
   font-weight: 600;
-  margin: 0 0 8px 0;
+  margin: 0;
 }
-.collection-desc {
-  font-size: 14px;
-  color: #666;
-  margin: 0 0 8px 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.collection-meta {
-  display: flex;
-  gap: 15px;
+.report-date {
   font-size: 12px;
   color: #999;
 }
-.card-right {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.report-content {
+  margin-bottom: 15px;
 }
-.card-right .view-btn {
+.report-item {
+  display: flex;
+  margin-bottom: 8px;
+}
+.report-actions {
+  display: flex;
+  gap: 10px;
+}
+.report-actions .view-btn {
   padding: 6px 12px;
   background: #2f54eb;
   color: #fff;
@@ -1926,11 +1670,11 @@ onMounted(() => {
   cursor: pointer;
   font-size: 12px;
 }
-.card-right .delete-btn {
+.report-actions .export-btn {
   padding: 6px 12px;
-  background: #fff;
-  color: #ff4d4f;
-  border: 1px solid #ff4d4f;
+  background: #52c41a;
+  color: #fff;
+  border: none;
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
@@ -2092,6 +1836,14 @@ onMounted(() => {
   background: #2f54eb;
   color: #fff;
   border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.cancel-btn {
+  padding: 8px 20px;
+  background: #f5f5f5;
+  border: 1px solid #e8e8e8;
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;

@@ -9,9 +9,8 @@
           </div>
           <ul class="nav-menu">
             <li class="menu-item" @click="$router.push('/')">首页</li>
-            <li class="menu-item active" @click="$router.push('/job-match')">人岗匹配</li>
-            <li class="menu-item" @click="$router.push('/student-ability')">能力画像</li>
-            <li class="menu-item" @click="$router.push('/resource-library')">资源库</li>
+            <li class="menu-item active" @click="$router.push('/career-planning-intro')">职业规划</li>
+            <li class="menu-item" @click="$router.push('/report-export')">报告导出</li>
             <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
             <li class="menu-item dropdown">
               核心功能 ▼
