@@ -97,7 +97,7 @@ const loginForm = ref({
   username: '',
   password: '',
   remember: false,
-  captcha: ''  // 图形验证码
+  captcha: ''
 })
 
 // 表单错误提示
@@ -107,7 +107,7 @@ const formError = ref({
   captcha: ''
 })
 
-// 提示信息
+// 全局提示信息
 const loginError = ref('')
 const loginSuccessMsg = ref('')
 let successTimer = null
@@ -119,6 +119,7 @@ const isLoading = ref(false)
 const captchaTimestamp = ref(Date.now())
 const captchaSrc = computed(() => `/api/captcha?t=${captchaTimestamp.value}`)
 
+// 刷新验证码
 const refreshCaptcha = () => {
   captchaTimestamp.value = Date.now()
   loginForm.value.captcha = ''
@@ -149,7 +150,7 @@ const validateForm = () => {
   return isValid
 }
 
-// 处理登录
+// 登录提交
 const handleLogin = async () => {
   if (!validateForm()) return
 

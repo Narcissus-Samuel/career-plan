@@ -215,26 +215,18 @@ def login():
     token = f"mock-token-{user['id']}"
     return jsonify({'token': token, 'user': {'id': user['id'], 'username': user['username'], 'role': user['role']}})
 
-# ---------- 用户管理接口（原有，未修改）----------
-@auth_bp.route('/users', methods=['GET'])
-def list_users():
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, username, phone, role, is_active, created_at FROM users")
-    rows = cursor.fetchall()
-    conn.close()
-    users = [dict(r) for r in rows]
-    return jsonify({'total': len(users), 'users': users})
-
-@auth_bp.route('/users/<int:user_id>/role', methods=['PUT'])
-def change_role(user_id):
-    data = request.json or {}
-    new_role = data.get('role')
-    if new_role not in ('user', 'admin'):
-        return jsonify({'error': 'invalid role'}), 400
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET role = ? WHERE id = ?", (new_role, user_id))
-    conn.commit()
-    conn.close()
-    return jsonify({'status': 'ok', 'id': user_id, 'role': new_role})
+# ---------- 获取当前登录用户信息 ----------
+@auth_bp.route('/user', methods=['GET'])
+@token_required
+def get_current_user():
+    """返回当前登录用户的基本信息"""
+    user = request.user
+    user_data = {
+        'id': user['id'],
+        'username': user['username'],
+        'phone': user['phone'],
+        'role': user['role'],
+        'is_active': user['is_active'],
+        'created_at': user['created_at']
+    }
+    return jsonify(user_data)

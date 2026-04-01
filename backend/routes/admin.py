@@ -1,13 +1,14 @@
 from flask import Blueprint, request, jsonify
 from db import get_db
 from .auth import admin_required, verify_token
-# 新增导入
 from services.llm_service import (
     cluster_categories_with_zhipu,
     assign_categories_by_keywords,
     generate_category_profile_with_zhipu
 )
 from services.llm_service import rebuild_job_graph
+import json
+import time
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
@@ -89,30 +90,24 @@ def delete_user(user_id):
     conn.close()
     return jsonify({'status': 'deleted'})
 
-# ========== 新增接口：自动聚类生成岗位大类 ==========
+# ========== 岗位管理接口 ==========
 @admin_bp.route('/cluster-categories', methods=['POST'])
 @admin_required
 def cluster_categories():
-    """
-    第一步：调用大模型自动聚类，生成10-15个大类，并存入job_categories表。
-    第二步：根据聚类结果，为所有岗位分配category_id（基于关键词匹配）。
-    """
+    """调用大模型自动聚类，生成10-15个大类"""
     data = request.get_json() or {}
-    sample_size = data.get('sample_size', 500)  # 抽样数量，默认500
+    sample_size = data.get('sample_size', 500)
 
-    # 1. 清空现有大类（确保完全基于大模型生成）
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM job_categories")
     conn.commit()
     conn.close()
 
-    # 2. 调用大模型聚类
     categories = cluster_categories_with_zhipu(sample_size)
     if not categories:
         return jsonify({'error': '聚类失败，未获得有效结果'}), 500
 
-    # 3. 将大类插入数据库
     conn = get_db()
     cursor = conn.cursor()
     category_job_titles_map = {}
@@ -127,7 +122,6 @@ def cluster_categories():
         category_job_titles_map[cat_name] = job_titles
     conn.close()
 
-    # 4. 为岗位分配类别
     assigned_count = assign_categories_by_keywords(category_job_titles_map)
 
     return jsonify({
@@ -135,11 +129,11 @@ def cluster_categories():
         'categories': categories
     })
 
-# ========== 新增接口：为所有大类生成通用画像 ==========
+
 @admin_bp.route('/generate-all-category-profiles', methods=['POST'])
 @admin_required
 def generate_all_category_profiles():
-    """为每个大类生成通用画像（技能、证书、软能力）"""
+    """为每个大类生成通用画像"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT id FROM job_categories")
@@ -156,10 +150,11 @@ def generate_all_category_profiles():
         'success_ids': success
     })
 
+
 @admin_bp.route('/build-job-graph', methods=['POST'])
 @admin_required
 def build_job_graph():
-    """重建岗位图谱（垂直晋升+横向换岗）"""
+    """重建岗位图谱"""
     try:
         v_count, l_count = rebuild_job_graph()
         return jsonify({
@@ -168,3 +163,114 @@ def build_job_graph():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ========== 报告管理接口 ==========
+@admin_bp.route('/reports', methods=['GET'])
+@admin_required
+def list_reports():
+    """获取所有报告列表（分页，可按学生筛选）"""
+    page = request.args.get('page', 1, type=int)
+    size = request.args.get('size', 20, type=int)
+    student_id = request.args.get('student_id', type=int)
+
+    if page < 1 or size < 1:
+        return jsonify({'error': '分页参数无效'}), 400
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    conditions = []
+    params = []
+    if student_id:
+        conditions.append("student_id = ?")
+        params.append(student_id)
+
+    where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+    count_sql = f"SELECT COUNT(*) as total FROM report_history {where_clause}"
+    cursor.execute(count_sql, params)
+    total = cursor.fetchone()['total']
+
+    offset = (page - 1) * size
+    sql = f"""
+        SELECT id, student_id, job_name, content, format_type, created_at
+        FROM report_history {where_clause}
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+    """
+    cursor.execute(sql, params + [size, offset])
+    rows = cursor.fetchall()
+    conn.close()
+
+    reports = [dict(row) for row in rows]
+    return jsonify({
+        'total': total,
+        'page': page,
+        'size': size,
+        'items': reports
+    })
+
+
+@admin_bp.route('/reports/<int:report_id>', methods=['GET'])
+@admin_required
+def get_report(report_id):
+    """获取单个报告详情"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM report_history WHERE id = ?", (report_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return jsonify({'error': '报告不存在'}), 404
+    return jsonify(dict(row))
+
+
+@admin_bp.route('/reports/<int:report_id>', methods=['DELETE'])
+@admin_required
+def delete_report(report_id):
+    """删除报告"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM report_history WHERE id = ?", (report_id,))
+    if cursor.rowcount == 0:
+        conn.close()
+        return jsonify({'error': '报告不存在'}), 404
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'deleted'})
+
+
+@admin_bp.route('/users/<int:user_id>/reports', methods=['GET'])
+@admin_required
+def get_user_reports(user_id):
+    """获取指定用户的所有报告（分页）"""
+    page = request.args.get('page', 1, type=int)
+    size = request.args.get('size', 20, type=int)
+
+    if page < 1 or size < 1:
+        return jsonify({'error': '分页参数无效'}), 400
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) as total FROM report_history WHERE student_id = ?", (user_id,))
+    total = cursor.fetchone()['total']
+
+    offset = (page - 1) * size
+    cursor.execute("""
+        SELECT id, student_id, job_name, content, format_type, created_at
+        FROM report_history
+        WHERE student_id = ?
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+    """, (user_id, size, offset))
+    rows = cursor.fetchall()
+    conn.close()
+
+    reports = [dict(row) for row in rows]
+    return jsonify({
+        'total': total,
+        'page': page,
+        'size': size,
+        'items': reports
+    })
