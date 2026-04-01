@@ -11,7 +11,7 @@
           <ul class="nav-menu">
             <li class="menu-item active" @click="$router.push('/')">首页</li>
             <li class="menu-item" @click="$router.push('/career-planning-intro')">职业规划</li>
-            <li class="menu-item" @click="$router.push('/resource-library')">资源库</li>
+            <li class="menu-item" @click="$router.push('/report-export')">报告导出</li>
             <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
             <li class="menu-item dropdown">
               核心功能 ▼
@@ -240,13 +240,14 @@ watch(() => route.path, () => {
 
 const toggleUserMenu = () => { isUserMenuOpen.value = !isUserMenuOpen.value }
 const handleLogout = () => {
+  // 真正清空登录状态
   localStorage.clear()
   isLogin.value = false
   isUserMenuOpen.value = false
-  initMockLogin()
-  isLogin.value = true
   userAvatar.value = ''
-  ElMessage.success('已切换为测试用户')
+  ElMessage.success('已成功退出登录')
+  
+  // 退出后不要自动登录！只在页面初始化时执行模拟登录
 }
 
 // 主题切换
