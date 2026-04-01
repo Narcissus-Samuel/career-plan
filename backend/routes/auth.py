@@ -3,11 +3,15 @@ import random
 import string
 import datetime
 import time
+import os
+import uuid
 from flask import Blueprint, request, jsonify, session, Response
 from werkzeug.security import generate_password_hash, check_password_hash
-from captcha.image import ImageCaptcha  # 需要安装：pip install captcha
+from werkzeug.utils import secure_filename
+from captcha.image import ImageCaptcha
 from db import get_db
 from functools import wraps
+import json
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api')
 
@@ -78,11 +82,8 @@ def admin_required(f):
 @auth_bp.route('/captcha', methods=['GET'])
 def get_captcha():
     """生成图形验证码图片"""
-    # 生成4位随机字符（大写字母+数字）
     captcha_text = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
-    # 存储到session
     session['captcha'] = captcha_text
-    # 生成图片
     image = ImageCaptcha(width=120, height=40)
     data = image.generate(captcha_text)
     return Response(data.read(), mimetype='image/png')
@@ -90,13 +91,11 @@ def get_captcha():
 # ---------- 短信验证码（模拟） ----------
 @auth_bp.route('/send_code', methods=['POST'])
 def send_code():
-    """生成并保存短信验证码（模拟），需先验证图形验证码（可选，建议加）"""
     data = request.json or {}
     phone = data.get('phone')
     if not phone:
         return jsonify({'error': 'phone required'}), 400
 
-    # 检查发送频率（60秒内只能发一次）
     now = time.time()
     if phone in last_send_time and now - last_send_time[phone] < 60:
         return jsonify({'error': '发送过于频繁，请稍后再试'}), 429
@@ -114,9 +113,8 @@ def send_code():
     conn.commit()
     conn.close()
 
-    # 真实环境应当发送短信，此处只打印到控制台，并返回模拟码（调试用）
     print(f"验证码 {code} 已发送至手机 {phone}")
-    return jsonify({'code': code, 'message': '验证码已发送'})  # 保留code便于调试
+    return jsonify({'code': code, 'message': '验证码已发送'})
 
 # ---------- 注册 ----------
 @auth_bp.route('/register', methods=['POST'])
@@ -125,23 +123,20 @@ def register():
     username = data.get('username')
     phone = data.get('phone')
     password = data.get('password')
-    sms_code = data.get('code')       # 短信验证码
-    captcha_input = data.get('captcha')  # 图形验证码
+    sms_code = data.get('code')
+    captcha_input = data.get('captcha')
 
-    # 验证图形验证码
     if not captcha_input:
         return jsonify({'error': '请输入图形验证码'}), 400
-    session_captcha = session.pop('captcha', None)  # 使用后立即删除
+    session_captcha = session.pop('captcha', None)
     if not session_captcha or session_captcha.lower() != captcha_input.lower():
         return jsonify({'error': '图形验证码错误'}), 400
 
-    # 基础验证
     if not username or not password:
         return jsonify({'error': 'username and password required'}), 400
     if phone and not sms_code:
         return jsonify({'error': '短信验证码不能为空'}), 400
 
-    # 检查用户名或手机号是否已存在
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
@@ -153,7 +148,6 @@ def register():
         conn.close()
         return jsonify({'error': '用户名或手机号已被注册'}), 400
 
-    # 验证短信验证码（如果提供了手机号）
     if phone and sms_code:
         cursor.execute(
             "SELECT code, expires_at FROM verification_codes WHERE phone = ? ORDER BY id DESC LIMIT 1",
@@ -170,11 +164,9 @@ def register():
                 return jsonify({'error': '短信验证码已过期'}), 400
         except Exception:
             pass
-        # 验证成功后删除该短信验证码（防止重复使用）
         cursor.execute("DELETE FROM verification_codes WHERE phone = ? AND code = ?", (phone, sms_code))
         conn.commit()
 
-    # 创建用户
     pw_hash = generate_password_hash(password)
     cursor.execute(
         "INSERT INTO users (username, phone, password_hash) VALUES (?, ?, ?)",
@@ -192,9 +184,8 @@ def login():
     data = request.json or {}
     identifier = data.get('username') or data.get('phone')
     password = data.get('password')
-    captcha_input = data.get('captcha')  # 图形验证码
+    captcha_input = data.get('captcha')
 
-    # 验证图形验证码
     if not captcha_input:
         return jsonify({'error': '请输入图形验证码'}), 400
     session_captcha = session.pop('captcha', None)
@@ -211,7 +202,6 @@ def login():
     if not check_password_hash(user['password_hash'], password):
         return jsonify({'error': 'invalid credentials'}), 401
 
-    # 生成简单 token（可换为 JWT）
     token = f"mock-token-{user['id']}"
     return jsonify({'token': token, 'user': {'id': user['id'], 'username': user['username'], 'role': user['role']}})
 
@@ -219,7 +209,6 @@ def login():
 @auth_bp.route('/user', methods=['GET'])
 @token_required
 def get_current_user():
-    """返回当前登录用户的基本信息"""
     user = request.user
     user_data = {
         'id': user['id'],
@@ -227,6 +216,476 @@ def get_current_user():
         'phone': user['phone'],
         'role': user['role'],
         'is_active': user['is_active'],
+        'avatar': user.get('avatar') or '',
         'created_at': user['created_at']
     }
     return jsonify(user_data)
+
+# ---------- 用户个人信息接口（扩展） ----------
+@auth_bp.route('/user/profile', methods=['GET'])
+@token_required
+def get_user_profile():
+    user = request.user
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # 查询用户基本信息
+    cursor.execute("SELECT id, username, phone, role, avatar, created_at FROM users WHERE id = ?", (user['id'],))
+    user_row = cursor.fetchone()
+    if not user_row:
+        conn.close()
+        return jsonify({'error': '用户不存在'}), 404
+
+    # 查询学生能力画像（可能没有）
+    cursor.execute("SELECT * FROM student WHERE user_id = ? ORDER BY id DESC LIMIT 1", (user['id'],))
+    student_row = cursor.fetchone()
+    conn.close()
+
+    profile = {
+        'id': user_row['id'],
+        'username': user_row['username'],
+        'phone': user_row['phone'],
+        'role': user_row['role'],
+        'avatar': user_row['avatar'] or '',
+        'joinTime': user_row['created_at'],
+    }
+
+    if student_row:
+        profile.update({
+            'name': student_row['name'] or '',
+            'realName': student_row['name'] or '',
+            'gender': '',  # 暂未存储
+            'school': '',  # 暂未存储
+            'major': '',   # 暂未存储
+            'grade': '',   # 暂未存储
+            'email': student_row['email'] or '',
+            'introduction': student_row['summary'] or '',
+            'education_text': student_row['education_text'] or '',
+            'work_text': student_row['work_text'] or '',
+            'project_text': student_row['project_text'] or '',
+            'skills_certs_text': student_row['skills_certs_text'] or '',
+            'summary': student_row['summary'] or '',
+            'skills': student_row['skills'] or '',
+            'certificates': student_row['certificates'] or '',
+            'soft_abilities': student_row['soft_abilities'] or '',
+            'completeness': student_row['completeness'] or 0,
+            'created_at': student_row['created_at'] or ''
+        })
+    else:
+        profile.update({
+            'name': '', 'realName': '', 'gender': '', 'school': '', 'major': '', 'grade': '',
+            'email': '', 'introduction': '', 'education_text': '', 'work_text': '', 'project_text': '',
+            'skills_certs_text': '', 'summary': '', 'skills': '', 'certificates': '', 'soft_abilities': '',
+            'completeness': 0, 'created_at': ''
+        })
+
+    return jsonify(profile)
+
+
+@auth_bp.route('/user/profile', methods=['PUT'])
+@token_required
+def update_user_profile():
+    data = request.json or {}
+    user = request.user
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # 检查 student 记录是否存在
+    cursor.execute("SELECT id FROM student WHERE user_id = ?", (user['id'],))
+    student_row = cursor.fetchone()
+    if not student_row:
+        # 创建一条空记录
+        cursor.execute('''
+            INSERT INTO student (user_id, name, email, completeness)
+            VALUES (?, ?, ?, ?)
+        ''', (user['id'], data.get('name', ''), data.get('email', ''), 0))
+        student_id = cursor.lastrowid
+    else:
+        student_id = student_row['id']
+
+    # 更新 student 表中允许的字段
+    update_fields = []
+    params = []
+    allowed_fields = ['name', 'email', 'education_text', 'work_text', 'project_text',
+                      'skills_certs_text', 'summary']
+    for field in allowed_fields:
+        if field in data:
+            update_fields.append(f"{field} = ?")
+            params.append(data[field])
+    if update_fields:
+        params.append(student_id)
+        cursor.execute(f"UPDATE student SET {', '.join(update_fields)} WHERE id = ?", params)
+
+    # 更新 users 表中的手机号（如果提供）
+    if 'phone' in data:
+        cursor.execute("UPDATE users SET phone = ? WHERE id = ?", (data['phone'], user['id']))
+
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
+
+
+@auth_bp.route('/user/avatar', methods=['POST'])
+@token_required
+def upload_avatar():
+    if 'file' not in request.files:
+        return jsonify({'error': 'no file'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'empty filename'}), 400
+
+    if not file.content_type.startswith('image/'):
+        return jsonify({'error': 'invalid image type'}), 400
+
+    # 保存文件
+    filename = secure_filename(f"{uuid.uuid4().hex}_{file.filename}")
+    upload_folder = os.path.join(os.path.dirname(__file__), '..', 'uploads', 'avatars')
+    os.makedirs(upload_folder, exist_ok=True)
+    file_path = os.path.join(upload_folder, filename)
+    file.save(file_path)
+
+    avatar_url = f"/uploads/avatars/{filename}"
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET avatar = ? WHERE id = ?", (avatar_url, request.user['id']))
+    conn.commit()
+    conn.close()
+
+    return jsonify({'avatar': avatar_url})
+
+
+@auth_bp.route('/user/change-password', methods=['POST'])
+@token_required
+def change_password():
+    data = request.json or {}
+    old_pwd = data.get('oldPwd')
+    new_pwd = data.get('newPwd')
+    if not old_pwd or not new_pwd:
+        return jsonify({'error': 'old password and new password required'}), 400
+
+    user = request.user
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT password_hash FROM users WHERE id = ?", (user['id'],))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({'error': 'user not found'}), 404
+
+    if not check_password_hash(row['password_hash'], old_pwd):
+        conn.close()
+        return jsonify({'error': 'invalid old password'}), 401
+
+    new_hash = generate_password_hash(new_pwd)
+    cursor.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user['id']))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
+
+
+@auth_bp.route('/user/bind-phone', methods=['POST'])
+@token_required
+def bind_phone():
+    data = request.json or {}
+    phone = data.get('phone')
+    code = data.get('code')
+    if not phone or not code:
+        return jsonify({'error': 'phone and code required'}), 400
+
+    # 模拟验证码验证，实际应查询 verification_codes 表
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET phone = ? WHERE id = ?", (phone, request.user['id']))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
+
+
+@auth_bp.route('/user/plans', methods=['GET'])
+@token_required
+def get_user_plans():
+    """获取用户的职业规划报告（从 report_history 表）"""
+    user = request.user
+    conn = get_db()
+    cursor = conn.cursor()
+    # 先获取学生 ID
+    cursor.execute("SELECT id FROM student WHERE user_id = ?", (user['id'],))
+    student_row = cursor.fetchone()
+    if not student_row:
+        conn.close()
+        return jsonify([])
+
+    cursor.execute('''
+        SELECT id, job_name, content, format_type, created_at
+        FROM report_history WHERE student_id = ? ORDER BY created_at DESC
+    ''', (student_row['id'],))
+    rows = cursor.fetchall()
+    conn.close()
+    plans = []
+    for row in rows:
+        plans.append({
+            'id': row['id'],
+            'title': f"{row['job_name']} 职业规划报告",
+            'targetJob': row['job_name'],
+            'cycle': '1-3年',   # 可后续从报告内容提取
+            'matchRate': 0,      # 匹配度不在 report_history 中，可忽略
+            'createTime': row['created_at']
+        })
+    return jsonify(plans)
+
+
+@auth_bp.route('/user/interest-reports', methods=['GET'])
+@token_required
+def get_interest_reports():
+    """获取用户的兴趣测试报告（从 assessment_results 表）"""
+    user = request.user
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT id, dimension_scores, recommendation, created_at
+        FROM assessment_results WHERE user_id = ? ORDER BY created_at DESC
+    ''', (user['id'],))
+    rows = cursor.fetchall()
+    conn.close()
+    reports = []
+    for row in rows:
+        # 简单解析，实际可解析 dimension_scores 生成更友好标题
+        reports.append({
+            'id': row['id'],
+            'title': '霍兰德职业兴趣测评报告',
+            'type': '霍兰德测试',
+            'result': '根据您的得分，兴趣类型偏向...',  # 可解析
+            'suitableJobs': '产品经理、人力资源、心理咨询师',
+            'createTime': row['created_at']
+        })
+    return jsonify(reports)
+
+
+@auth_bp.route('/user/match-reports', methods=['GET'])
+@token_required
+def get_match_reports():
+    """获取用户的人岗匹配报告（从 match_history 表，关联 student 表）"""
+    user = request.user
+    conn = get_db()
+    cursor = conn.cursor()
+    # 先获取学生 ID
+    cursor.execute("SELECT id FROM student WHERE user_id = ?", (user['id'],))
+    student_row = cursor.fetchone()
+    if not student_row:
+        conn.close()
+        return jsonify([])
+
+    cursor.execute('''
+        SELECT id, job_name, match_score, details, created_at
+        FROM match_history WHERE student_id = ? ORDER BY created_at DESC
+    ''', (student_row['id'],))
+    rows = cursor.fetchall()
+    conn.close()
+    reports = []
+    for row in rows:
+        details = json.loads(row['details']) if row['details'] else {}
+        gap = details.get('gap_analysis', {})
+        reports.append({
+            'id': row['id'],
+            'title': f"{row['job_name']} 匹配报告",
+            'targetJob': row['job_name'],
+            'score': row['match_score'],
+            'result': '高度匹配' if row['match_score'] >= 80 else ('中度匹配' if row['match_score'] >= 60 else '待提升'),
+            'suggestion': gap.get('skills', '请完善技能'),
+            'createTime': row['created_at']
+        })
+    return jsonify(reports)
+
+
+# ---------- 浏览历史接口（需要表 user_browse_history） ----------
+@auth_bp.route('/user/history', methods=['GET'])
+@token_required
+def get_browse_history():
+    """获取用户浏览历史"""
+    user = request.user
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT id, title, description, cover, created_at
+        FROM user_browse_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 50
+    ''', (user['id'],))
+    rows = cursor.fetchall()
+    conn.close()
+    history = []
+    for row in rows:
+        history.append({
+            'id': row['id'],
+            'title': row['title'],
+            'desc': row['description'],
+            'cover': row['cover'],
+            'browseTime': row['created_at']
+        })
+    return jsonify(history)
+
+
+@auth_bp.route('/user/history', methods=['POST'])
+@token_required
+def add_browse_history():
+    """添加一条浏览记录"""
+    data = request.json or {}
+    user = request.user
+    title = data.get('title')
+    description = data.get('desc') or ''
+    cover = data.get('cover') or ''
+    item_type = data.get('type', 'job')
+    item_id = data.get('itemId', 0)
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO user_browse_history (user_id, item_type, item_id, title, description, cover)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (user['id'], item_type, item_id, title, description, cover))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'added'})
+
+
+@auth_bp.route('/user/history/<int:history_id>', methods=['DELETE'])
+@token_required
+def delete_browse_history(history_id):
+    """删除单条浏览历史"""
+    user = request.user
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM user_browse_history WHERE id = ? AND user_id = ?", (history_id, user['id']))
+    if cursor.rowcount == 0:
+        conn.close()
+        return jsonify({'error': 'not found'}), 404
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'deleted'})
+
+
+@auth_bp.route('/user/history/clear', methods=['DELETE'])
+@token_required
+def clear_browse_history():
+    """清空浏览历史"""
+    user = request.user
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM user_browse_history WHERE user_id = ?", (user['id'],))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'cleared'})
+
+@auth_bp.route('/user/stats', methods=['GET'])
+@token_required
+def get_user_stats():
+    """获取用户统计数据：测评次数、规划方案数"""
+    user = request.user
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # 1. 测评次数（assessment_results 表）
+    cursor.execute("SELECT COUNT(*) as cnt FROM assessment_results WHERE user_id = ?", (user['id'],))
+    assessment_count = cursor.fetchone()['cnt']
+    
+    # 2. 规划方案数（report_history 表关联 student）
+    cursor.execute("SELECT id FROM student WHERE user_id = ?", (user['id'],))
+    student_row = cursor.fetchone()
+    plan_count = 0
+    if student_row:
+        cursor.execute("SELECT COUNT(*) as cnt FROM report_history WHERE student_id = ?", (student_row['id'],))
+        plan_count = cursor.fetchone()['cnt']
+    
+    conn.close()
+    return jsonify({
+        'assessmentCount': assessment_count,
+        'planCount': plan_count
+    })
+
+# ---------- 统一获取用户所有报告列表 ----------
+@auth_bp.route('/user/reports', methods=['GET'])
+@token_required
+def get_all_reports():
+    """获取当前用户的所有报告（兴趣测试、人岗匹配、职业规划）"""
+    user = request.user
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # 1. 获取学生ID（可能为空）
+    cursor.execute("SELECT id FROM student WHERE user_id = ?", (user['id'],))
+    student_row = cursor.fetchone()
+    student_id = student_row['id'] if student_row else None
+
+    reports = []
+
+    # 2. 兴趣测试报告（assessment_results）
+    cursor.execute('''
+        SELECT id, dimension_scores, recommendation, created_at
+        FROM assessment_results
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+    ''', (user['id'],))
+    for row in cursor.fetchall():
+        # 将时间戳转换为ISO字符串（如果数据库存储的是数字时间戳）
+        created_at = row['created_at']
+        if isinstance(created_at, (int, float)):
+            created_at = datetime.datetime.fromtimestamp(created_at).isoformat()
+        reports.append({
+            'id': f"interest_{row['id']}",
+            'title': '霍兰德职业兴趣测评报告',
+            'type': 'interest_test',
+            'summary': row['recommendation'][:100] if row['recommendation'] else '兴趣类型分析报告',
+            'created_at': created_at,
+            'original_id': row['id'],
+            'original_table': 'assessment_results'
+        })
+
+    # 3. 人岗匹配报告（match_history，需要student_id）
+    if student_id:
+        cursor.execute('''
+            SELECT id, job_name, match_score, details, created_at
+            FROM match_history
+            WHERE student_id = ?
+            ORDER BY created_at DESC
+        ''', (student_id,))
+        for row in cursor.fetchall():
+            created_at = row['created_at']
+            if isinstance(created_at, (int, float)):
+                created_at = datetime.datetime.fromtimestamp(created_at).isoformat()
+            reports.append({
+                'id': f"match_{row['id']}",
+                'title': f"{row['job_name']} 人岗匹配报告",
+                'type': 'job_match',
+                'summary': f"匹配度: {row['match_score']}%",
+                'created_at': created_at,
+                'original_id': row['id'],
+                'original_table': 'match_history'
+            })
+
+    # 4. 职业规划报告（report_history，需要student_id）
+    if student_id:
+        cursor.execute('''
+            SELECT id, job_name, content, format_type, created_at
+            FROM report_history
+            WHERE student_id = ?
+            ORDER BY created_at DESC
+        ''', (student_id,))
+        for row in cursor.fetchall():
+            created_at = row['created_at']
+            if isinstance(created_at, (int, float)):
+                created_at = datetime.datetime.fromtimestamp(created_at).isoformat()
+            content = row['content'] or ''
+            summary = (content[:100] + '...') if len(content) > 100 else content
+            reports.append({
+                'id': f"plan_{row['id']}",
+                'title': f"{row['job_name']} 职业规划报告",
+                'type': 'career_plan',
+                'summary': summary,
+                'created_at': created_at,
+                'original_id': row['id'],
+                'original_table': 'report_history'
+            })
+
+    conn.close()
+
+    # 按创建时间倒序排序（已按数据库顺序，但为了保险再排一次）
+    reports.sort(key=lambda x: x['created_at'], reverse=True)
+    return jsonify(reports)
