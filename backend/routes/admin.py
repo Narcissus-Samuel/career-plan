@@ -1,6 +1,11 @@
 from flask import Blueprint, request, jsonify
 from db import get_db
 from .auth import admin_required, verify_token
+<<<<<<< Updated upstream
+=======
+
+# 新增导入
+>>>>>>> Stashed changes
 from services.llm_service import (
     cluster_categories_with_zhipu,
     assign_categories_by_keywords,
@@ -13,6 +18,7 @@ import time
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
 
+# ====================== 登录 ======================
 @admin_bp.route('/login', methods=['POST'])
 def admin_login():
     data = request.json or {}
@@ -34,6 +40,7 @@ def admin_login():
     return jsonify({'token': token, 'user': {'id': user['id'], 'username': user['username']}})
 
 
+# ====================== 用户管理 ======================
 @admin_bp.route('/users', methods=['GET'])
 @admin_required
 def list_users():
@@ -90,11 +97,167 @@ def delete_user(user_id):
     conn.close()
     return jsonify({'status': 'deleted'})
 
+<<<<<<< Updated upstream
 # ========== 岗位管理接口 ==========
 @admin_bp.route('/cluster-categories', methods=['POST'])
 @admin_required
 def cluster_categories():
     """调用大模型自动聚类，生成10-15个大类"""
+=======
+
+# ====================== 岗位大类管理 ======================
+@admin_bp.route('/categories', methods=['GET'])
+@admin_required
+def get_categories():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id, name, description FROM job_categories")
+    rows = cur.fetchall()
+    conn.close()
+    list_data = [dict(row) for row in rows]
+    return jsonify({"list": list_data})
+
+
+@admin_bp.route('/categories', methods=['POST'])
+@admin_required
+def add_category():
+    data = request.json or {}
+    name = data.get("name")
+    desc = data.get("description", "")
+    if not name:
+        return jsonify({"error": "name required"}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO job_categories (name, description) VALUES (?, ?)", (name, desc))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+
+@admin_bp.route('/categories/<int:cid>', methods=['DELETE'])
+@admin_required
+def delete_category(cid):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM job_categories WHERE id = ?", (cid,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "deleted"})
+
+
+# ====================== 岗位数据管理（100% 匹配你的数据库） ======================
+@admin_bp.route('/jobs', methods=['GET'])
+@admin_required
+def get_all_jobs():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT 
+            job.rowid as id,
+            job.job_name,
+            job.location,
+            job.salary_range,
+            job.company,
+            job.industry,
+            job.company_size,
+            job.company_type,
+            job.job_code,
+            job.job_description,
+            job.updated_at,
+            job.company_info,
+            job.source_url,
+            job.category_id,
+            job_categories.name as category_name
+        FROM job
+        LEFT JOIN job_categories ON job.category_id = job_categories.id
+    ''')
+    rows = cur.fetchall()
+    conn.close()
+    jobs = [dict(r) for r in rows]
+    return jsonify({"list": jobs})
+
+
+@admin_bp.route('/jobs', methods=['POST'])
+@admin_required
+def add_job():
+    data = request.json or {}
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('''
+        INSERT INTO job (
+            job_name, location, salary_range, company, industry,
+            company_size, company_type, job_code, job_description,
+            company_info, source_url, updated_at, category_id
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+    ''', (
+        data.get('job_name'),
+        data.get('location'),
+        data.get('salary_range'),
+        data.get('company'),
+        data.get('industry'),
+        data.get('company_size'),
+        data.get('company_type'),
+        data.get('job_code'),
+        data.get('job_description'),
+        data.get('company_info'),
+        data.get('source_url'),
+        data.get('updated_at'),
+        data.get('category_id')
+    ))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+
+@admin_bp.route('/jobs/<int:jid>', methods=['PUT'])
+@admin_required
+def update_job(jid):
+    data = request.json or {}
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('''
+        UPDATE job SET
+            job_name=?, location=?, salary_range=?, company=?, industry=?,
+            company_size=?, company_type=?, job_code=?, job_description=?,
+            company_info=?, source_url=?, updated_at=?, category_id=?
+        WHERE rowid=?
+    ''', (
+        data.get('job_name'),
+        data.get('location'),
+        data.get('salary_range'),
+        data.get('company'),
+        data.get('industry'),
+        data.get('company_size'),
+        data.get('company_type'),
+        data.get('job_code'),
+        data.get('job_description'),
+        data.get('company_info'),
+        data.get('source_url'),
+        data.get('updated_at'),
+        data.get('category_id'),
+        jid
+    ))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+
+@admin_bp.route('/jobs/<int:jid>', methods=['DELETE'])
+@admin_required
+def delete_job(jid):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM job WHERE rowid = ?", (jid,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "deleted"})
+
+
+# ====================== AI 自动聚类 ======================
+@admin_bp.route('/cluster-categories', methods=['POST'])
+@admin_required
+def cluster_categories():
+>>>>>>> Stashed changes
     data = request.get_json() or {}
     sample_size = data.get('sample_size', 500)
 
@@ -130,10 +293,17 @@ def cluster_categories():
     })
 
 
+<<<<<<< Updated upstream
 @admin_bp.route('/generate-all-category-profiles', methods=['POST'])
 @admin_required
 def generate_all_category_profiles():
     """为每个大类生成通用画像"""
+=======
+# ====================== AI 生成所有大类画像 ======================
+@admin_bp.route('/generate-all-category-profiles', methods=['POST'])
+@admin_required
+def generate_all_category_profiles():
+>>>>>>> Stashed changes
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT id FROM job_categories")
@@ -151,10 +321,17 @@ def generate_all_category_profiles():
     })
 
 
+<<<<<<< Updated upstream
 @admin_bp.route('/build-job-graph', methods=['POST'])
 @admin_required
 def build_job_graph():
     """重建岗位图谱"""
+=======
+# ====================== AI 构建晋升&换岗图谱 ======================
+@admin_bp.route('/build-job-graph', methods=['POST'])
+@admin_required
+def build_job_graph():
+>>>>>>> Stashed changes
     try:
         v_count, l_count = rebuild_job_graph()
         return jsonify({

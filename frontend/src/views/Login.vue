@@ -175,13 +175,20 @@ const handleLogin = async () => {
     }
 
     // 登录成功
-    loginSuccessMsg.value = '登录成功！即将跳转至首页'
     localStorage.setItem('token', data.token)
     localStorage.setItem('currentUser', JSON.stringify(data.user))
+    localStorage.setItem('role', data.user.role) // 保存角色
 
-    successTimer = setTimeout(() => {
-      router.push('/')
-    }, 1500)
+    // ====================== 关键修改：根据角色跳转 ======================
+    if (data.user.role === 'admin') {
+      loginSuccessMsg.value = '管理员登录成功！即将进入管理后台'
+      setTimeout(() => router.push('/admin'), 1500)
+    } else {
+      loginSuccessMsg.value = '登录成功！即将跳转至首页'
+      setTimeout(() => router.push('/'), 1500)
+    }
+    // ===================================================================
+
   } catch (error) {
     loginError.value = error.message
     refreshCaptcha() // 失败后刷新验证码
