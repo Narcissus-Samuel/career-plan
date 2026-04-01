@@ -1,6 +1,6 @@
 <template>
   <div class="career-home">
-    <!-- 1. 顶部导航（整合搜索框）- 固定在顶部 -->
+    <!-- 顶部导航（不变） -->
     <header class="top-nav">
       <div class="nav-wrap">
         <div class="nav-left">
@@ -10,7 +10,6 @@
           </div>
           <ul class="nav-menu">
             <li class="menu-item active" @click="$router.push('/')">首页</li>
-            <!-- <li class="menu-item" @click="$router.push('/student-ability')">岗位画像</li> -->
             <li class="menu-item" @click="$router.push('/career-planning-intro')">职业规划</li>
             <li class="menu-item" @click="$router.push('/resource-library')">资源库</li>
             <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
@@ -33,35 +32,16 @@
             </li>
           </ul>
         </div>
-
-        <!-- 导航栏右侧：搜索框 + 原有功能 -->
         <div class="nav-right">
-          <!-- 导航栏内的搜索框 -->
           <div class="nav-search-wrap">
-            <input 
-              type="text" 
-              class="nav-search-input" 
-              v-model="searchKeyword"
-              placeholder="搜索职业方向、专业、院校、岗位类型"
-              @keyup.enter="handleSearch"
-            >
+            <input type="text" class="nav-search-input" v-model="searchKeyword" placeholder="搜索职业方向、专业、院校、岗位类型" @keyup.enter="handleSearch">
             <button class="nav-search-btn" @click="handleSearch">搜索</button>
           </div>
-
           <button class="btn-toggle-theme" @click="toggleTheme">🌙</button>
-          
-          <!-- 未登录：显示登录/注册按钮 -->
           <button class="btn-login" @click="$router.push('/login')" v-if="!isLogin">登录</button>
           <button class="btn-register" @click="$router.push('/register')" v-if="!isLogin">注册</button>
-          
-          <!-- 已登录：显示用户头像 + 下拉菜单 -->
           <div class="user-profile" v-if="isLogin">
-            <img 
-              :src="userAvatar || 'https://picsum.photos/seed/avatar/40/40'" 
-              alt="用户头像" 
-              class="avatar"
-              @click="toggleUserMenu"
-            >
+            <img :src="userAvatar || 'https://picsum.photos/seed/avatar/40/40'" alt="用户头像" class="avatar" @click="toggleUserMenu">
             <div class="user-menu" v-show="isUserMenuOpen">
               <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
               <div class="menu-item" @click="$router.push('/settings')">账号设置</div>
@@ -72,19 +52,12 @@
       </div>
     </header>
 
-    <!-- 2. Banner区（轮播图）- 调整顶部间距避免被导航栏遮挡 -->
+    <!-- 轮播图区（不变） -->
     <section class="banner-carousel">
       <div class="carousel-container" ref="carouselRef">
-        <div 
-          class="carousel-track" 
-          :style="{ transform: `translateX(-${currentIndex * 100}%)` }"
-        >
+        <div class="carousel-track" :style="{ transform: `translateX(-${currentIndex * 100}%)` }">
           <div class="carousel-item" v-for="(item, index) in carouselList" :key="index">
-            <img 
-              :src="item.url" 
-              alt="轮播图" 
-              class="carousel-img"
-            >
+            <img :src="item.url" alt="轮播图" class="carousel-img">
             <div class="carousel-overlay">
               <div class="overlay-left">
                 <h1 class="overlay-title">大学生智能职业规划系统</h1>
@@ -102,29 +75,18 @@
         <button class="carousel-btn prev-btn" @click="prevSlide">◀</button>
         <button class="carousel-btn next-btn" @click="nextSlide">▶</button>
         <div class="carousel-indicators">
-          <span 
-            class="indicator" 
-            v-for="(item, index) in carouselList" 
-            :key="index"
-            :class="{ active: index === currentIndex }"
-            @click="goToSlide(index)"
-          ></span>
+          <span class="indicator" v-for="(item, index) in carouselList" :key="index" :class="{ active: index === currentIndex }" @click="goToSlide(index)"></span>
         </div>
         <div class="upload-area">
           <label class="upload-btn">
-            <input 
-              type="file" 
-              accept="image/*" 
-              @change="handleImageUpload"
-              hidden
-            >
+            <input type="file" accept="image/*" @change="handleImageUpload" hidden>
             📤 更换轮播图片
           </label>
         </div>
       </div>
     </section>
 
-    <!-- 调整：轮播图下方功能模块样式（番茄小说网风格） -->
+    <!-- 功能模块（不变） -->
     <section class="function-modules">
       <div class="modules-wrap">
         <div class="module-item" @click="$router.push('/job-portrait')">
@@ -151,37 +113,18 @@
       </div>
     </section>
 
-    <!-- 7. 招聘岗位卡片区（修改为五列两行，纯文字样式） -->
+    <!-- 招聘岗位卡片区（纯后端分页，快速加载） -->
     <section class="job-section">
       <div class="job-wrap">
-        <!-- 新增：岗位信息标题 + 筛选栏 - 调整布局，筛选词放在标题下方 -->
         <div class="job-header">
           <h2 class="job-title-main">
             岗位信息
-            <span v-if="searchKeyword" style="font-size:16px;color:#666;margin-left:10px;">
-              搜索结果：{{ searchKeyword }}
-            </span>
+            <span v-if="searchKeyword" style="font-size:16px;color:#666;margin-left:10px;">搜索结果：{{ searchKeyword }}</span>
           </h2>
-          <!-- 修改：筛选栏移到标题下方，移除重置按钮 -->
           <div class="job-filter">
             <div class="filter-tags">
-              <!-- 动态渲染岗位名称筛选标签 -->
-              <span 
-                class="filter-tag" 
-                :class="{ active: filterJobName === '' && searchKeyword === '' }"
-                @click="resetAllFilter"
-              >
-                全部岗位
-              </span>
-              <span 
-                class="filter-tag" 
-                v-for="jobName in jobNameList" 
-                :key="jobName"
-                :class="{ active: filterJobName === jobName }"
-                @click="filterJobName = jobName; filterJobs()"
-              >
-                {{ jobName }}
-              </span>
+              <span class="filter-tag" :class="{ active: filterJobName === '' && searchKeyword === '' }" @click="resetAllFilter">全部岗位</span>
+              <span class="filter-tag" v-for="jobName in jobNameList" :key="jobName" :class="{ active: filterJobName === jobName }" @click="filterJobName = jobName; filterJobs()">{{ jobName }}</span>
             </div>
           </div>
         </div>
@@ -195,118 +138,47 @@
         <!-- 错误提示 -->
         <div v-else-if="error" class="error-container">
           <p class="error-text">{{ error }}</p>
-          <button class="reload-btn" @click="fetchAllJobData">重新加载</button>
+          <button class="reload-btn" @click="fetchJobs(1)">重新加载</button>
         </div>
 
-        <!-- 岗位卡片容器（五列网格布局，纯文字样式） -->
-        <div 
-          class="job-card-container" 
-          ref="jobContainerRef"
-          v-else
-        >
-          <!-- 岗位卡片（纯文字样式，突出岗位名称和公司名称） -->
-          <div
-            class="job-card"
-            v-for="(item, index) in currentPageJobs" 
-            :key="item.id"
-            :class="{ 'animate-in': jobCardAnimateStates[index] }"
-            @mouseenter="hoverJobCard = item.id"
-            @mouseleave="hoverJobCard = null"
-            @dblclick="goToJobDetail(item.id)"
-          >
-            <!-- 简化：只保留白色背景的核心内容区域 -->
+        <!-- 岗位卡片列表 -->
+        <div class="job-card-container" ref="jobContainerRef" v-else>
+          <div class="job-card" v-for="(item, index) in currentPageJobs" :key="item.id" :class="{ 'animate-in': jobCardAnimateStates[index] }"
+               @mouseenter="hoverJobCard = item.id" @mouseleave="hoverJobCard = null" @dblclick="goToJobDetail(item.id)">
             <div class="job-card-content">
               <div class="job-title">{{ item.job_name || '未知岗位' }}</div>
               <div class="job-company">{{ item.company || '未知公司' }}</div>
-              
-              <!-- 补充信息：薪资 + 经验（移除学历） -->
-              <div class="job-meta">
-                <span class="salary">{{ item.salary_range || item.salary || '面议' }}</span>
-              </div>
-              
-              <!-- 悬浮时显示的岗位画像标签 -->
-              <div class="job-hover-info" v-if="hoverJobCard === item.id">
-                <span class="job-portrait-tag">岗位画像</span>
-              </div>
+              <div class="job-meta"><span class="salary">{{ item.salary_range || '面议' }}</span></div>
+              <div class="job-hover-info" v-if="hoverJobCard === item.id"><span class="job-portrait-tag">岗位画像</span></div>
             </div>
           </div>
-
-          <!-- 空数据提示 -->
-          <div v-if="filteredJobList.length === 0" class="empty-job-container">
-            <p class="empty-text">暂无匹配的岗位数据</p>
-          </div>
+          <div v-if="currentPageJobs.length === 0 && !loading" class="empty-job-container"><p class="empty-text">暂无匹配的岗位数据</p></div>
         </div>
 
-        <!-- 分页导航 -->
-        <div v-if="filteredJobList.length > 0" class="pagination-container">
-          <div class="pagination-info">
-            共 {{ filteredJobList.length }} 个岗位，当前第 {{ currentPage }}/{{ totalPages }} 页
-          </div>
+        <!-- 分页组件 -->
+        <div v-if="total > 0" class="pagination-container">
+          <div class="pagination-info">共 {{ total }} 个岗位，当前第 {{ currentPage }}/{{ totalPages }} 页</div>
           <div class="pagination">
-            <button 
-              class="page-btn" 
-              @click="changePage(1)"
-              :disabled="currentPage === 1"
-            >
-              首页
-            </button>
-            <button 
-              class="page-btn" 
-              @click="changePage(currentPage - 1)"
-              :disabled="currentPage === 1"
-            >
-              上一页
-            </button>
-            
-            <button 
-              v-for="pageNum in pageNumbers" 
-              :key="pageNum"
-              class="page-number"
-              :class="{ active: pageNum === currentPage }"
-              @click="changePage(pageNum)"
-              v-if="pageNum !== -1"
-            >
-              {{ pageNum }}
-            </button>
+            <button class="page-btn" @click="changePage(1)" :disabled="currentPage === 1">首页</button>
+            <button class="page-btn" @click="changePage(currentPage - 1)" :disabled="currentPage === 1">上一页</button>
+            <button v-for="pageNum in pageNumbers" :key="pageNum" class="page-number" :class="{ active: pageNum === currentPage }" @click="changePage(pageNum)" v-if="pageNum !== -1">{{ pageNum }}</button>
             <span class="page-ellipsis" v-for="(pageNum, index) in pageNumbers" :key="`ellipsis-${index}`" v-if="pageNum === -1">...</span>
-            
-            <button 
-              class="page-btn" 
-              @click="changePage(currentPage + 1)"
-              :disabled="currentPage === totalPages"
-            >
-              下一页
-            </button>
-            <button 
-              class="page-btn" 
-              @click="changePage(totalPages)"
-              :disabled="currentPage === totalPages"
-            >
-              尾页
-            </button>
+            <button class="page-btn" @click="changePage(currentPage + 1)" :disabled="currentPage === totalPages">下一页</button>
+            <button class="page-btn" @click="changePage(totalPages)" :disabled="currentPage === totalPages">尾页</button>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- 新增：最适配十大岗位 - 传送带形式 -->
+    <!-- 最适配十大岗位传送带 -->
     <section class="top-ten-jobs-section">
       <div class="section-header">
         <h2 class="section-title">最适配十大岗位</h2>
         <el-button type="text" @click="$router.push('/match-result')">查看全部 ></el-button>
       </div>
       <div class="slider-container" ref="sliderRef">
-        <div 
-          class="slider-track" 
-          :style="{ transform: `translateX(-${sliderOffset}%)` }"
-        >
-          <!-- 复制一份数据实现无缝循环 -->
-          <div
-            class="slider-card"
-            v-for="(job, index) in [...topTenJobs, ...topTenJobs]"
-            :key="index"
-            @click="$router.push('/match-result')"
-          >
+        <div class="slider-track" :style="{ transform: `translateX(-${sliderOffset}%)` }">
+          <div class="slider-card" v-for="(job, index) in [...topTenJobs, ...topTenJobs]" :key="index" @click="$router.push('/match-result')">
             <img :src="job.cover" :alt="job.jobName" class="slider-card-cover" />
             <div class="slider-card-info">
               <div class="slider-card-title">{{ job.jobName }}</div>
@@ -317,49 +189,23 @@
       </div>
     </section>
 
-    <!-- 热门岗位画像卡片区域（数据库全部去重数据+纯文字+双击跳转） -->
+    <!-- 热门岗位画像卡片区域 -->
     <section class="job-portrait-card-section" ref="portraitSectionRef">
       <div class="section-header">
         <h2 class="section-title">热门岗位画像</h2>
       </div>
-      <div 
-        class="portrait-card-container" 
-        ref="portraitContainerRef"
-        @mousemove="handleMouseMove"
-      >
-        <div
-          class="portrait-card"
-          v-for="(job, index) in jobPortraitList"
-          :key="job.jobName"
-          :style="getCardStyle(index)"
-          :class="{ 'animate-in': cardAnimateStates[index] }"
-          @mouseenter="hoverPortrait = job.jobName"
-          @mouseleave="hoverPortrait = null"
-          @dblclick="goToJobPortraitDetail(job.jobName)"
-        >
-          <!-- 纯文字展示岗位名称，无图片 -->
-          <div class="portrait-text-content">
-            <span class="portrait-job-name">{{ job.jobName }}</span>
-          </div>
-          
-          <!-- 悬浮提示 -->
-          <div class="portrait-name-tooltip" v-if="hoverPortrait === job.jobName">
-            {{ job.jobName }}
-          </div>
+      <div class="portrait-card-container" ref="portraitContainerRef" @mousemove="handleMouseMove">
+        <div class="portrait-card" v-for="(job, index) in jobPortraitList" :key="job.jobName" :style="getCardStyle(index)" :class="{ 'animate-in': cardAnimateStates[index] }"
+             @mouseenter="hoverPortrait = job.jobName" @mouseleave="hoverPortrait = null" @dblclick="goToJobPortraitDetail(job.jobName)">
+          <div class="portrait-text-content"><span class="portrait-job-name">{{ job.jobName }}</span></div>
+          <div class="portrait-name-tooltip" v-if="hoverPortrait === job.jobName">{{ job.jobName }}</div>
         </div>
-
-        <!-- 空数据提示 -->
-        <div v-if="jobPortraitList.length === 0 && !loading" class="empty-portrait-container">
-          <p class="empty-text">暂无岗位画像数据</p>
-        </div>
+        <div v-if="jobPortraitList.length === 0 && !loading" class="empty-portrait-container"><p class="empty-text">暂无岗位画像数据</p></div>
       </div>
     </section>
 
-    <!-- 8. 页脚 -->
     <footer class="footer">
-      <div class="footer-wrap">
-        © 2026 大学生职业规划系统 | 助力大学生精准规划职业方向
-      </div>
+      <div class="footer-wrap">© 2026 大学生职业规划系统 | 助力大学生精准规划职业方向</div>
     </footer>
   </div>
 </template>
@@ -370,47 +216,45 @@ import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
-// ========== 登录状态核心逻辑 ==========
-const router = useRouter()
-const route = useRoute()
+// ========== 模拟登录 ==========
+const initMockLogin = () => {
+  if (!localStorage.getItem('token')) {
+    localStorage.setItem('token', 'mock-token-1')
+    localStorage.setItem('currentUser', JSON.stringify({ id: 1, username: '测试用户', role: 'user', avatar: '' }))
+    localStorage.setItem('avatar', '')
+    localStorage.setItem('nickname', '测试用户')
+  }
+}
+initMockLogin()
 
 const isLogin = ref(!!localStorage.getItem('token'))
 const userAvatar = ref(localStorage.getItem('avatar') || '')
 const isUserMenuOpen = ref(false)
+const router = useRouter()
+const route = useRoute()
 
-watch(
-  () => route.path,
-  () => {
-    isLogin.value = !!localStorage.getItem('token')
-    userAvatar.value = localStorage.getItem('avatar') || ''
-  },
-  { immediate: true }
-)
+watch(() => route.path, () => {
+  isLogin.value = !!localStorage.getItem('token')
+  userAvatar.value = localStorage.getItem('avatar') || ''
+}, { immediate: true })
 
-const toggleUserMenu = () => {
-  isUserMenuOpen.value = !isUserMenuOpen.value
-}
-
+const toggleUserMenu = () => { isUserMenuOpen.value = !isUserMenuOpen.value }
 const handleLogout = () => {
-  localStorage.removeItem('token')
-  localStorage.removeItem('avatar')
-  localStorage.removeItem('nickname')
+  localStorage.clear()
   isLogin.value = false
   isUserMenuOpen.value = false
-  router.push('/')
-  ElMessage.success('退出登录成功')
+  initMockLogin()
+  isLogin.value = true
+  userAvatar.value = ''
+  ElMessage.success('已切换为测试用户')
 }
 
-// ========== 主题切换逻辑 ==========
+// 主题切换
 const darkMode = ref(localStorage.getItem('darkMode') === 'true')
 function applyTheme() {
-  if (darkMode.value) {
-    document.body.classList.add('dark')
-  } else {
-    document.body.classList.remove('dark')
-  }
+  if (darkMode.value) document.body.classList.add('dark')
+  else document.body.classList.remove('dark')
 }
-
 function toggleTheme() {
   darkMode.value = !darkMode.value
   localStorage.setItem('darkMode', darkMode.value)
@@ -418,7 +262,7 @@ function toggleTheme() {
   ElMessage.success(`已切换为${darkMode.value ? '暗黑' : '明亮'}模式`)
 }
 
-// ========== 轮播图逻辑 ==========
+// 轮播图
 const carouselRef = ref(null)
 const currentIndex = ref(0)
 const carouselList = ref([
@@ -427,41 +271,15 @@ const carouselList = ref([
   { url: 'https://picsum.photos/seed/carousel3/1200/300' }
 ])
 let carouselTimer = null
-
-const startCarousel = () => {
-  carouselTimer = setInterval(() => {
-    nextSlide()
-  }, 3000)
-}
-
-const prevSlide = () => {
-  currentIndex.value = (currentIndex.value - 1 + carouselList.value.length) % carouselList.value.length
-}
-
-const nextSlide = () => {
-  currentIndex.value = (currentIndex.value + 1) % carouselList.value.length
-}
-
-const goToSlide = (index) => {
-  currentIndex.value = index
-}
-
+const startCarousel = () => { carouselTimer = setInterval(() => nextSlide(), 3000) }
+const prevSlide = () => { currentIndex.value = (currentIndex.value - 1 + carouselList.value.length) % carouselList.value.length }
+const nextSlide = () => { currentIndex.value = (currentIndex.value + 1) % carouselList.value.length }
+const goToSlide = (index) => { currentIndex.value = index }
 const handleImageUpload = (e) => {
   const file = e.target.files[0]
   if (!file) return
-  
-  const isImage = file.type.startsWith('image/')
-  if (!isImage) {
-    ElMessage.error('请选择图片文件')
-    return
-  }
-  
-  const isLt5M = file.size / 1024 / 1024 < 5
-  if (!isLt5M) {
-    ElMessage.error('图片大小不能超过5MB')
-    return
-  }
-  
+  if (!file.type.startsWith('image/')) { ElMessage.error('请选择图片文件'); return }
+  if (file.size / 1024 / 1024 > 5) { ElMessage.error('图片大小不能超过5MB'); return }
   const reader = new FileReader()
   reader.onload = (event) => {
     carouselList.value.push({ url: event.target.result })
@@ -472,479 +290,152 @@ const handleImageUpload = (e) => {
   e.target.value = ''
 }
 
-// ========== 搜索功能核心 ==========
+// 岗位数据（后端分页）
+const jobList = ref([])
+const jobNameList = ref([])
+const loading = ref(false)
+const error = ref('')
+const total = ref(0)
+const pageSize = ref(10)
+const currentPage = ref(1)
+const filterJobName = ref('')
 const searchKeyword = ref('')
 
-// ========== 招聘岗位数据（适配新的Flask接口） ==========
-const jobList = ref([])
-const jobNameList = ref([]) // 存储所有唯一的岗位名称
-const loading = ref(false) // 加载状态
-const error = ref('') // 错误信息
+const API_BASE_URL = 'http://localhost:5000'
+const JOB_SEARCH_API_URL = `${API_BASE_URL}/api/jobs/search`
+const JOB_NAMES_API_URL = `${API_BASE_URL}/api/jobs/names`
 
-// 后端接口基础地址
-const API_BASE_URL = 'http://localhost:5000' 
-
-// 更新接口地址，匹配Flask后端
-const ALL_JOBS_API_URL = `${API_BASE_URL}/api/jobs/simple_search` // 使用simple_search获取所有岗位
-const JOB_DETAIL_API_URL = `${API_BASE_URL}/api/jobs/` // 获取岗位详情
-const JOB_PROFILE_API_URL = `${API_BASE_URL}/api/jobs/` // 获取岗位画像
-const JOB_CATEGORIES_API_URL = `${API_BASE_URL}/api/jobs/categories` // 获取岗位分类
-const JOB_NAMES_API_URL = `${API_BASE_URL}/api/jobs/names` // 新增：获取所有岗位名称接口
-
-// 计算薪资中间值（用于排序）
 const calculateSalaryValue = (salaryRange) => {
   if (!salaryRange || salaryRange === '面议') return 0
-  
-  // 提取薪资范围中的数字
   const match = salaryRange.match(/(\d+)K-(\d+)K/)
   if (match && match.length === 3) {
-    const min = parseFloat(match[1])
-    const max = parseFloat(match[2])
-    return (min + max) / 2
+    return (parseFloat(match[1]) + parseFloat(match[2])) / 2
   }
-  
   return 0
 }
 
-// 获取所有唯一的岗位名称
 const fetchJobNames = async () => {
   try {
-    const response = await axios.get(JOB_NAMES_API_URL, {
-      timeout: 5000,
-      headers: { 
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      withCredentials: false,
-    })
-    
-    // 处理返回的岗位名称列表，去重并过滤空值
-    if (Array.isArray(response.data)) {
-      const uniqueNames = Array.from(new Set(response.data))
-        .filter(name => name && name.trim() && name !== '未知岗位')
-        .sort() // 按字母顺序排序
-      jobNameList.value = uniqueNames
-    } else if (response.data?.names) {
-      const uniqueNames = Array.from(new Set(response.data.names))
-        .filter(name => name && name.trim() && name !== '未知岗位')
-        .sort()
-      jobNameList.value = uniqueNames
-    }
-  } catch (err) {
-    console.error('获取岗位名称列表失败:', err)
-    // 备用方案：从已获取的岗位数据中提取名称
-    if (jobList.value.length > 0) {
-      const uniqueNames = Array.from(new Set(jobList.value.map(item => item.job_name)))
-        .filter(name => name && name.trim() && name !== '未知岗位')
-        .sort()
-      jobNameList.value = uniqueNames
-    }
-  }
-}
-
-// 跳转到岗位详情页（需要时才获取详情）
-const goToJobDetail = async (jobId) => {
-  try {
-    // 先查找本地是否有该岗位的详细信息
-    const jobItem = jobList.value.find(item => item.id === jobId)
-    
-    // 如果没有详细信息，则获取
-    if (jobItem && !jobItem.detailFetched) {
-      ElMessage.info('正在加载岗位详情...')
-      const detail = await fetchJobDetail(jobId)
-      const profile = await fetchJobProfile(jobId)
-      
-      // 更新本地数据
-      const index = jobList.value.findIndex(item => item.id === jobId)
-      if (index !== -1) {
-        jobList.value[index] = {
-          ...jobList.value[index],
-          ...detail,
-          profile,
-          detailFetched: true
-        }
-      }
-    }
-    
-    // 跳转到详情页
-    router.push({ path: '/job-detail', query: { id: jobId } })
-  } catch (err) {
-    console.error('获取岗位详情失败:', err)
-    ElMessage.error('获取岗位详情失败，将跳转到基础详情页')
-    router.push({ path: '/job-detail', query: { id: jobId } })
-  }
-}
-
-// 获取岗位详情（按需加载）
-const fetchJobDetail = async (jobId) => {
-  try {
-    const response = await axios.get(`${JOB_DETAIL_API_URL}${jobId}`, {
-      timeout: 5000,
-      headers: { 'Accept': 'application/json' }
-    })
-    return response.data || {}
-  } catch (err) {
-    console.error(`获取岗位${jobId}详情失败:`, err)
-    return {}
-  }
-}
-
-// 获取岗位画像（按需加载）
-const fetchJobProfile = async (jobId) => {
-  try {
-    const response = await axios.get(`${JOB_PROFILE_API_URL}${jobId}/profile`, {
-      timeout: 5000,
-      headers: { 'Accept': 'application/json' }
-    })
-    return response.data || {}
-  } catch (err) {
-    console.error(`获取岗位${jobId}画像失败:`, err)
-    return {}
-  }
-}
-
-// 获取岗位分类
-const fetchJobCategories = async () => {
-  try {
-    const response = await axios.get(JOB_CATEGORIES_API_URL, {
-      timeout: 5000,
-      headers: { 'Accept': 'application/json' }
-    })
-    return response.data || []
-  } catch (err) {
-    console.error('获取岗位分类失败:', err)
-    return []
-  }
-}
-
-const fetchAllJobData = async () => {
-  try {
-    loading.value = true
-    error.value = ''
-    
-    const config = {
-      timeout: 60000,
-      headers: { 
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      withCredentials: false,
-    }
-    
     const token = localStorage.getItem('token')
-    let allJobs = []
-    let currentPage = 1
-    const pageSize = 1000
-    let hasMoreData = true
-    let failedAttempts = 0 // 失败计数器
-    const MAX_FAILED_ATTEMPTS = 5 // 最大失败次数
-    const MAX_TOTAL_PAGES = 20 // 最大请求页数（防止无限循环）
-
-    // 优化循环条件
-    while (hasMoreData && currentPage <= MAX_TOTAL_PAGES && failedAttempts < MAX_FAILED_ATTEMPTS) {
-      try {
-        const params = new URLSearchParams()
-        if (token) params.append('token', token)
-        params.append('page', currentPage)
-        params.append('size', pageSize)
-        
-        console.log(`正在请求第${currentPage}页数据...`)
-        const response = await axios.get(`${ALL_JOBS_API_URL}?${params.toString()}`, config)
-        
-        // 统一数据处理
-        let pageData = []
-        if (Array.isArray(response.data)) {
-          pageData = response.data
-        } else if (response.data && Array.isArray(response.data.data)) {
-          pageData = response.data.data
-        }
-        
-        // 记录总条数（如果后端返回）
-        const totalCount = response.data?.total || response.data?.count || 0
-        console.log(`第${currentPage}页获取到${pageData.length}条数据，总计${totalCount}条`)
-        
-        if (pageData.length > 0) {
-          allJobs = [...allJobs, ...pageData]
-          failedAttempts = 0 // 重置失败计数器
-          // 判断是否还有更多数据
-          hasMoreData = pageData.length === pageSize && 
-                        (totalCount === 0 || allJobs.length < totalCount)
-        } else {
-          hasMoreData = false
-        }
-        
-        currentPage++
-        await new Promise(resolve => setTimeout(resolve, 200)) // 增加延迟，减轻服务器压力
-        
-      } catch (pageError) {
-        console.error(`获取第${currentPage}页数据失败:`, pageError)
-        failedAttempts++
-        currentPage++
-        
-        // 仅当连续失败次数达到上限时停止
-        if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
-          ElMessage.warning(`连续${MAX_FAILED_ATTEMPTS}页请求失败，已停止获取更多数据`)
-          hasMoreData = false
-        }
-      }
-    }
-    
-    // 数据处理
-    if (allJobs.length > 0) {
-      const categories = await fetchJobCategories()
-      
-      const jobDataWithBasicInfo = allJobs.map(item => {
-        // 原有数据处理逻辑保持不变
-        const matchedCategory = categories.find(cat => cat.id === item.category_id)
-        
-        let jobType = '技术类'
-        if (matchedCategory) {
-          if (matchedCategory.name.includes('产品')) jobType = '产品类'
-          else if (matchedCategory.name.includes('运营')) jobType = '运营类'
-          else if (matchedCategory.name.includes('算法')) jobType = '算法类'
-          else jobType = '技术类'
-        } else if (item.type) {
-          jobType = item.type
-        }
-        
-        const salaryValue = calculateSalaryValue(item.salary_range || item.salary)
-        
-        return {
-          id: item.id || Math.random().toString(36).substr(2, 9),
-          company: item.company || '未知公司',
-          companyShort: item.company?.substring(0, 2) || '未知',
-          category: matchedCategory?.name || item.category || '其他',
-          job_name: item.job_name || '未知岗位',
-          type: jobType,
-          salary_range: item.salary_range || item.salary || '面议',
-          salaryValue,
-          // 移除学历信息
-          experience: item.experience || '1-3年',
-          // 移除日期信息
-          detailFetched: false
-        }
-      })
-      
-      jobList.value = jobDataWithBasicInfo
-      // 获取岗位名称列表（从已加载的数据中提取）
-      await fetchJobNames()
-      // 同步生成岗位画像数据（去重）
-      generateUniquePortraitList()
-      initCardAnimateStates()
-    } else {
-      error.value = '未获取到任何岗位数据，请检查后端接口'
-      ElMessage.warning('接口返回空数据')
-    }
+    const res = await axios.get(JOB_NAMES_API_URL, { headers: { Authorization: token ? `Bearer ${token}` : '' } })
+    if (Array.isArray(res.data)) jobNameList.value = res.data.filter(name => name && name.trim())
   } catch (err) {
-    // 原有错误处理逻辑保持不变
-    console.error('获取岗位数据失败:', err)
-    
-    let errorMsg = ''
-    if (err.code === 'ECONNREFUSED') {
-      errorMsg = '加载失败：无法连接到后端服务器，请检查后端是否启动'
-    } else if (err.code === 'ECONNABORTED') {
-      errorMsg = '加载失败：请求超时，请检查网络或后端服务'
-    } else if (err.message.includes('CORS') || err.message.includes('Access-Control')) {
-      errorMsg = '加载失败：跨域请求被阻止，请配置后端CORS'
-    } else {
-      errorMsg = `加载失败：${err.message || '网络异常，请稍后重试'}`
+    console.error('获取岗位名称失败:', err)
+    if (jobList.value.length > 0) {
+      const names = [...new Set(jobList.value.map(j => j.job_name).filter(Boolean))]
+      jobNameList.value = names
     }
-    
-    error.value = errorMsg
-    ElMessage.error(errorMsg)
+  }
+}
+
+const fetchJobs = async (page = 1) => {
+  loading.value = true
+  error.value = ''
+  currentPage.value = page
+  try {
+    const token = localStorage.getItem('token')
+    const params = {
+      page: currentPage.value,
+      size: pageSize.value,
+      keyword: searchKeyword.value.trim() || undefined,
+    }
+    if (filterJobName.value) params.keyword = filterJobName.value
+    const res = await axios.get(JOB_SEARCH_API_URL, { params, headers: { Authorization: token ? `Bearer ${token}` : '' } })
+    const data = res.data
+    let items = data.items || data.data || []
+    if (!Array.isArray(items)) items = []
+    jobList.value = items.map(item => ({
+      id: item.id || item.rowid,
+      job_name: item.job_name || '未知岗位',
+      company: item.company || '未知公司',
+      salary_range: item.salary_range || '面议',
+      salaryValue: calculateSalaryValue(item.salary_range),
+      industry: item.industry || '',
+      location: item.location || '',
+      experience: item.experience || '1-3年'
+    }))
+    total.value = data.total || data.count || 0
+  } catch (err) {
+    console.error('获取岗位数据失败:', err)
+    error.value = err.response?.data?.error || err.message || '加载失败'
+    jobList.value = []
+    total.value = 0
   } finally {
     loading.value = false
   }
 }
 
-// 筛选逻辑 - 支持 精确筛选 + 模糊搜索
-const filterJobName = ref('')
-
-// 筛选并按薪资从高到低排序
-const filteredJobList = computed(() => {
-  // 复制原始数据，避免修改原数组
-  let filtered = [...jobList.value]
-  
-  // 1. 按岗位名称精确筛选
-  if (filterJobName.value && filterJobName.value !== '') {
-    filtered = filtered.filter(item => {
-      return item.job_name === filterJobName.value
-    })
-  }
-
-  // 2. 导航栏搜索：模糊匹配岗位名称
-  if (searchKeyword.value && searchKeyword.value.trim() !== '') {
-    const keyword = searchKeyword.value.trim().toLowerCase()
-    filtered = filtered.filter(item => {
-      return (item.job_name && item.job_name.toLowerCase().includes(keyword)) ||
-             (item.company && item.company.toLowerCase().includes(keyword))
-    })
-  }
-  
-  // 按薪资从高到低排序
-  filtered.sort((a, b) => {
-    return b.salaryValue - a.salaryValue
-  })
-  
-  return filtered
-})
-
-// ========== 分页功能核心逻辑 ==========
-const pageSize = ref(10) // 每页显示10个岗位（5列×2行）
-const currentPage = ref(1) // 当前页码
-
-// 计算总页数
-const totalPages = computed(() => {
-  return Math.ceil(filteredJobList.value.length / pageSize.value)
-})
-
-// 计算当前页显示的岗位数据
-const currentPageJobs = computed(() => {
-  const startIndex = (currentPage.value - 1) * pageSize.value
-  const endIndex = startIndex + pageSize.value
-  return filteredJobList.value.slice(startIndex, endIndex)
-})
-
-// 计算显示的页码范围（优化显示，只显示当前页前后2页）
-const pageNumbers = computed(() => {
-  const pages = []
-  const total = totalPages.value
-  
-  // 如果总页数小于等于7，显示所有页码
-  if (total <= 7) {
-    for (let i = 1; i <= total; i++) {
-      pages.push(i)
-    }
-  } else {
-    // 显示当前页前后2页，首页和尾页
-    if (currentPage.value <= 3) {
-      // 前3页，显示1-5和最后一页
-      pages.push(1, 2, 3, 4, 5, -1, total)
-    } else if (currentPage.value >= total - 2) {
-      // 后3页，显示第一页和最后5页
-      pages.push(1, -1, total - 4, total - 3, total - 2, total - 1, total)
-    } else {
-      // 中间页，显示首页、当前页前后2页、尾页
-      pages.push(
-        1, 
-        -1, 
-        currentPage.value - 2, 
-        currentPage.value - 1, 
-        currentPage.value, 
-        currentPage.value + 1, 
-        currentPage.value + 2, 
-        -1, 
-        total
-      )
-    }
-  }
-  
-  return pages
-})
-
-// 切换页码
-const changePage = (pageNum) => {
-  if (pageNum < 1 || pageNum > totalPages.value || pageNum === currentPage.value) {
-    return
-  }
-  currentPage.value = pageNum
-  // 重新初始化动画状态
-  initCardAnimateStates()
-  // 滚动到岗位列表顶部
-  const jobSection = document.querySelector('.job-section')
-  if (jobSection) {
-    jobSection.scrollIntoView({ behavior: 'smooth' })
-  }
-}
-
-// 筛选时重置页码
-const filterJobs = () => {
-  searchKeyword.value = ''
-  currentPage.value = 1
-  initCardAnimateStates()
-}
-
-// 重置所有筛选（回到全部岗位）
-const resetAllFilter = () => {
-  filterJobName.value = ''
-  searchKeyword.value = ''
-  currentPage.value = 1
-  initCardAnimateStates()
-}
-
-// ========== 热门岗位画像 - 从数据库生成【全部去重】数据 ==========
-const jobPortraitList = ref([])
-
-// 从岗位列表生成【全部】唯一的岗位画像数据（无重复、纯文字）
-const generateUniquePortraitList = () => {
-  if (!jobList.value || jobList.value.length === 0) return
-  
-  // 提取所有岗位名称并去重
-  const uniqueJobNames = Array.from(new Set(
-    jobList.value
-      .map(item => item.job_name)
-      .filter(name => name && name.trim() && name !== '未知岗位')
-  ))
-
-  // ✅ 关键修改：生成【全部】岗位画像，不再限制数量
-  jobPortraitList.value = uniqueJobNames.map(name => ({
-    jobName: name
-  }))
-}
-
-// 双击跳转到岗位画像页面
-const goToJobPortraitDetail = (jobName) => {
-  router.push({
-    path: '/job-portrait',
-    query: { jobName: encodeURIComponent(jobName) }
-  })
-}
-
-// ========== 保留原有悬浮状态逻辑 ==========
-const hoverCard = ref(null)
-const hoverPortrait = ref(null)
-const hoverJobCard = ref(null)
-
-// ========== 保留原有其他功能逻辑 ==========
-const goToFeature = (type) => {
-  switch(type) {
-    case '测评':
-      router.push('/interest-test')
-      break
-    case '分析':
-      router.push('/ability-analysis')
-      break
-    case '规划':
-      router.push('/development-path')
-      break
-    case '导出':
-      router.push('/report-export')
-      break;
-    default:
-      break
-  }
-}
-
-// 搜索执行
+const goToJobDetail = (jobId) => { router.push({ path: '/job-detail', query: { id: jobId } }) }
+const filterJobs = () => { currentPage.value = 1; fetchJobs(1) }
+const resetAllFilter = () => { filterJobName.value = ''; searchKeyword.value = ''; currentPage.value = 1; fetchJobs(1) }
 const handleSearch = () => {
   const keyword = searchKeyword.value.trim()
   if (keyword) {
     filterJobName.value = ''
     currentPage.value = 1
-    initCardAnimateStates()
+    fetchJobs(1)
     ElMessage.success(`已搜索：${keyword}`)
-    
-    // 自动滚动到岗位列表
     const jobSection = document.querySelector('.job-section')
-    if (jobSection) {
-      jobSection.scrollIntoView({ behavior: 'smooth' })
-    }
+    if (jobSection) jobSection.scrollIntoView({ behavior: 'smooth' })
   } else {
     ElMessage.warning('请输入搜索关键词')
   }
 }
+const changePage = (pageNum) => {
+  if (pageNum < 1 || pageNum > totalPages.value || pageNum === currentPage.value) return
+  fetchJobs(pageNum)
+  const jobSection = document.querySelector('.job-section')
+  if (jobSection) jobSection.scrollIntoView({ behavior: 'smooth' })
+}
+const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
+const currentPageJobs = computed(() => jobList.value)
+const pageNumbers = computed(() => {
+  const pages = []
+  const total = totalPages.value
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) pages.push(i)
+  } else {
+    if (currentPage.value <= 3) {
+      pages.push(1, 2, 3, 4, 5, -1, total)
+    } else if (currentPage.value >= total - 2) {
+      pages.push(1, -1, total - 4, total - 3, total - 2, total - 1, total)
+    } else {
+      pages.push(1, -1, currentPage.value - 2, currentPage.value - 1, currentPage.value,
+                 currentPage.value + 1, currentPage.value + 2, -1, total)
+    }
+  }
+  return pages
+})
 
-// ========== 保留原有最适配十大岗位数据 ==========
+// 岗位画像列表（单独从接口获取，不依赖岗位分页）
+const jobPortraitList = ref([])
+const fetchPortraitList = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    const res = await axios.get(JOB_NAMES_API_URL, { headers: { Authorization: token ? `Bearer ${token}` : '' } })
+    if (Array.isArray(res.data)) {
+      jobPortraitList.value = res.data.filter(name => name && name.trim()).map(name => ({ jobName: name }))
+    }
+  } catch (err) {
+    console.error('获取岗位画像列表失败:', err)
+    if (jobList.value.length > 0) {
+      const names = [...new Set(jobList.value.map(j => j.job_name).filter(Boolean))]
+      jobPortraitList.value = names.map(name => ({ jobName: name }))
+    }
+  }
+  initCardAnimateStates()
+}
+const goToJobPortraitDetail = (jobName) => {
+  router.push({ path: '/job-portrait', query: { jobName: encodeURIComponent(jobName) } })
+}
+
+// 其他功能
+const goToFeature = (type) => {
+  const map = { '测评': '/interest-test', '分析': '/ability-analysis', '规划': '/development-path', '导出': '/report-export' }
+  router.push(map[type] || '/')
+}
+
+// 传送带数据
 const topTenJobs = ref([
   { jobName: '前端开发工程师', matchRate: 95, cover: 'https://picsum.photos/seed/top1/200/280' },
   { jobName: '产品经理', matchRate: 92, cover: 'https://picsum.photos/seed/top2/200/280' },
@@ -957,140 +448,93 @@ const topTenJobs = ref([
   { jobName: '嵌入式工程师', matchRate: 77, cover: 'https://picsum.photos/seed/top9/200/280' },
   { jobName: '游戏策划', matchRate: 75, cover: 'https://picsum.photos/seed/top10/200/280' }
 ])
-
-// ========== 保留原有最适配十大岗位传送带逻辑 ==========
 const sliderRef = ref(null)
 const sliderOffset = ref(0)
 let sliderTimer = null
-const sliderSpeed = 0.1 
+const sliderSpeed = 0.1
+const startSlider = () => { sliderTimer = setInterval(() => { sliderOffset.value += sliderSpeed; if (sliderOffset.value >= 100) sliderOffset.value = 0 }, 30) }
 
-const startSlider = () => {
-  sliderTimer = setInterval(() => {
-    sliderOffset.value += sliderSpeed
-    if (sliderOffset.value >= 100) {
-      sliderOffset.value = 0
-    }
-  }, 30)
-}
-
-// ========== 保留原有岗位画像卡片区域逻辑 ==========
+// 动画相关
 const portraitContainerRef = ref(null)
 const portraitSectionRef = ref(null)
-const jobContainerRef = ref(null)
 const mousePos = ref({ x: 0, y: 0 })
 const containerRect = ref({ left: 0, top: 0, width: 0, height: 0 })
 const cardAnimateStates = ref([])
 const jobCardAnimateStates = ref([])
 const animateTimers = ref([])
 const jobAnimateTimers = ref([])
+const hoverCard = ref(null)
+const hoverPortrait = ref(null)
+const hoverJobCard = ref(null)
 
-// 保留原有初始化卡片动画状态逻辑
 const initCardAnimateStates = () => {
   cardAnimateStates.value = jobPortraitList.value.map(() => false)
   jobCardAnimateStates.value = currentPageJobs.value.map(() => false)
 }
-
-// 保留原有监听滚动触发动画逻辑
 const handleScroll = () => {
-  if (!portraitSectionRef.value) return
-  
-  const rect = portraitSectionRef.value.getBoundingClientRect()
-  if (rect.top < window.innerHeight * 0.8 && !cardAnimateStates.value[0]) {
-    startCardAnimation()
+  if (portraitSectionRef.value) {
+    const rect = portraitSectionRef.value.getBoundingClientRect()
+    if (rect.top < window.innerHeight * 0.8 && !cardAnimateStates.value[0]) {
+      jobPortraitList.value.forEach((_, i) => {
+        const timer = setTimeout(() => { cardAnimateStates.value[i] = true }, i * 150)
+        animateTimers.value.push(timer)
+      })
+    }
   }
-  
-  const jobRect = document.querySelector('.job-section').getBoundingClientRect()
-  if (jobRect.top < window.innerHeight * 0.8 && !jobCardAnimateStates.value[0] && currentPageJobs.value.length > 0) {
-    startJobCardAnimation()
+  const jobRect = document.querySelector('.job-section')?.getBoundingClientRect()
+  if (jobRect && jobRect.top < window.innerHeight * 0.8 && !jobCardAnimateStates.value[0] && currentPageJobs.value.length > 0) {
+    currentPageJobs.value.forEach((_, i) => {
+      const timer = setTimeout(() => { jobCardAnimateStates.value[i] = true }, i * 150)
+      jobAnimateTimers.value.push(timer)
+    })
   }
 }
-
-// 保留原有启动卡片动画逻辑
 const startCardAnimation = () => {
-  jobPortraitList.value.forEach((_, index) => {
-    const timer = setTimeout(() => {
-      cardAnimateStates.value[index] = true
-    }, index * 150)
+  jobPortraitList.value.forEach((_, i) => {
+    const timer = setTimeout(() => { cardAnimateStates.value[i] = true }, i * 150)
     animateTimers.value.push(timer)
   })
 }
-
-// 保留原有启动岗位卡片动画逻辑
 const startJobCardAnimation = () => {
-  currentPageJobs.value.forEach((_, index) => {
-    const timer = setTimeout(() => {
-      jobCardAnimateStates.value[index] = true
-    }, index * 150)
+  currentPageJobs.value.forEach((_, i) => {
+    const timer = setTimeout(() => { jobCardAnimateStates.value[i] = true }, i * 150)
     jobAnimateTimers.value.push(timer)
   })
 }
-
-// 保留原有鼠标移动事件逻辑
 const handleMouseMove = (e) => {
   if (!portraitContainerRef.value) return
   const rect = portraitContainerRef.value.getBoundingClientRect()
   containerRect.value = rect
-  mousePos.value = {
-    x: e.clientX - rect.left,
-    y: e.clientY - rect.top
-  }
+  mousePos.value = { x: e.clientX - rect.left, y: e.clientY - rect.top }
 }
-
-// 【修改 1】只有鼠标下移时偏移量增大，上移保持正常，解决顶部空白
 const getCardStyle = (index) => {
   const { x, y } = mousePos.value
   const { width, height } = containerRect.value
   if (!width || !height) return {}
-
   const col = index % 6
   const row = Math.floor(index / 6)
-  const cardWidth = 200
-  const cardHeight = 140
-  const gapX = 60
-  const gapY = 30
-  
+  const cardWidth = 200, cardHeight = 140, gapX = 60, gapY = 30
   const colOffset = col % 2 === 1 ? cardHeight / 2 : 0
-  
   const baseX = (width - 6 * cardWidth - 5 * gapX) / 2 + col * (cardWidth + gapX)
   const baseY = row * (cardHeight + gapY) + colOffset
-
-  const ratioX = x / width
-  const ratioY = y / height
-
-  // 核心修改：下移才增大偏移，上移保持小偏移
-  let followY = 0
-  if (ratioY > 0.5) {
-    // 鼠标在下方，增大偏移
-    followY = -(ratioY - 0.5) * 1800
-  } else {
-    // 鼠标在上半部分，正常偏移，不放大
-    followY = -(ratioY - 0.5) * 600
-  }
+  const ratioX = x / width, ratioY = y / height
+  let followY = ratioY > 0.5 ? -(ratioY - 0.5) * 1800 : -(ratioY - 0.5) * 600
   const followX = -(ratioX - 0.5) * 1200
-
-  return {
-    left: `${baseX + followX}px`,
-    top: `${baseY + followY}px`,
-    transition: cardAnimateStates.value[index] ? 'all 0.3s ease' : 'none'
-  }
+  return { left: `${baseX + followX}px`, top: `${baseY + followY}px`, transition: cardAnimateStates.value[index] ? 'all 0.3s ease' : 'none' }
 }
 
-// ========== 生命周期逻辑 ==========
 onMounted(() => {
   startCarousel()
   startSlider()
   applyTheme()
   initCardAnimateStates()
-  
   nextTick(() => {
-    if (portraitContainerRef.value) {
-      containerRect.value = portraitContainerRef.value.getBoundingClientRect()
-    }
+    if (portraitContainerRef.value) containerRect.value = portraitContainerRef.value.getBoundingClientRect()
     window.addEventListener('scroll', handleScroll)
     handleScroll()
-    
-    // 调用优化后的获取岗位数据函数
-    fetchAllJobData()
+    fetchJobNames()
+    fetchJobs(1)
+    fetchPortraitList()
   })
 })
 
@@ -1102,6 +546,7 @@ onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
 })
 </script>
+
 
 <style scoped>
 /* 全局容器 */
