@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, session
 from db import get_db
 import json
 import random
+import os
 from services.llm_service import call_llm
 
 assessment_bp = Blueprint('assessment', __name__, url_prefix='/api/assessment')
@@ -15,10 +16,7 @@ def get_questions():
     questions = cur.fetchall()
     conn.close()
 
-    # 转换为字典列表
     question_list = [{'id': q['id'], 'question': q['question'], 'dimension': q['dimension']} for q in questions]
-
-    # 随机打乱顺序
     random.shuffle(question_list)
 
     return jsonify(question_list)
@@ -31,14 +29,30 @@ def submit_assessment():
         return jsonify({'error': 'answers required'}), 400
 
     answers = data['answers']
+    
+    # ===================== 自动获取当前登录用户ID =====================
+    auth_header = request.headers.get('Authorization', '')
     user_id = data.get('user_id')
+    
+    # 从 token 解析用户ID
+    if auth_header.startswith('Bearer mock-token-'):
+        user_id = int(auth_header.replace('Bearer mock-token-', '').strip())
+    
+    # 从 session 获取用户ID
+    if not user_id and 'user_id' in session:
+        user_id = session['user_id']
+    
+    # 兜底
+    if not user_id:
+        user_id = 6
+    # ================================================================
+
     session_id = data.get('session_id', 'guest')
-    test_mode = data.get('test_mode', False)  # 正式环境默认关闭测试模式
+    test_mode = data.get('test_mode', False)
 
     if not answers:
         return jsonify({'error': 'answers cannot be empty'}), 400
 
-    # 计算每个维度的总分和计数
     dimension_totals = {}
     dimension_counts = {}
 
@@ -48,10 +62,9 @@ def submit_assessment():
     for answer in answers:
         question_id = answer.get('question_id')
         score = answer.get('score')
-        if not question_id or not isinstance(score, int) or score < 1 or score > 5:
+        if not question_id or not isinstance(score, int) or score < 0 or score > 5:
             continue
 
-        # 从数据库获取问题的维度
         cur.execute('SELECT dimension FROM assessment_questions WHERE id = ?', (question_id,))
         row = cur.fetchone()
         if row:
@@ -62,12 +75,13 @@ def submit_assessment():
             dimension_totals[dimension] += score
             dimension_counts[dimension] += 1
 
-    # 计算平均分
     dimension_scores = {}
     for dim in dimension_totals:
-        dimension_scores[dim] = round(dimension_totals[dim] / dimension_counts[dim], 2)
+        if dimension_counts[dim] > 0:
+            dimension_scores[dim] = round(dimension_totals[dim] / dimension_counts[dim], 2)
+        else:
+            dimension_scores[dim] = 0.0
 
-    # 生成推荐
     if test_mode or not should_call_llm_api():
         recommendation = "【测试模式】推荐功能已启用，正式使用时将生成个性化职业建议。"
         print(f"⚠️  当前为测试模式，未调用 LLM API")
@@ -75,7 +89,7 @@ def submit_assessment():
         print(f"✅ 正式模式，正在调用 LLM API 生成推荐...")
         recommendation = generate_career_recommendation(dimension_scores)
 
-    # 保存到数据库
+    # 保存到对应用户ID
     cur.execute('''
         INSERT INTO assessment_results (user_id, session_id, dimension_scores, recommendation, raw_answers)
         VALUES (?, ?, ?, ?, ?)
@@ -119,7 +133,6 @@ def get_history(user_id):
 
 def generate_career_recommendation(dimension_scores):
     """根据维度得分生成职业推荐报告"""
-    # 霍兰德六维度排序
     holland_types = {
         'R': '实际型 (Realistic)',
         'I': '研究型 (Investigative)',
@@ -129,7 +142,9 @@ def generate_career_recommendation(dimension_scores):
         'C': '常规型 (Conventional)'
     }
 
-    # 假设 dimension_scores 的键是 'R', 'I', 'A', 'S', 'E', 'C'
+    if not dimension_scores:
+        return "未获取到有效测评得分，无法生成职业推荐。"
+        
     sorted_dims = sorted(dimension_scores.items(), key=lambda x: x[1], reverse=True)
 
     prompt = f"""
@@ -160,18 +175,13 @@ def generate_career_recommendation(dimension_scores):
 
 def should_call_llm_api():
     """检查是否应该调用 LLM API"""
-    import os
-    from db import get_db
-    # 检查环境变量开关
     if os.getenv('ENABLE_LLM_RECOMMENDATION', 'false').lower() != 'true':
         print(f"⚠️ ENABLE_LLM_RECOMMENDATION 未开启")
         return False
     
-    # 添加每日调用次数检查逻辑
     max_calls = int(os.getenv('MAX_DAILY_API_CALLS', '100'))
     conn = get_db()
     cur = conn.cursor()
-    # 统计今日已调用次数
     cur.execute('''
         SELECT COUNT(*) as cnt FROM assessment_results 
         WHERE DATE(created_at) = DATE('now') 

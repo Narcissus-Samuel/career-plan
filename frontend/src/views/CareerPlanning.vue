@@ -1,6 +1,5 @@
 <template>
   <div class="career-planning-page">
-    <!-- 顶部导航栏 -->
     <header class="top-nav">
       <div class="nav-wrap">
         <div class="nav-left">
@@ -51,12 +50,11 @@
       </div>
     </header>
 
-    <!-- 报告主体 -->
     <div class="main-content">
       <div v-if="reportVisible" class="report-container">
         <el-card class="report-card" shadow="hover">
           <div class="report-header-bar">
-            <div><b>目标岗位：</b> {{ targetJob || 'BD经理' }}</div>
+            <div><b>目标岗位：</b> {{ targetJob || '前端开发' }}</div>
             <div><b>生成时间：</b> {{ reportTime }}</div>
             <div class="right-btns">
               <el-button type="primary" @click="generateReport"> 🔄 重新生成 </el-button>
@@ -65,7 +63,7 @@
           </div>
 
           <div class="report-content-section">
-            <div class="section-title"><i class="icon">📊</i> 报告详情</div>
+            <div class="section-title"><i class="icon">📊</i> 职业生涯发展报告</div>
             <div v-html="aiReportHtml"></div>
           </div>
         </el-card>
@@ -96,87 +94,97 @@ const reportVisible = ref(false)
 const reportTime = ref('')
 const targetJob = ref('')
 const aiReportContent = ref('')
+const currentReportId = ref(null)
 
-// ✅ 核心：完美解析Markdown表格 + 自动渲染成标准HTML表格 + 清理所有乱码
 const aiReportHtml = computed(() => {
-  let html = aiReportContent.value
+  let txt = aiReportContent.value || ''
 
-  // 1. 预处理：清理多余空行、Markdown符号，保留表格结构
-  html = html
-    .replace(/\n{3,}/g, '\n\n') // 合并多余空行
-    .replace(/^# /gm, '<h1 class="report-main-title">')
-    .replace(/^## /gm, '<h2 class="chapter-title">')
-    .replace(/^### /gm, '<h3 class="sub-title">')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/^> (.*)$/gm, '<div class="report-note">$1</div>')
+  // 1. 按「一、二、三、四、」拆分章节
+  const parts = txt.split(/(?=一、|二、|三、|四、)/)
 
-  // 2. 核心：完美解析Markdown表格（完全匹配你截图的格式）
-  const tableRegex = /(\|.*?\|\n)(\|.*?\|\n)(\|.*?\|\n)+/g
-  html = html.replace(tableRegex, (tableStr) => {
-    const lines = tableStr.trim().split('\n').filter(line => !line.includes('---'))
-    if (lines.length < 2) return tableStr
+  let html = ''
 
-    // 表头
-    const headers = lines[0].split('|').filter(cell => cell.trim()).map(cell => cell.trim())
-    // 表体
-    const rows = lines.slice(1).map(row => 
-      row.split('|').filter(cell => cell.trim()).map(cell => cell.trim())
-    )
+  parts.forEach(part => {
+    if (!part.trim()) return
 
-    // 生成标准HTML表格（带样式类）
-    let tableHtml = '<table class="standard-table">'
-    // 表头
-    tableHtml += '<thead><tr>'
-    headers.forEach(header => {
-      tableHtml += `<th>${header}</th>`
-    })
-    tableHtml += '</tr></thead>'
-    // 表体
-    tableHtml += '<tbody>'
-    rows.forEach(row => {
-      tableHtml += '<tr>'
-      row.forEach(cell => {
-        tableHtml += `<td>${cell}</td>`
+    // 2. 每个章节自动包成白色卡片
+    html += '<div class="card-block">'
+
+    // 替换标题：一、XXX → 蓝色左侧边框标题
+    let p = part
+      .replace(/^(一、|二、|三、|四、)(.+)$/gm, '<h2 class="chapter-title">$1$2</h2>')
+
+    // 表格自动渲染
+    const tableRex = /(\|.*?\|\n)+/g
+    p = p.replace(tableRex, (tableStr) => {
+      const lines = tableStr.trim().split('\n').filter(l => !l.includes('---'))
+      if (lines.length < 2) return tableStr
+
+      let ths = lines[0].split('|').map(c => c.trim()).filter(Boolean)
+      let rows = lines.slice(1).map(r => r.split('|').map(c => c.trim()).filter(Boolean))
+
+      let t = '<table class="standard-table"><thead><tr>'
+      ths.forEach(h => t += `<th>${h}</th>`)
+      t += '</tr></thead><tbody>'
+      rows.forEach(r => {
+        t += '<tr>'
+        r.forEach(c => t += `<td>${c}</td>`)
+        t += '</tr>'
       })
-      tableHtml += '</tr>'
+      t += '</tbody></table>'
+      return t
     })
-    tableHtml += '</tbody></table>'
 
-    return tableHtml
+    // 加粗 **xxx**
+    p = p.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+
+    // 段落
+    p = p.replace(/^(.+)$/gm, (line) => {
+      if (line.match(/<h|<table|^\s*$/)) return line
+      return `<p class="text-paragraph">${line}</p>`
+    })
+
+    html += p
+    html += '</div>'
   })
-
-  // 3. 处理普通段落
-  html = html.replace(/^(?!<h|<table|<div)(.+)$/gm, '<p class="text-paragraph">$1</p>')
-
-  // 4. 闭合标签
-  html = html.replace(/<h1 class="report-main-title">/g, '<h1 class="report-main-title">$1</h1>')
-  html = html.replace(/<h2 class="chapter-title">/g, '<h2 class="chapter-title">$1</h2>')
-  html = html.replace(/<h3 class="sub-title">/g, '<h3 class="sub-title">$1</h3>')
 
   return html
 })
 
-const getStudentId = () => localStorage.getItem('student_id') || 1
+const getStudentId = () => {
+  const id = localStorage.getItem('studentId') || localStorage.getItem('student_id')
+  return id ? parseInt(id) : null
+}
 
 const fetchReportData = async () => {
   const loading = ElLoading.service({ text: 'AI 正在生成专属报告...' })
   try {
+    const studentId = getStudentId()
+    if (!studentId) {
+      ElMessage.error('未获取到学生信息，请重新登录')
+      return
+    }
+
     const { data } = await axios.post('/api/report/generate', {
-      student_id: getStudentId(),
+      student_id: studentId,
       job_name: ''
     })
+
     if (data.error) {
       ElMessage.error(data.error)
       return
     }
+
     aiReportContent.value = data.content
-    targetJob.value = data.job_name
+    targetJob.value = data.job_name || '前端开发'
+    currentReportId.value = data.report_id
     reportTime.value = new Date().toLocaleString()
     reportVisible.value = true
-    ElMessage.success('报告生成成功！')
+
+    ElMessage.success('报告生成并已自动保存！')
   } catch (err) {
     console.error(err)
-    ElMessage.error('报告生成失败，请检查后端服务')
+    ElMessage.error('报告生成失败')
   } finally {
     loading.close()
   }
@@ -184,6 +192,7 @@ const fetchReportData = async () => {
 
 const generateReport = () => {
   aiReportContent.value = ''
+  reportVisible.value = false
   fetchReportData()
 }
 
@@ -198,10 +207,9 @@ const exportReport = () => {
     html2canvas: { scale: 2 },
     jsPDF: { format: 'a4' }
   }).from(document.querySelector('.report-content-section')).save()
-  ElMessage.success('导出成功')
 }
 
-const toggleUserMenu = () => isUserMenuOpen.value = !isUserMenuOpen.value
+const toggleUserMenu = () => (isUserMenuOpen.value = !isUserMenuOpen.value)
 const handleLogout = () => { localStorage.clear(); router.push('/'); ElMessage.success('退出成功') }
 const goToFeature = (t) => router.push({ '测评':'/interest-test','分析':'/ability-analysis','规划':'/development-path','导出':'/report-export'}[t]||'/')
 const handleSearch = () => ElMessage.warning('搜索功能开发中')
@@ -213,7 +221,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 原有导航样式100%保留 */
 .career-planning-page { width:100%; min-height:100vh; background:#f5f7fa; }
 .top-nav { position:fixed; top:0; left:0; width:100%; height:60px; background:#fff; box-shadow:0 2px 12px rgba(0,0,0,0.08); z-index:9999; }
 .nav-wrap { width:1200px; margin:0 auto; display:flex; justify-content:space-between; align-items:center; height:100%; }
@@ -245,7 +252,6 @@ onMounted(() => {
 .user-menu .menu-item { padding:10px 16px; font-size:14px; cursor:pointer; }
 .user-menu .logout { color:#f56c6c; border-top:1px solid #eee; }
 
-/* 内容区样式 */
 .main-content { padding-top:70px; width:1200px; margin:0 auto; padding-bottom:40px; }
 .report-container { width:100%; }
 .report-card { border-radius:12px; overflow:hidden; box-shadow:0 4px 20px rgba(0,0,0,0.06); }
@@ -256,7 +262,16 @@ onMounted(() => {
 .section-title { font-size:22px; font-weight:bold; margin-bottom:24px; color:#222; display:flex; align-items:center; gap:8px; }
 .icon { color:#1890ff; font-size:24px; }
 
-/* ====================== 核心：标准表格样式（完全匹配你截图） ====================== */
+/* 🔥 卡片式布局核心（你要的整洁效果） */
+.card-block {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  border: 1px solid #f0f0f0;
+}
+
 .standard-table {
   width: 100%;
   border-collapse: collapse;
@@ -286,12 +301,11 @@ onMounted(() => {
   border-bottom: none;
 }
 
-/* ====================== 其他报告样式 ====================== */
 .report-main-title {
   font-size: 26px;
   font-weight: bold;
   color: #1890ff;
-  margin: 0 0 30px;
+  margin: 0 0 20px;
   padding-bottom: 16px;
   border-bottom: 2px solid #e8f4ff;
 }
@@ -299,7 +313,7 @@ onMounted(() => {
   font-size: 20px;
   font-weight: bold;
   color: #333;
-  margin: 32px 0 16px;
+  margin: 0 0 16px;
   padding-left: 10px;
   border-left: 4px solid #1890ff;
 }
@@ -324,7 +338,6 @@ onMounted(() => {
   text-align: justify;
 }
 
-/* 加载样式 */
 .loading-box {
   display: flex;
   flex-direction: column;

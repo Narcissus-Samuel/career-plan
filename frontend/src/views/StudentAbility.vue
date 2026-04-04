@@ -1,6 +1,5 @@
 <template>
   <div class="student-ability-page">
-    <!-- 顶部导航栏 -->
     <header class="top-nav">
       <div class="nav-wrap">
         <div class="nav-left">
@@ -52,12 +51,10 @@
       </div>
     </header>
 
-    <!-- 主体内容 -->
     <div class="main-container">
       <div class="content-wrapper glass-panel">
         <h2 class="page-title">📋 学生信息与简历填写</h2>
         
-        <!-- 历史能力画像选择 -->
         <div v-if="historyProfiles.length > 0" class="history-profile-section">
           <h3 class="section-subtitle">📊 历史能力画像</h3>
           <div class="history-profile-card">
@@ -69,7 +66,6 @@
           </div>
         </div>
         
-        <!-- 基础信息 -->
         <div class="basic-info-section">
           <h3 class="section-subtitle">个人基础信息</h3>
           <div class="form-row">
@@ -79,7 +75,6 @@
           </div>
         </div>
 
-        <!-- 输入模式切换 -->
         <div class="input-mode-switch">
           <button class="mode-btn" :class="{ active: inputMode === 'manual' }" @click="inputMode = 'manual'">
             ✏️ 手动填写简历
@@ -89,7 +84,6 @@
           </button>
         </div>
 
-        <!-- 手动填写模式 -->
         <div v-if="inputMode === 'manual'" class="manual-input-section">
           <div class="form-tip"><i>💡</i> 请详细填写以下信息，AI将基于这些内容生成精准的能力画像</div>
           
@@ -130,9 +124,7 @@
           </div>
         </div>
 
-        <!-- 上传文件模式 -->
         <div v-if="inputMode === 'upload'" class="upload-section">
-          <!-- 历史上传文件 -->
           <div v-if="historyFiles.length > 0" class="history-file-section">
             <div class="history-file-card">
               <div class="file-info">
@@ -217,9 +209,6 @@ const formatTime = (timeStr) => {
   return `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
 }
 
-// ==============================================
-// ✅ 已修复：不请求后端，彻底消除 Network Error
-// ==============================================
 const loadHistoryProfiles = async () => {}
 const loadHistoryFiles = async () => {}
 

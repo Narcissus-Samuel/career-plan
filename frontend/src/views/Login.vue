@@ -178,6 +178,7 @@ const handleLogin = async () => {
     localStorage.setItem('token', data.token)
     localStorage.setItem('currentUser', JSON.stringify(data.user))
     localStorage.setItem('role', data.user.role) // 保存角色
+    localStorage.setItem('user_id', data.user.id)
 
     // ====================== 关键修改：根据角色跳转 ======================
     if (data.user.role === 'admin') {
