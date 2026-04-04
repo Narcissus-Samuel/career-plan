@@ -51,7 +51,7 @@ def _call_deepseek(prompt: str) -> str:
         payload = {
             'model': 'deepseek-ai/DeepSeek-V3',
             'messages': [{'role': 'user', 'content': prompt}],
-            'max_tokens': 600
+            'max_tokens': 6000
         }
         r = requests.post(url, headers=headers, json=payload, timeout=60)
         r.raise_for_status()
@@ -200,7 +200,7 @@ def _local_llm_fallback(prompt: str) -> str:
     return "# 本地生成内容（示例）\n\n" + "\n".join(summary_lines) + "\n\n（未命中外部API，属于演示内容）"
 
 
-def call_llm(prompt: str, temperature=0.3, max_tokens=2000, thinking=False, max_retries=1) -> str:
+def call_llm(prompt: str, temperature=0.3, max_tokens=6000, thinking=False, max_retries=1) -> str:
     """
     统一 LLM 调用入口。
     【优化】默认 max_retries 降为 1，避免测试时长时间等待；增加详细日志。
@@ -237,7 +237,7 @@ def call_llm(prompt: str, temperature=0.3, max_tokens=2000, thinking=False, max_
     return result
 
 
-def _call_zhipu(prompt: str, temperature=0.3, max_tokens=2000, thinking=False, max_retries=1) -> str:
+def _call_zhipu(prompt: str, temperature=0.3, max_tokens=6000, thinking=False, max_retries=1) -> str:
     """
     【真实实现】调用阿里云百炼 qwen-plus 模型。
     【优化】增加每次重试的日志，明确失败原因。
@@ -423,7 +423,7 @@ def cluster_categories_with_zhipu(sample_size: int = 500) -> List[Dict[str, Any]
 {sample_text}
 """
     for attempt in range(2):
-        result = _call_zhipu(prompt, temperature=0.2, max_tokens=4000)
+        result = _call_zhipu(prompt, temperature=0.2, max_tokens=6000)
         if not result:
             continue
         json_match = re.search(r'```json\n(.*?)\n```', result, re.DOTALL)
@@ -519,7 +519,7 @@ def generate_category_profile_with_zhipu(category_id: int) -> bool:
 只返回JSON，不要其他文字。
 """
     for attempt in range(2):
-        result = _call_zhipu(prompt, temperature=0.3, max_tokens=4000)
+        result = _call_zhipu(prompt, temperature=0.3, max_tokens=6000)
         if not result:
             continue
         json_match = re.search(r'```json\n(.*?)\n```', result, re.DOTALL)
@@ -615,7 +615,7 @@ def generate_dynamic_job_profile(job_name: str) -> Optional[Dict[str, Any]]:
 只返回JSON，不要其他文字。
 """
     for attempt in range(2):
-        result = _call_zhipu(prompt, temperature=0.3, max_tokens=3000)
+        result = _call_zhipu(prompt, temperature=0.3, max_tokens=6000)
         if not result:
             continue
         json_match = re.search(r'```json\n(.*?)\n```', result, re.DOTALL)
@@ -860,7 +860,7 @@ def build_vertical_paths() -> List[Tuple[str, str, str, str]]:
         3. 只返回干净JSON数组，不要任何多余文字、解释、标点。
         示例：["高级工程师","技术主管","技术经理"]
         """
-        result = _call_zhipu(prompt, temperature=0.3, max_tokens=200)
+        result = _call_zhipu(prompt, temperature=0.3, max_tokens=6000)
         if not result:
             continue
 

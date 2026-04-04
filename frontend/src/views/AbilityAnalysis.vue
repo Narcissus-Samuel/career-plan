@@ -1,6 +1,5 @@
 <template>
   <div class="ability-profile-page">
-    <!-- 顶部导航栏 -->
     <header class="top-nav">
       <div class="nav-wrap">
         <div class="nav-left">
@@ -62,20 +61,16 @@
       </div>
     </header>
 
-    <!-- AI能力画像核心展示区域 -->
     <div class="profile-container">
       <div class="step-content glass-panel">
         <h2 class="section-title">🤖 AI 学生就业能力画像</h2>
 
-        <!-- 加载状态 -->
         <div v-if="generatingProfile" class="loading-container">
           <div class="loading-spinner">🔄</div>
           <p class="loading-text">AI 正在分析你的简历数据，生成多维度能力画像...</p>
         </div>
 
-        <!-- 画像结果 -->
         <div v-else-if="profileGenerated" class="profile-result">
-          <!-- 基础信息横向卡片 -->
           <div class="basic-info-card card-effect">
             <div class="info-card-item">
               <span class="info-icon">👤</span>
@@ -117,7 +112,6 @@
             </div>
           </div>
 
-          <!-- 软能力维度 -->
           <div class="dimension-scores">
             <h3 class="dimension-title">📊 软能力维度评分</h3>
             <div class="radar-chart-container card-effect">
@@ -135,7 +129,6 @@
             </div>
           </div>
 
-          <!-- 技能 & 证书 -->
           <div class="skill-cert-section">
             <div class="skill-card card-effect">
               <h3 class="skill-title">💻 专业技能</h3>
@@ -157,7 +150,6 @@
             </div>
           </div>
 
-          <!-- 经历 -->
           <div class="experience-section">
             <div class="exp-card card-effect">
               <h3 class="exp-title">🎓 教育经历</h3>
@@ -201,13 +193,11 @@
             </div>
           </div>
 
-          <!-- AI评价 -->
           <div class="ai-evaluation card-effect">
             <h3 class="eval-title">📝 AI 综合能力评价</h3>
             <div class="eval-content">{{ profile.aiEvaluation }}</div>
           </div>
 
-          <!-- 操作按钮 -->
           <div class="profile-actions">
             <el-button class="btn-effect" @click="regenerateProfile" :loading="generatingProfile">重新生成画像</el-button>
             <el-button class="btn-effect" type="info" @click="goToEditInfo">重新填写学生信息</el-button>
@@ -216,7 +206,6 @@
           </div>
         </div>
 
-        <!-- 未生成状态 -->
         <div v-else class="empty-profile">
           <p class="empty-text">暂无能力画像数据，请先完成简历上传/手动录入</p>
           <el-button class="btn-effect" type="primary" @click="goBack">返回填写信息</el-button>
@@ -236,13 +225,11 @@ import * as echarts from 'echarts'
 const router = useRouter()
 const route = useRoute()
 
-// 导航状态
 const isLogin = ref(!!localStorage.getItem('token'))
 const userAvatar = ref(localStorage.getItem('avatar') || '')
 const isUserMenuOpen = ref(false)
 const darkMode = ref(localStorage.getItem('darkMode') === 'true')
 
-// 请求配置
 const token = localStorage.getItem('token')
 const userId = ref(localStorage.getItem('userId') || 3)
 const studentId = ref(route.query.studentId || localStorage.getItem('studentId') || 1)
@@ -253,7 +240,6 @@ const api = axios.create({
   timeout: 30000
 })
 
-// 核心状态
 const generatingProfile = ref(false)
 const profileGenerated = ref(false)
 const profile = reactive({
@@ -263,16 +249,13 @@ const profile = reactive({
   project_text: '', project_json: [], aiEvaluation: ''
 })
 
-// 雷达图实例
 let radarChartInstance = null
 
-// 计算竞争力是否有效
 const isCompetitiveScoreValid = computed(() => {
   const soft = getSoftAbilityList()
   return Object.values(soft).some(item => item.score > 0)
 })
 
-// 初始化
 onMounted(() => {
   getProfileData()
 })
@@ -281,7 +264,6 @@ watch(() => profile.soft_abilities, () => {
   if (profileGenerated.value) initRadarChart()
 }, { deep: true })
 
-// 初始化雷达图
 const initRadarChart = () => {
   const chartDom = document.getElementById('softAbilityRadarChart')
   if (!chartDom) return setTimeout(() => initRadarChart(), 150)
@@ -309,7 +291,6 @@ const initRadarChart = () => {
   window.addEventListener('resize', () => radarChartInstance?.resize())
 }
 
-// 获取画像数据
 const getProfileData = async () => {
   try {
     generatingProfile.value = true
@@ -328,7 +309,6 @@ const getProfileData = async () => {
   }
 }
 
-// 软能力列表
 const getSoftAbilityList = () => {
   const res = {}
   if (profile.soft_abilities && typeof profile.soft_abilities === 'object') {
@@ -352,7 +332,6 @@ const getSoftAbilityList = () => {
   return res
 }
 
-// 生成AI评价
 const generateAIEvaluation = (data) => {
   const skills = data.skills?.join('、') || '无'
   const certs = data.certificates?.join('、') || '无'
@@ -376,7 +355,6 @@ const generateAIEvaluation = (data) => {
   return text
 }
 
-// 重新生成
 const regenerateProfile = async () => {
   try {
     await ElMessageBox.confirm('确定重新生成？', '提示', { type: 'warning' })
@@ -387,24 +365,10 @@ const regenerateProfile = async () => {
   }
 }
 
-// 导出
 const exportProfile = async () => {
-  try {
-    const res = await api.post('/profile/export', {
-      student_id: studentId.value, format: 'pdf', profile_data: profile
-    }, { responseType: 'blob' })
-    const url = URL.createObjectURL(new Blob([res.data]))
-    const a = document.createElement('a')
-    a.href = url; a.download = `能力画像_${profile.name || '用户'}.pdf`
-    document.body.appendChild(a); a.click(); a.remove()
-    URL.revokeObjectURL(url)
-    ElMessage.success('导出成功')
-  } catch (e) {
-    ElMessage.error('导出失败：后端未实现或网络异常')
-  }
+  ElMessage.warning('导出功能需后端实现 export 接口')
 }
 
-// 工具方法
 const getScoreColor = s => s >= 80 ? '#10b981' : s >= 60 ? '#f59e0b' : s >= 40 ? '#f97316' : '#ef4444'
 const getCompletenessDesc = s => s >= 90 ? '极完整' : s >= 80 ? '优秀' : s >= 70 ? '良好' : s >= 60 ? '一般' : '偏低'
 const getCompetitiveDesc = s => s >= 90 ? '极强' : s >= 80 ? '优秀' : s >= 70 ? '良好' : s >= 60 ? '一般' : '偏弱'
@@ -415,27 +379,9 @@ const getCompetitiveScore = () => {
   return Math.round(profile.completeness * 0.6 + avg * 0.4)
 }
 
-// 路由跳转
 const goBack = () => router.push('/student-ability')
 const goToEditInfo = () => router.push('/student-ability')
-const goToInterestTest = async () => {
-  try {
-    // 自动保存当前能力画像
-    await api.post('/profile/save', {
-      student_id: studentId.value,
-      profile_data: profile
-    })
-    ElMessage.success('能力画像已自动保存')
-  } catch (e) {
-    ElMessage.warning('自动保存失败，将直接进入测试')
-  }
-  
-  // 再跳转
-  router.push({ 
-    path: '/interest-test', 
-    query: { studentId: studentId.value } 
-  })
-}
+const goToInterestTest = () => router.push({ path: '/interest-test', query: { studentId: studentId.value } })
 const toggleUserMenu = () => isUserMenuOpen.value = !isUserMenuOpen.value
 const handleLogout = () => { localStorage.clear(); isLogin.value = false; router.push('/'); ElMessage.success('已退出') }
 const toggleTheme = () => { darkMode.value = !darkMode.value; localStorage.setItem('darkMode', darkMode.value) }
@@ -460,7 +406,6 @@ const handleSearch = () => {
   color: #1a2639;
 }
 
-/* 导航 */
 .top-nav {
   height: 60px;
   background: #fff;
@@ -512,7 +457,6 @@ const handleSearch = () => {
 .user-menu .menu-item:hover { background: #f0f7ff; }
 .user-menu .logout { color: #ff4d4f; border-top: 1px solid #f0f0f0; }
 
-/* 容器 */
 .profile-container {
   width: 100%;
   max-width: 1100px;
@@ -550,7 +494,6 @@ const handleSearch = () => {
   background: linear-gradient(90deg, #2563eb, #3b82f6);
 }
 
-/* 卡片特效 */
 .card-effect {
   position: relative;
   overflow: hidden;
@@ -565,7 +508,6 @@ const handleSearch = () => {
   box-shadow: 0 12px 24px rgba(0,0,0,0.08);
 }
 
-/* 基础信息卡片 */
 .basic-info-card {
   display: flex;
   align-items: center;
@@ -587,7 +529,6 @@ const handleSearch = () => {
 .info-value { color: #1e293b; font-size: 15px; font-weight: 500; }
 .info-card-divider { width: 1px; height: 30px; background: rgba(148,163,184,0.2); margin: 0 10px; }
 
-/* 评分 */
 .core-scores { display: flex; gap: 20px; margin-bottom: 35px; }
 .score-card { flex: 1; background: #fff; border-radius: 16px; padding: 24px; }
 .score-type { font-size: 15px; color: #64748b; margin-bottom: 10px; }
@@ -597,7 +538,6 @@ const handleSearch = () => {
 .bar-empty { height: 100%; background: #e2e8f0; border-radius: 20px; }
 .score-desc { font-size: 14px; color: #64748b; line-height: 1.5; }
 
-/* 维度 */
 .dimension-title { font-size: 19px; font-weight: 600; color: #1e293b; margin-bottom: 20px; }
 .radar-chart-container { width: 100%; height: 400px; margin-bottom: 30px; padding: 24px; border-radius: 16px; }
 .radar-chart { width: 100%; height: 100%; }
@@ -608,7 +548,6 @@ const handleSearch = () => {
 .dimension-score { font-weight: 600; color: #1e293b; font-size: 14px; }
 .dimension-tip { font-size: 12px; color: #94a3b8; font-style: italic; }
 
-/* 技能证书 */
 .skill-cert-section { display: flex; gap: 20px; margin-bottom: 35px; }
 .skill-card, .cert-card { flex: 1; background: #fff; border-radius: 16px; padding: 24px; }
 .skill-title, .cert-title { font-size: 17px; font-weight: 600; color: #1e293b; margin-bottom: 18px; }
@@ -619,7 +558,6 @@ const handleSearch = () => {
 .cert-tag { background: #f0fdf4; color: #166534; border: 1px solid #dcfce7; }
 .empty-tag { color: #94a3b8; background: #f8fafc; border: 1px solid #e2e8f0; }
 
-/* 经历 */
 .experience-section { display: grid; grid-template-columns: repeat(auto-fill,minmax(320px,1fr)); gap: 20px; margin-bottom: 35px; }
 .exp-card { background: #fff; border-radius: 16px; padding: 24px; }
 .exp-title { font-size: 17px; font-weight: 600; color: #1e293b; margin-bottom: 18px; }
@@ -629,12 +567,10 @@ const handleSearch = () => {
 .date-range, .role { font-size: 12px; color: #64748b; }
 .work-achievements, .project-outcome { color: #0f766e; font-size: 13px; font-weight: 500; }
 
-/* AI评价 */
 .ai-evaluation { background: #fff; border-radius: 16px; padding: 24px; margin-bottom: 30px; }
 .eval-title { font-size: 17px; font-weight: 600; color: #1e293b; margin-bottom: 18px; }
 .eval-content { font-size: 15px; line-height: 1.7; color: #334155; background: #f8fafc; padding: 16px; border-radius: 8px; border-left: 3px solid #2563eb; }
 
-/* 按钮 */
 .profile-actions { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
 .btn-effect { position: relative; overflow: hidden; transition: all 0.3s ease !important; }
 .btn-effect::after { content: ''; position: absolute; top:0; left:-100%; width:100%; height:100%; background: linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent); transition: left 0.6s; }
@@ -644,14 +580,12 @@ const handleSearch = () => {
 :deep(.el-button--success) { background: linear-gradient(135deg,#10b981,#34d399) !important; border:none !important; }
 :deep(.el-button--info) { background: linear-gradient(135deg,#64748b,#94a3b8) !important; border:none !important; color:#fff !important; }
 
-/* 加载 & 空状态 */
 .loading-container { display: flex; flex-direction: column; align-items: center; padding:60px 20px; }
 .loading-spinner { font-size:48px; animation:spin 2s linear infinite; margin-bottom:20px; }
 .loading-text { font-size:16px; color:#64748b; }
 .empty-profile { display: flex; flex-direction: column; align-items: center; padding:80px 20px; text-align:center; }
 .empty-text { font-size:16px; color:#64748b; margin-bottom:24px; line-height:1.6; }
 
-/* 动画 */
 @keyframes fadeInUp {
   from { opacity:0; transform:translateY(20px); }
   to { opacity:1; transform:translateY(0); }
@@ -665,7 +599,6 @@ const handleSearch = () => {
   100% { transform:rotate(360deg); }
 }
 
-/* 响应式 */
 @media(max-width:768px) {
   .basic-info-card { flex-direction: column; gap:15px; padding:20px; }
   .info-card-divider { width:80%; height:1px; margin:10px 0; }

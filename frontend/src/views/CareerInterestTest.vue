@@ -183,7 +183,7 @@
               @click="nextQuestion"
               :disabled="currentAnswer === 0"
             >
-              {{ currentQuestionIndex === testQuestions.length - 1 ? '完成测评' : '下一题' }}
+              {{ currentQuestionIndex === testQuestions.length - 1 ? '提交测评' : '下一题' }}
             </button>
           </div>
         </div>
@@ -383,6 +383,7 @@ const loading = ref(true)
 
 const isLogin = ref(!!localStorage.getItem('token'))
 const userAvatar = ref(localStorage.getItem('avatar') || '')
+const userId = ref(localStorage.getItem('user_id') || '')
 const isUserMenuOpen = ref(false)
 
 watch(
@@ -390,6 +391,7 @@ watch(
   () => {
     isLogin.value = !!localStorage.getItem('token')
     userAvatar.value = localStorage.getItem('avatar') || ''
+    userId.value = localStorage.getItem('user_id') || ''
   },
   { immediate: true }
 )
@@ -402,6 +404,7 @@ const handleLogout = () => {
   localStorage.removeItem('token')
   localStorage.removeItem('avatar')
   localStorage.removeItem('nickname')
+  localStorage.removeItem('user_id')
   isLogin.value = false
   isUserMenuOpen.value = false
   router.push('/')
@@ -569,17 +572,22 @@ const fetchAssessmentQuestions = async () => {
 const submitAssessmentResult = async () => {
   try {
     loading.value = true
-    const answersArray = Object.entries(answers.value).map(([qIdx, fiveScore]) => {
-      const question = testQuestions.value[parseInt(qIdx)]
-      return {
-        question_id: question.id,
-        score: fiveScore
+    const answersArray = []
+    
+    for (const qid of Object.keys(answers.value)) {
+      const score = answers.value[qid]
+      const q = testQuestions.value.find(item => item.id == qid)
+      if (q) {
+        answersArray.push({
+          question_id: q.id,
+          score: score
+        })
       }
-    })
+    }
     
     const submitData = {
       answers: answersArray,
-      user_id: localStorage.getItem('user_id') || null,
+      user_id: userId.value || null,
       session_id: localStorage.getItem('session_id') || `guest_${Date.now()}`,
       test_mode: false
     }
@@ -598,7 +606,7 @@ const submitAssessmentResult = async () => {
         dimensionScores.value[type] = Math.round(scores[type] * 20)
       })
       recommendation.value = response.data.recommendation
-      ElMessage.success('测评提交成功，已生成AI报告！')
+      ElMessage.success('测评提交成功，报告已保存至当前用户账号！')
       return response.data
     }
   } catch (error) {
@@ -614,13 +622,14 @@ const calculateLocalScores = () => {
   const total = { R:0, I:0, A:0, S:0, E:0, C:0 }
   const count = { R:0, I:0, A:0, S:0, E:0, C:0 }
   
-  Object.entries(answers.value).forEach(([idx, score]) => {
-    const q = testQuestions.value[+idx]
-    if (!q) return
-    const s = options.value[score-1].score
+  for (const qid of Object.keys(answers.value)) {
+    const scoreVal = answers.value[qid]
+    const q = testQuestions.value.find(item => item.id == qid)
+    if (!q) continue
+    const s = options.value[scoreVal - 1]?.score || 60
     total[q.dimension] += s
     count[q.dimension]++
-  })
+  }
   
   Object.keys(total).forEach(k => {
     dimensionScores.value[k] = count[k] ? Math.round(total[k]/count[k]) : 60
@@ -700,13 +709,15 @@ const startTimer = () => {
 }
 
 const selectAnswerAndNext = (v) => {
-  answers.value[currentQuestionIndex.value] = v
+  const q = currentQuestion.value
+  answers.value[q.id] = v
   currentAnswer.value = v
   saveTestDraft()
   setTimeout(() => {
     if (currentQuestionIndex.value < testQuestions.value.length - 1) {
       currentQuestionIndex.value++
-      currentAnswer.value = answers.value[currentQuestionIndex.value] || 0
+      const nextQ = currentQuestion.value
+      currentAnswer.value = answers.value[nextQ.id] || 0
     } else completeTest()
   }, 300)
 }
@@ -714,30 +725,39 @@ const selectAnswerAndNext = (v) => {
 const prevQuestion = () => {
   if (currentQuestionIndex.value > 0) {
     currentQuestionIndex.value--
-    currentAnswer.value = answers.value[currentQuestionIndex.value] || 0
+    const q = currentQuestion.value
+    currentAnswer.value = answers.value[q.id] || 0
   }
 }
 
 const nextQuestion = () => {
-  answers.value[currentQuestionIndex.value] = currentAnswer.value
+  const q = currentQuestion.value
+  answers.value[q.id] = currentAnswer.value
   if (currentQuestionIndex.value < testQuestions.value.length - 1) {
     currentQuestionIndex.value++
-    currentAnswer.value = answers.value[currentQuestionIndex.value] || 0
+    const nextQ = currentQuestion.value
+    currentAnswer.value = answers.value[nextQ.id] || 0
   } else completeTest()
 }
 
 const completeTest = async () => {
   clearInterval(timer)
   testResultDate.value = new Date().toLocaleString()
-  testQuestions.value.forEach((_, i) => answers.value[i] ||= 3)
+  
+  testQuestions.value.forEach(q => {
+    if (!answers.value[q.id]) {
+      answers.value[q.id] = 3
+    }
+  })
+  
   await submitAssessmentResult()
+  
   testCompleted.value = true
   testStarted.value = false
   saveTestDraft()
   saveTestResult()
 }
 
-// ✅ 修复：重新测评函数（核心修复点）
 const restartTest = () => {
   clearInterval(timer)
   testCompleted.value = false

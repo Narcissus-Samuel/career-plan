@@ -1,5 +1,6 @@
 <template>
-  <div class="job-match-container">
+  <div class="job-match-container" :class="{ dark: darkMode }">
+    <!-- 顶部导航栏（与岗位选择页完全一致） -->
     <header class="top-nav">
       <div class="nav-wrap">
         <div class="nav-left">
@@ -31,19 +32,35 @@
             </li>
           </ul>
         </div>
+
         <div class="nav-right">
           <div class="nav-search-wrap">
-            <input type="text" class="nav-search-input" placeholder="搜索岗位详情..." @keyup.enter="handleSearch" />
-            <button class="btn-toggle-theme" @click="toggleTheme">🌙</button>
-            <button class="btn-login" @click="$router.push('/login')" v-if="!isLogin">登录</button>
-            <button class="btn-register" @click="$router.push('/register')" v-if="!isLogin">注册</button>
-            <div class="user-profile" v-if="isLogin">
-              <img :src="userAvatar || 'https://picsum.photos/seed/avatar/40/40'" alt="头像" class="avatar" @click="toggleUserMenu" />
-              <div class="user-menu" v-show="isUserMenuOpen">
-                <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
-                <div class="menu-item" @click="$router.push('/settings')">账号设置</div>
-                <div class="menu-item logout" @click="handleLogout">退出登录</div>
-              </div>
+            <input 
+              type="text" 
+              class="nav-search-input" 
+              placeholder="搜索职业方向、专业、院校、岗位类型"
+              @keyup.enter="handleSearch"
+              v-model="searchKeyword"
+            >
+            <button class="nav-search-btn" @click="handleSearch">搜索</button>
+          </div>
+
+          <button class="btn-toggle-theme" @click="toggleTheme">🌙</button>
+          
+          <button class="btn-login" @click="$router.push('/login')" v-if="!isLogin">登录</button>
+          <button class="btn-register" @click="$router.push('/register')" v-if="!isLogin">注册</button>
+          
+          <div class="user-profile" v-if="isLogin">
+            <img 
+              :src="userAvatar || 'https://picsum.photos/seed/avatar/40/40'" 
+              alt="用户头像" 
+              class="avatar"
+              @click="toggleUserMenu"
+            >
+            <div class="user-menu" v-show="isUserMenuOpen">
+              <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
+              <div class="menu-item" @click="$router.push('/settings')">账号设置</div>
+              <div class="menu-item logout" @click="handleLogout">退出登录</div>
             </div>
           </div>
         </div>
@@ -196,6 +213,8 @@ const route = useRoute()
 const isLogin = ref(!!localStorage.getItem('token'))
 const userAvatar = ref(localStorage.getItem('avatar') || '')
 const isUserMenuOpen = ref(false)
+const darkMode = ref(localStorage.getItem('darkMode') === 'true')
+const searchKeyword = ref('')
 
 const jobName = ref('软件工程师')
 const matchResult = ref({
@@ -204,7 +223,7 @@ const matchResult = ref({
   gapAnalysis: { base: '', skills: '', quality: '', potential: '' }
 })
 
-// 加载匹配数据
+// 加载匹配数据 + 匹配完成自动保存到数据库
 const loadProfileAndMatch = async () => {
   const loading = ElLoading.service({ text: 'AI大模型分析中...' })
   
@@ -241,6 +260,8 @@ const loadProfileAndMatch = async () => {
 
     ElMessage.success('AI大模型匹配完成！')
 
+    await autoSaveToDatabase()
+
   } catch (err) {
     console.error("错误：", err)
     const errMsg = err.response?.data?.error || '大模型调用失败，请检查技能是否完善'
@@ -257,14 +278,30 @@ const loadProfileAndMatch = async () => {
   }
 }
 
-// ==============================================
-// ✅ 终极最终版：完全删除接口调用，只跳转，永不报错！
-// ==============================================
+// 自动保存到数据库
+const autoSaveToDatabase = async () => {
+  try {
+    const studentId = localStorage.getItem('studentId') || localStorage.getItem('userId')
+    if (!studentId) return
+
+    await axios.post('/api/match/match', {
+      student_id: Number(studentId),
+      job_name: jobName.value
+    })
+
+    localStorage.setItem('lastMatchResult', JSON.stringify(matchResult.value))
+    localStorage.setItem('lastMatchJob', jobName.value)
+
+    console.log('✅ 匹配结果已自动保存到数据库')
+  } catch (e) {
+    console.warn('自动保存失败', e)
+  }
+}
+
+// 生成报告
 const generateAndSaveReport = async () => {
   try {
     ElLoading.service({ text: '正在生成报告...' })
-
-    // 只保存数据到本地，不调用任何后端接口
     localStorage.setItem('lastMatchResult', JSON.stringify(matchResult.value))
     localStorage.setItem('lastMatchJob', jobName.value)
 
@@ -273,13 +310,13 @@ const generateAndSaveReport = async () => {
       ElMessage.success('生涯规划报告生成成功！')
       ElLoading.service().close()
     }, 800)
-
   } catch (e) {
     ElLoading.service().close()
     ElMessage.error('报告生成失败')
   }
 }
 
+// 用户菜单
 const toggleUserMenu = () => { isUserMenuOpen.value = !isUserMenuOpen.value }
 const handleLogout = () => {
   localStorage.clear()
@@ -287,13 +324,41 @@ const handleLogout = () => {
   router.push('/')
   ElMessage.success('退出登录成功')
 }
-const toggleTheme = () => {}
+
+// 主题切换
+const applyTheme = () => {
+  if (darkMode.value) {
+    document.body.classList.add('dark')
+  } else {
+    document.body.classList.remove('dark')
+  }
+}
+const toggleTheme = () => {
+  darkMode.value = !darkMode.value
+  localStorage.setItem('darkMode', darkMode.value)
+  applyTheme()
+  ElMessage.success(`已切换为${darkMode.value ? '暗黑' : '明亮'}模式`)
+}
+
+// 功能跳转
 const goToFeature = (type) => {
   const map = {'测评':'/interest-test','分析':'/ability-analysis','规划':'/development-path','导出':'/report-export'}
   router.push(map[type] || '/')
 }
-const handleSearch = () => { ElMessage.warning('请输入岗位名称') }
 
+// 导航搜索
+const handleSearch = () => {
+  const keyword = searchKeyword.value.trim()
+  if (!keyword) {
+    ElMessage.warning('请输入搜索关键词')
+    return
+  }
+  router.push(`/search?keyword=${encodeURIComponent(keyword)}`)
+  searchKeyword.value = ''
+  ElMessage.success(`正在搜索：${keyword}`)
+}
+
+// 评分等级
 const getScoreLevelColor = () => {
   if (matchResult.value.totalScore >= 85) return '#1989fa'
   if (matchResult.value.totalScore >= 70) return '#409EFF'
@@ -309,6 +374,7 @@ const getMatchSuggestion = () => {
   return matchResult.value.gapAnalysis?.base || 'AI 正在生成建议...'
 }
 
+// 导出
 const exportResult = () => {
   const blob = new Blob([JSON.stringify(matchResult.value, null, 2)], { type: 'application/json' })
   const a = document.createElement('a')
@@ -318,10 +384,12 @@ const exportResult = () => {
   ElMessage.success('导出成功')
 }
 
+// 更换岗位
 const changeJob = () => {
   router.push('/jobmatch-analysis')
 }
 
+// 图表
 let radarChart = null
 let resizeListener = null
 const initMatchChart = () => {
@@ -354,6 +422,7 @@ onUnmounted(() => {
 })
 
 onMounted(() => {
+  applyTheme()
   if (!isLogin.value) {
     ElMessage.warning('请先登录')
     router.push('/login')
@@ -370,17 +439,29 @@ onMounted(() => {
   min-height: 100vh;
   width: 100%;
   box-sizing: border-box;
+  transition: all 0.3s ease;
+}
+.job-match-container.dark {
+  background: #0f172a !important;
+  color: #f1f5f9;
 }
 
+/* ————————————————————————————————————————
+   导航栏样式（与岗位选择页完全一致）
+———————————————————————————————————————— */
 .top-nav {
   height: 60px;
-  background: #ffffff;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   width: 100%;
   position: fixed;
   top: 0;
   left: 0;
   z-index: 9999;
+  transition: all 0.3s ease;
+}
+.job-match-container.dark .top-nav {
+  background: #1e293b;
 }
 .nav-wrap {
   width: 1200px;
@@ -390,42 +471,267 @@ onMounted(() => {
   align-items: center;
   height: 100%;
 }
-.nav-left { display: flex; align-items: center; }
-.logo { display: flex; align-items: center; margin-right: 40px; font-size: 18px; font-weight: bold; color: #000; }
-.logo-icon { font-size: 24px; margin-right: 8px; }
-.nav-menu { display: flex; list-style: none; margin: 0; padding: 0; }
-.menu-item { margin: 0 15px; font-size: 14px; cursor: pointer; padding: 0 5px; position: relative; height: 60px; line-height: 60px; color: #000; transition: color 0.3s ease; }
-.menu-item:hover { color: #2f54eb; }
-.menu-item.active { color: #2f54eb; }
-.menu-item.active::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 3px; background: #2f54eb; border-radius: 3px 3px 0 0; }
-.dropdown { position: relative; }
-.dropdown-menu { position: absolute; top: 100%; left: 0; width: 200px; background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.12); border-radius: 8px; list-style: none; padding: 8px 0; margin: 0; display: none; z-index: 9999; }
-.dropdown:hover .dropdown-menu { display: block; animation: fadeIn 0.3s ease; }
-.dropdown-item { padding: 12px 20px; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; height: auto; line-height: normal; color: #333; transition: background 0.3s ease; }
-.dropdown-item:hover { background: #f0f7ff; }
-.color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.nav-left {
+  display: flex;
+  align-items: center;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  margin-right: 40px;
+  font-size: 18px;
+  font-weight: bold;
+  color: #000;
+}
+.job-match-container.dark .logo {
+  color: #f1f5f9;
+}
+.logo-icon {
+  font-size: 24px;
+  margin-right: 8px;
+}
+.nav-menu {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.menu-item {
+  margin: 0 15px;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 5px;
+  position: relative;
+  height: 60px;
+  line-height: 60px;
+  color: #000;
+  transition: color 0.3s ease;
+}
+.job-match-container.dark .menu-item {
+  color: #f1f5f9;
+}
+.menu-item:hover {
+  color: #2f54eb;
+}
+.menu-item.active {
+  color: #2f54eb;
+  font-weight: 500;
+}
+.menu-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: #2f54eb;
+  transition: all 0.3s ease;
+}
+
+/* 下拉菜单 */
+.dropdown {
+  position: relative;
+}
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 200px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border-radius: 4px;
+  list-style: none;
+  padding: 8px 0;
+  margin: 0;
+  display: none;
+  z-index: 9999;
+  transition: all 0.3s ease;
+}
+.job-match-container.dark .dropdown-menu {
+  background: #334155;
+}
+.dropdown:hover .dropdown-menu {
+  display: block;
+}
+.dropdown-item {
+  padding: 10px 15px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: auto;
+  line-height: normal;
+  color: #000;
+  transition: background 0.3s ease;
+}
+.job-match-container.dark .dropdown-item {
+  color: #f1f5f9;
+}
+.dropdown-item:hover {
+  background: #f5f7fa;
+  color: #2f54eb;
+}
+.job-match-container.dark .dropdown-item:hover {
+  background: #475569;
+}
+.color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
 .color-dot.red { background: #ff7a45; }
 .color-dot.orange { background: #faad14; }
 .color-dot.green { background: #52c41a; }
 .color-dot.blue { background: #1890ff; }
-.nav-right { display: flex; gap: 15px; align-items: center; }
-.nav-search-wrap { display: flex; width: 200px; height: 24px; border-radius: 12px; overflow: hidden; border: 1px solid #e8e8e8; transition: border 0.3s ease; }
-.nav-search-wrap:focus-within { border-color: #2f54eb; }
-.nav-search-input { flex: 1; height: 100%; padding: 0 12px; border: none; outline: none; font-size: 12px; background: transparent; }
-.btn-toggle-theme { padding: 6px 10px; border: none; background: #f5f7fa; border-radius: 4px; cursor: pointer; color: #000; transition: all 0.3s ease; }
-.btn-toggle-theme:hover { background: #e8e8e8; }
-.btn-login { padding: 6px 15px; border: 1px solid #2f54eb; color: #2f54eb; background: #fff; border-radius: 4px; cursor: pointer; transition: all 0.3s ease; }
-.btn-login:hover { background: #f0f7ff; }
-.btn-register { padding: 6px 15px; border: none; color: #fff; background: #2f54eb; border-radius: 4px; cursor: pointer; transition: all 0.3s ease; }
-.btn-register:hover { background: #1d39c4; }
-.user-profile { position: relative; display: flex; align-items: center; }
-.avatar { width: 36px; height: 36px; border-radius: 50%; cursor: pointer; border: 2px solid #f0f0f0; transition: border 0.3s ease; }
-.avatar:hover { border-color: #2f54eb; }
-.user-menu { position: absolute; top: 50px; right: 0; width: 120px; background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.12); border-radius: 8px; z-index: 9999; animation: fadeIn 0.3s ease; }
-.user-menu .menu-item { padding: 10px 15px; font-size: 14px; cursor: pointer; height: auto; line-height: normal; margin: 0; color: #333; transition: background 0.3s ease; }
-.user-menu .menu-item:hover { background: #f0f7ff; color: #333; }
-.user-menu .logout { color: #ff4d4f; border-top: 1px solid #f0f0f0; }
 
+/* 导航右侧 */
+.nav-right {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+.nav-search-wrap {
+  display: flex;
+  width: 200px;
+  height: 24px;
+}
+.nav-search-input {
+  flex: 1;
+  height: 100%;
+  padding: 0 10px;
+  border: 1px solid #e8e8e8;
+  border-radius: 4px 0 0 4px;
+  outline: none;
+  font-size: 12px;
+  transition: all 0.3s ease;
+}
+.job-match-container.dark .nav-search-input {
+  background: #334155;
+  border-color: #475569;
+  color: #f1f5f9;
+}
+.nav-search-input:focus {
+  border-color: #2f54eb;
+}
+.nav-search-btn {
+  width: 53px;
+  height: 100%;
+  background: #2f54eb;
+  color: #fff;
+  border: none;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.3s ease;
+}
+.nav-search-btn:hover {
+  background: #1d3ecf;
+}
+
+.btn-toggle-theme {
+  padding: 6px 10px;
+  border: none;
+  background: #f5f7fa;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #000;
+  transition: all 0.3s ease;
+}
+.job-match-container.dark .btn-toggle-theme {
+  background: #334155;
+  color: #f1f5f9;
+}
+.btn-toggle-theme:hover {
+  background: #e2e8f0;
+}
+.btn-login {
+  padding: 6px 15px;
+  border: 1px solid #2f54eb;
+  color: #2f54eb;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.job-match-container.dark .btn-login {
+  background: transparent;
+}
+.btn-login:hover {
+  background: #2f54eb;
+  color: #fff;
+}
+.btn-register {
+  padding: 6px 15px;
+  border: none;
+  color: #fff;
+  background: #2f54eb;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+.btn-register:hover {
+  background: #1d3ecf;
+}
+
+/* 用户头像菜单 */
+.user-profile {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid #f0f0f0;
+  transition: border-color 0.3s ease;
+}
+.avatar:hover {
+  border-color: #2f54eb;
+}
+.user-menu {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  width: 120px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  border-radius: 4px;
+  z-index: 9999;
+}
+.job-match-container.dark .user-menu {
+  background: #334155;
+}
+.user-menu .menu-item {
+  padding: 8px 15px;
+  font-size: 14px;
+  cursor: pointer;
+  height: auto;
+  line-height: normal;
+  margin: 0;
+  color: #000;
+}
+.job-match-container.dark .user-menu .menu-item {
+  color: #f1f5f9;
+}
+.user-menu .menu-item:hover {
+  background: #f5f7fa;
+  color: #2f54eb;
+}
+.job-match-container.dark .user-menu .menu-item:hover {
+  background: #475569;
+}
+.user-menu .logout {
+  color: #ff4d4f;
+  border-top: 1px solid #e8e8e8;
+}
+
+/* ————————————————————————————————————————
+   原有页面内容样式（保持不变）
+———————————————————————————————————————— */
 .main-content {
   padding-top: 60px;
 }
@@ -435,6 +741,10 @@ onMounted(() => {
   padding: 16px 20px;
   border-radius: 0;
   border-bottom: 1px solid #d1e9f1;
+}
+.job-match-container.dark .guide-card {
+  background: #1e293b;
+  border-color: #334155;
 }
 .guide-content {
   max-width: 1200px;
@@ -446,11 +756,17 @@ onMounted(() => {
   font-size: 18px;
   font-weight: 60;
 }
+.job-match-container.dark .guide-content h3 {
+  color: #f1f5f9;
+}
 .guide-content p {
   margin: 0;
   color: #606266;
   font-size: 14px;
   line-height: 1.5;
+}
+.job-match-container.dark .guide-content p {
+  color: #cbd5e1;
 }
 
 .card-item {
@@ -463,6 +779,9 @@ onMounted(() => {
   max-width: 1200px;
   margin: 0 auto;
 }
+.job-match-container.dark .card-item {
+  background: #1e293b;
+}
 .result-card {
   padding: 0;
 }
@@ -474,10 +793,17 @@ onMounted(() => {
   background-color: #f8f9fa;
   border-bottom: 1px solid #e5e7eb;
 }
+.job-match-container.dark .result-header {
+  background: #334155;
+  border-color: #475569;
+}
 .job-title {
   font-size: 16px;
   font-weight: 600;
   color: #303133;
+}
+.job-match-container.dark .job-title {
+  color: #f1f5f9;
 }
 
 .total-score-section {
@@ -487,6 +813,9 @@ onMounted(() => {
   gap: 24px;
   border-bottom: 1px solid #f0f0f0;
 }
+.job-match-container.dark .total-score-section {
+  border-color: #475569;
+}
 .score-card {
   flex: 1;
   min-width: 280px;
@@ -495,16 +824,22 @@ onMounted(() => {
   border-radius: 12px;
   text-align: center;
 }
+.job-match-container.dark .score-card {
+  background: #334155;
+}
 .score-card h3 {
   margin: 0 0 16px 0;
   color: #606266;
   font-size: 16px;
   font-weight: 500;
 }
+.job-match-container.dark .score-card h3 {
+  color: #cbd5e1;
+}
 .score-value {
   font-size: 48px;
   font-weight: 700;
-  color: '#409EFF';
+  color: #409EFF;
   margin-bottom: 16px;
   line-height: 1;
 }
@@ -517,11 +852,17 @@ onMounted(() => {
   display: flex;
   align-items: center;
 }
+.job-match-container.dark .match-suggestion {
+  background: #334155;
+}
 .match-suggestion p {
   margin: 0;
   color: #606266;
   line-height: 1.6;
   font-size: 15px;
+}
+.job-match-container.dark .match-suggestion p {
+  color: #cbd5e1;
 }
 
 .section-title {
@@ -530,7 +871,10 @@ onMounted(() => {
   color: #303133;
   margin-bottom: 20px;
   padding-left: 8px;
-  border-left: 4px solid '#409EFF';
+  border-left: 4px solid #409EFF;
+}
+.job-match-container.dark .section-title {
+  color: #f1f5f9;
 }
 
 .dimension-section,
@@ -538,6 +882,11 @@ onMounted(() => {
 .gap-analysis-section {
   padding: 24px;
   border-bottom: 1px solid #f0f0f0;
+}
+.job-match-container.dark .dimension-section,
+.job-match-container.dark .chart-section,
+.job-match-container.dark .gap-analysis-section {
+  border-color: #475569;
 }
 .gap-analysis-section {
   border-bottom: none;
@@ -549,6 +898,9 @@ onMounted(() => {
   margin: 0;
   font-size: 14px;
 }
+.job-match-container.dark .gap-content {
+  color: #cbd5e1;
+}
 
 .operation-btn-group {
   padding: 24px;
@@ -559,6 +911,10 @@ onMounted(() => {
   gap: 16px;
   flex-wrap: wrap;
   border-top: 1px solid #e5e7eb;
+}
+.job-match-container.dark .operation-btn-group {
+  background: #334155;
+  border-color: #475569;
 }
 .operation-btn-group .el-button {
   padding: 12px 30px;
@@ -572,6 +928,12 @@ onMounted(() => {
   border-radius: 8px;
   border: 1px solid #e5e7eb;
 }
+.job-match-container.dark :deep(.el-table) {
+  --el-table-header-text-color: #f1f5f9;
+  --el-table-row-hover-bg-color: #475569;
+  background: #334155;
+  border-color: #475569;
+}
 :deep(.el-table td),
 :deep(.el-table th) {
   text-align: center;
@@ -580,9 +942,17 @@ onMounted(() => {
   color: #606266;
   border-bottom: 1px solid #f0f0f0;
 }
+.job-match-container.dark :deep(.el-table td),
+.job-match-container.dark :deep(.el-table th) {
+  color: #cbd5e1;
+  border-color: #475569;
+}
 :deep(.el-table th) {
   background-color: #f8f9fa;
   font-weight: 600;
+}
+.job-match-container.dark :deep(.el-table th) {
+  background: #475569;
 }
 
 :deep(.el-collapse-item__header) {
@@ -593,10 +963,18 @@ onMounted(() => {
   background-color: #ffffff;
   border-bottom: 1px solid #e5e7eb;
 }
+.job-match-container.dark :deep(.el-collapse-item__header) {
+  background: #334155;
+  color: #f1f5f9;
+  border-color: #475569;
+}
 :deep(.el-collapse-item__content) {
   padding: 20px;
   background-color: #ffffff;
   border: none;
+}
+.job-match-container.dark :deep(.el-collapse-item__content) {
+  background: #334155;
 }
 
 @media (max-width: 768px) {

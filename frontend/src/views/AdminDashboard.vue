@@ -124,7 +124,7 @@
           </div>
         </div>
 
-        <!-- 🔥 新增：用户生涯数据管理 -->
+        <!-- 🔥 用户生涯数据管理（与报告导出接口完全打通） -->
         <div v-show="activeMenu === 'careerData'">
           <div class="toolbar" style="display: flex; gap: 12px; align-items: center;">
             <button @click="fetchCareerData()" class="btn btn-primary">刷新生涯数据</button>
@@ -134,9 +134,9 @@
             </select>
             <select v-model="selectedDataType" class="input" style="width: 160px;">
               <option value="">全部类型</option>
-              <option value="interest_test">兴趣测试</option>
-              <option value="student_profile">学生画像</option>
-              <option value="career_report">职业生涯报告</option>
+              <option value="interest_test">兴趣测试报告</option>
+              <option value="job_match">人岗匹配报告</option>
+              <option value="career_plan">职业规划报告</option>
             </select>
           </div>
           <div class="table-container">
@@ -145,7 +145,8 @@
                 <tr>
                   <th>数据ID</th>
                   <th>所属用户</th>
-                  <th>数据类型</th>
+                  <th>报告类型</th>
+                  <th>报告标题</th>
                   <th>创建时间</th>
                   <th>操作</th>
                 </tr>
@@ -159,6 +160,7 @@
                       {{ getDataTypeText(data.data_type) }}
                     </span>
                   </td>
+                  <td>{{ data.title || '无标题' }}</td>
                   <td>{{ data.created_at || '-' }}</td>
                   <td class="action-btns">
                     <button @click="viewCareerDataDetail(data)" class="btn btn-sm btn-primary">查看详情</button>
@@ -166,7 +168,7 @@
                   </td>
                 </tr>
                 <tr v-if="careerDataList.length === 0">
-                  <td colspan="5" style="text-align: center; padding: 20px;">暂无生涯数据</td>
+                  <td colspan="6" style="text-align: center; padding: 20px;">暂无生涯报告数据</td>
                 </tr>
               </tbody>
             </table>
@@ -240,7 +242,7 @@
       </div>
     </div>
 
-    <!-- 生涯数据详情弹窗 -->
+    <!-- 生涯报告详情弹窗（与导出页完全一致） -->
     <div v-show="showCareerDataDetail" class="modal-overlay">
       <div class="modal profile-modal">
         <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -250,10 +252,11 @@
         <div style="margin-top:15px; text-align: left;">
           <p><strong>数据ID：</strong> {{ currentCareerData.id }}</p>
           <p><strong>所属用户：</strong> {{ getUserUsername(currentCareerData.user_id) || '未知用户' }}</p>
+          <p><strong>报告标题：</strong> {{ currentCareerData.title || '无标题' }}</p>
           <p><strong>创建时间：</strong> {{ currentCareerData.created_at || '暂无' }}</p>
           <div style="margin-top:20px;">
-            <h4>数据内容：</h4>
-            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 10px; white-space: pre-wrap; word-break: break-all;">
+            <h4>报告内容：</h4>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 10px; white-space: pre-wrap; word-break: break-all; max-height: 400px; overflow-y: auto;">
               {{ formatCareerDataContent(currentCareerData.content) }}
             </div>
           </div>
@@ -287,7 +290,7 @@ const jobForm = ref({
 const showProfileModal = ref(false)
 const currentProfile = ref({ job_name: '', skills: [], certificates: [], soft_abilities: {} })
 
-// 生涯数据相关（新增）
+// 🔥 生涯数据管理（与报告导出接口完全打通）
 const careerDataList = ref([])
 const selectedUserId = ref('')
 const selectedDataType = ref('')
@@ -311,55 +314,54 @@ const checkAdmin = () => {
 }
 const logout = () => { localStorage.clear(); router.push('/login') }
 
-// 菜单标题计算
+// 菜单标题
 const menuTitle = computed(() => {
   const map = {
     users: '👥 用户管理',
     categories: '📂 岗位大类管理',
     jobs: '💼 岗位数据管理',
-    careerData: '📊 用户生涯数据管理'
+    careerData: '📊 用户生涯报告管理'
   }
   return map[activeMenu.value] || '管理面板'
 })
 
-// ====================== 通用工具函数 ======================
-// 根据ID获取大类名称
+// ====================== 通用工具 ======================
 const getCategoryName = (cid) => {
   const cat = categories.value.find(c => c.id == cid)
   return cat ? cat.name : "未分类"
 }
 
-// 根据用户ID获取用户名
 const getUserUsername = (userId) => {
   const user = users.value.find(u => u.id == userId)
   return user ? user.username : ''
 }
 
-// 生涯数据类型文本转换
+// 🔥 与报告导出页完全一致的类型映射
 const getDataTypeText = (type) => {
   const map = {
-    'interest_test': '兴趣测试',
-    'student_profile': '学生画像',
-    'career_report': '职业生涯报告'
+    'interest_test': '兴趣测试报告',
+    'job_match': '人岗匹配报告',
+    'career_plan': '职业规划报告'
   }
   return map[type] || '未知类型'
 }
 
-// 生涯数据类型标签样式
 const getDataTypeTagClass = (type) => {
   const map = {
     'interest_test': 'tag interest-tag',
-    'student_profile': 'tag profile-tag',
-    'career_report': 'tag report-tag'
+    'job_match': 'tag match-tag',
+    'career_plan': 'tag plan-tag'
   }
   return map[type] || 'tag'
 }
 
-// 格式化生涯数据内容（JSON转字符串）
 const formatCareerDataContent = (content) => {
-  if (!content) return '暂无数据内容'
+  if (!content) return '暂无报告内容'
   try {
-    return typeof content === 'string' ? JSON.stringify(JSON.parse(content), null, 2) : JSON.stringify(content, null, 2)
+    if (typeof content === 'string') {
+      return content
+    }
+    return JSON.stringify(content, null, 2)
   } catch (e) {
     return content
   }
@@ -377,7 +379,7 @@ const delUser = async (id) => {
   try { await api.delete('/admin/users/'+id); fetchUsers() } catch (e) {}
 }
 
-// ====================== 岗位大类管理 ======================
+// ====================== 岗位大类 ======================
 const fetchCategories = async () => {
   try { const res = await api.get('/admin/categories'); categories.value = res.data.list || [] } catch (e) {}
 }
@@ -403,7 +405,6 @@ const deleteJob = async (id) => {
   try { await api.delete('/admin/jobs/'+id); fetchAllJobs() } catch (e) {}
 }
 
-// 查看岗位画像
 const viewJobProfile = async (jobId) => {
   try {
     const res = await api.get('/jobs/'+jobId+'/profile')
@@ -415,51 +416,102 @@ const viewJobProfile = async (jobId) => {
 }
 const closeProfileModal = () => { showProfileModal.value = false }
 
-// ====================== 新增：用户生涯数据管理 ======================
-// 获取生涯数据（支持筛选）
+// ====================== 🔥 生涯数据管理（修复404最终版） ======================
 const fetchCareerData = async () => {
   try {
-    // 构建筛选参数
-    const params = new URLSearchParams()
-    if (selectedUserId.value) params.append('user_id', selectedUserId.value)
-    if (selectedDataType.value) params.append('data_type', selectedDataType.value)
-    
-    const res = await api.get(`/admin/career-data?${params.toString()}`)
-    careerDataList.value = res.data.list || []
+    careerDataList.value = []
+    const userId = selectedUserId.value
+
+    if (!userId) {
+      alert("请先选择一个用户再刷新！")
+      return
+    }
+
+    // 1. 兴趣测评
+    let interest = []
+    try {
+      const { data } = await api.get(`/assessment/history/${userId}`)
+      interest = (Array.isArray(data) ? data : []).map(item => ({
+        id: 'interest_' + item.id,
+        user_id: userId,
+        data_type: 'interest_test',
+        title: `霍兰德测评报告 #${item.id}`,
+        created_at: item.created_at,
+        content: item
+      }))
+    } catch {}
+
+    // 2. 人岗匹配
+    let match = []
+    try {
+      const { data } = await api.get(`/match/history/${userId}`)
+      match = (data.history || []).map(item => ({
+        id: 'match_' + item.id,
+        user_id: userId,
+        data_type: 'job_match',
+        title: `${item.job_name} 匹配报告`,
+        created_at: new Date(item.created_at * 1000).toLocaleString(),
+        content: item
+      }))
+    } catch {}
+
+    // 3. 职业规划报告
+    let plan = []
+    try {
+      const { data } = await api.get(`/report/history/${userId}`)
+      plan = (Array.isArray(data) ? data : []).map(item => ({
+        id: 'plan_' + item.id,
+        user_id: userId,
+        data_type: 'career_plan',
+        title: `${item.job_name} 职业生涯规划报告`,
+        created_at: item.created_at,
+        content: item.content
+      }))
+    } catch {}
+
+    let all = [...interest, ...match, ...plan]
+    if (selectedDataType.value) {
+      all = all.filter(i => i.data_type === selectedDataType.value)
+    }
+    careerDataList.value = all
   } catch (e) {
-    console.log("获取生涯数据失败", e)
+    console.error("获取生涯报告失败", e)
     careerDataList.value = []
   }
 }
 
-// 查看生涯数据详情
 const viewCareerDataDetail = (data) => {
   currentCareerData.value = { ...data }
   showCareerDataDetail.value = true
 }
+
 const closeCareerDataDetail = () => {
   showCareerDataDetail.value = false
   currentCareerData.value = {}
 }
 
-// 删除生涯数据
 const deleteCareerData = async (dataId) => {
-  if (!confirm('确定删除这条生涯数据？')) return
+  if (!confirm('确定删除这条报告？')) return
   try {
-    await api.delete(`/admin/career-data/${dataId}`)
-    fetchCareerData() // 刷新列表
+    const type = dataId.split('_')[0]
+    const realId = dataId.split('_')[1]
+
+    if (type === 'interest') await api.delete(`/assessment/${realId}`)
+    if (type === 'match') await api.delete(`/match/${realId}`)
+    if (type === 'plan') await api.delete(`/report/${realId}`)
+
+    fetchCareerData()
+    alert("删除成功！")
   } catch (e) {
-    alert("删除失败")
+    alert("删除失败：后端未实现该删除接口")
   }
 }
 
-// 页面加载时初始化数据
 onMounted(() => {
   checkAdmin()
   fetchUsers()
   fetchCategories()
   fetchAllJobs()
-  fetchCareerData() // 初始化生涯数据
 })
 </script>
 
@@ -498,11 +550,11 @@ onMounted(() => {
 .admin-tag { background: #e6f7ff; color: #1890ff; }
 .user-tag { background: #f6ffed; color: #52c41a; }
 
-/* 生涯数据类型标签样式 */
+/* 🔥 报告类型标签（与导出页一致） */
 .tag { padding: 4px 8px; border-radius: 4px; font-size: 12px; }
 .interest-tag { background: #e8f4f8; color: #4299e1; }
-.profile-tag { background: #fdf2f8; color: #9f7aea; }
-.report-tag { background: #f5fafe; color: #38b2ac; }
+.match-tag { background: #f6ffed; color: #00b42a; }
+.plan-tag { background: #fff7e6; color: #fa8c16; }
 
 .action-btns { display: flex; gap: 6px; white-space: nowrap; }
 .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
@@ -515,11 +567,10 @@ onMounted(() => {
 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 999; }
 .modal { background: #fff; width: 500px; padding: 30px; border-radius: 10px; max-height: 90vh; overflow-y: auto; }
 .job-modal { width: 750px; }
-.profile-modal { width: 700px; }
+.profile-modal { width: 750px; }
 .input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; }
 .modal-btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 
-/* 岗位画像标签样式 */
 .skill { background: #e6f7ff; color: #1890ff; border-radius: 20px; padding: 4px 10px; font-size: 12px; }
 .cert { background: #f6ffed; color: #00b42a; border-radius: 20px; padding: 4px 10px; font-size: 12px; }
 .soft-item { margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }

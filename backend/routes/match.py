@@ -4,6 +4,7 @@ import json
 import time
 import re
 from services.llm_service import call_llm
+from routes.auth import token_required  # 👈 加上这行
 
 match_bp = Blueprint('match', __name__, url_prefix='/api/match')
 
@@ -373,20 +374,56 @@ def match():
     job_ability = get_job_abilities(job_name)
     match_detail = compute_match(student_ability, job_ability)
 
-    # 可选：存入匹配历史
+    # ======================
+    # 固定修复：确保 details 存入数据库
+    # ======================
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+
+        details_json = json.dumps(match_detail, ensure_ascii=False)
+
+        cursor.execute('''
+            INSERT INTO match_history 
+            (student_id, job_name, match_score, details, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (
+            student_id,
+            job_name,
+            match_detail['overall_score'],
+            details_json,
+            int(time.time())
+        ))
+
+        conn.commit()
+        print("✅ 匹配记录已保存，details=", details_json)
+    except Exception as e:
+        print("❌ 保存失败：", e)
+    finally:
+        conn.close()
+
+    return jsonify(match_detail)
+@match_bp.route('/history/<int:student_id>', methods=['GET'])
+@token_required
+def get_match_history(student_id):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO match_history (student_id, job_name, match_score, details, created_at)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (
-        student_id,
-        job_name,
-        match_detail['overall_score'],
-        json.dumps(match_detail, ensure_ascii=False),
-        int(time.time())
-    ))
-    conn.commit()
+        SELECT id, job_name, match_score, details, created_at
+        FROM match_history
+        WHERE student_id = ?
+        ORDER BY created_at DESC
+    ''', (student_id,))
+    rows = cursor.fetchall()
     conn.close()
 
-    return jsonify(match_detail)
+    history = []
+    for r in rows:
+        history.append({
+            'id': r['id'],
+            'job_name': r['job_name'],
+            'match_score': r['match_score'],
+            'details': r['details'],  # 👈 这里必须加
+            'created_at': r['created_at']
+        })
+    return jsonify({'history': history})

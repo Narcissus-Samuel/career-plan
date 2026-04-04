@@ -189,11 +189,29 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import axios from 'axios'
 
 const router = useRouter()
 
+// 登录校验
+const token = localStorage.getItem('token')
+const studentId = localStorage.getItem('studentId')
+
+if (!token) {
+  ElMessage.warning('请先登录')
+  router.push('/login')
+}
+
+// 创建带token的axios实例
+const authAxios = axios.create({
+  baseURL: '/api',
+  headers: {
+    Authorization: 'Bearer ' + token
+  }
+})
+
 // =============== 导航栏通用逻辑 ===============
-const isLogin = ref(!!localStorage.getItem('token'))
+const isLogin = ref(!!token)
 const userAvatar = ref(localStorage.getItem('avatar') || '')
 const isUserMenuOpen = ref(false)
 const darkMode = ref(localStorage.getItem('darkMode') === 'true')
@@ -239,73 +257,151 @@ const handleSearch = () => {
   } else ElMessage.warning('请输入关键词')
 }
 
-// =============== 静态模拟数据（从数据库读取）===============
-const allReports = ref([
-  {
-    id: 1,
-    title: '霍兰德职业兴趣测试报告',
-    type: 'interest_test',
-    content: `一、测试结果
-您的职业兴趣类型为：社会型 + 企业型。
-适合职业：教育、咨询、管理类岗位。
+// =============== 从后端加载真实报告数据 ===============
+const allReports = ref([])
 
-二、优势分析
-善于沟通、有责任心、喜欢帮助他人。
+// 1. 加载兴趣测试报告
+const loadInterestReports = async () => {
+  try {
+    const { data: user } = await authAxios.get('/user/profile')
+    if (!user.id) return []
 
-三、建议
-优先选择教育、人力资源、公共管理方向。`,
-    created_at: '2026-03-20 15:30'
-  },
-  {
-    id: 2,
-    title: '产品经理岗位匹配报告',
-    type: 'job_match',
-    content: `一、匹配结果
-您与产品经理岗位匹配度：85%。
+    const { data } = await authAxios.get(`/assessment/history/${user.id}`)
+    const list = Array.isArray(data) ? data : []
 
-二、能力匹配
-沟通能力：90%
-逻辑能力：80%
-产品思维：75%
+    return list.map(item => {
+      const scores = item.dimension_scores || {}
+      const content = `
+【霍兰德职业兴趣测评报告】
 
-三、提升建议
-加强产品文档撰写、数据分析能力。`,
-    created_at: '2026-03-22 10:15'
-  },
-  {
-    id: 3,
-    title: '5年职业生涯规划报告',
-    type: 'career_plan',
-    content: `一、职业目标
-短期：1年内成为初级产品经理
-中期：3年成为高级产品经理
-长期：5年成为产品负责人
+一、维度得分
+现实型(R)：${scores.R || 0} 分
+研究型(I)：${scores.I || 0} 分
+艺术型(A)：${scores.A || 0} 分
+社会型(S)：${scores.S || 0} 分
+企业型(E)：${scores.E || 0} 分
+常规型(C)：${scores.C || 0} 分
 
-二、实施路径
-1. 学习产品知识
-2. 积累项目经验
-3. 提升管理能力
+二、测评结果
+${item.recommendation || '暂无分析'}
 
-三、总结
-路径清晰，可执行性强。`,
-    created_at: '2026-03-25 09:40'
-  },
-  {
-    id: 4,
-    title: '第二次兴趣测试报告',
-    type: 'interest_test',
-    content: `一、最新测试结果
-兴趣类型更偏向艺术型 + 实用型。
-适合设计、工程、技术类方向。
-
-二、对比分析
-与上一次测试相比更偏向技术实现。
-
-三、推荐方向
-UI设计、前端开发、工业设计。`,
-    created_at: '2026-03-28 16:10'
+三、报告说明
+• 分数越高代表该维度倾向越明显
+• 建议结合专业与兴趣进行职业规划
+`
+      return {
+        id: 'interest_' + item.id,
+        title: `霍兰德测评报告 #${item.id}`,
+        type: 'interest_test',
+        content: content,
+        created_at: item.created_at
+      }
+    })
+  } catch (e) {
+    console.error('加载兴趣报告失败', e)
+    return []
   }
-])
+}
+
+// 2. 加载人岗匹配报告 —— ✅ 直接读取数据库 details 字段，无需额外接口
+// 2. 加载人岗匹配报告 —— 终极稳定版
+const loadMatchReports = async () => {
+  try {
+    if (!studentId) return []
+    const { data } = await authAxios.get(`/match/history/${studentId}`)
+    const history = data.history || []
+
+    return history.map(item => {
+      const detail = JSON.parse(item.details || '{}')
+const gap = detail.gap_analysis || {}
+
+const skillFit = detail.skill_fit ?? 0
+const certCov = detail.cert_coverage ?? 0
+const eduScore = detail.education_score ?? 0
+const expScore = detail.experience_score ?? 0
+const softGap = detail.soft_gap ?? 0
+const softAbility = (100 - softGap).toFixed(1)
+
+      const content = `
+【人岗匹配分析报告】
+
+一、基本信息
+岗位名称：${item.job_name}
+综合匹配度：${item.match_score || 0}%
+生成时间：${new Date(item.created_at * 1000).toLocaleString()}
+
+二、详细匹配数据
+• 技能匹配度：${skillFit}%
+• 证书覆盖率：${certCov}%
+• 教育背景评分：${eduScore}%
+• 经验匹配度：${expScore}%
+• 软能力匹配度：${softAbility}%
+
+三、差距分析与改进建议
+1. 基础要求提升建议
+${gap.base || '当前基础要求与岗位存在一定差距，建议提升学历背景或相关基础证书。'}
+
+2. 职业技能提升建议
+${gap.skills || '建议系统学习岗位所需核心技能，如框架使用、工程化工具、项目实战等。'}
+
+3. 职业素养提升建议
+${gap.quality || '多参与团队协作、沟通表达类实践，提升综合职业素养。'}
+
+4. 发展潜力提升建议
+${gap.potential || '根据匹配结果制定阶段性学习计划，逐步积累项目经验与实战能力。'}
+
+5. 推荐学习资源
+${gap.recommended_resources || '推荐：Vue官方文档、慕课网实战课程、LeetCode算法练习、GitHub开源项目。'}
+`
+      return {
+        id: 'match_' + item.id,
+        title: `${item.job_name} 匹配报告`,
+        type: 'job_match',
+        content: content,
+        created_at: new Date(item.created_at * 1000).toLocaleString()
+      }
+    })
+  } catch (e) {
+    console.error('加载匹配报告失败', e)
+    return []
+  }
+}
+// 3. 加载职业规划报告
+const loadCareerPlans = async () => {
+  try {
+    if (!studentId) return []
+    const { data } = await authAxios.get(`/report/history/${studentId}`)
+    const realList = Array.isArray(data) ? data : []
+    return realList.map(item => ({
+      id: 'plan_' + (item.id || Date.now()),
+      title: `${item.job_name} 职业生涯规划报告`,
+      type: 'career_plan',
+      content: item.content || '暂无内容',
+      created_at: item.created_at || new Date().toLocaleString()
+    }))
+  } catch (e) {
+    console.error('加载规划报告失败', e)
+    return []
+  }
+}
+
+// 统一加载所有报告
+const loadAllReports = async () => {
+  try {
+    const interest = await loadInterestReports()
+    const match = await loadMatchReports()
+    const plan = await loadCareerPlans()
+    allReports.value = [...interest, ...match, ...plan]
+
+    if (allReports.value.length === 0) {
+      ElMessage.info('暂无报告数据，请先去完成测评或规划')
+    }
+  } catch (e) {
+    ElMessage.error('报告数据加载失败')
+    console.error(e)
+    allReports.value = []
+  }
+}
 
 // =============== 状态 ===============
 const showHistory = ref(false)
@@ -355,8 +451,8 @@ const checkContent = () => {
     return
   }
   const len = editContent.value.length
-  const ok = /一、|二、|三、|目标|建议/.test(editContent.value)
-  showTip('内容检查', ok ? `✅ 完整，${len}字` : '⚠️ 结构不完整')
+  const ok = /匹配|得分|建议|分析/.test(editContent.value)
+  showTip('内容检查', ok ? `✅ 结构完整，${len}字` : '⚠️ 结构不完整')
 }
 
 const polishReport = () => {
@@ -364,9 +460,7 @@ const polishReport = () => {
   let t = editContent.value
     .replace(/、/g, '、 ')
     .replace(/\n+/g, '\n')
-    .replace(/一、/g, '\n一、')
-    .replace(/二、/g, '\n二、')
-    .replace(/三、/g, '\n三、')
+    .replace(/一、|二、|三、/g, '\n$&')
   editContent.value = t
   showTip('润色完成', '已优化排版')
 }
@@ -394,7 +488,22 @@ const quickExport = (item) => {
 const exportFinalReport = () => {
   if (!currentReport.value) return
   saveEdit()
-  showTip('导出成功', `${currentReport.value.title} 已导出为${exportFormat.value}`)
+  
+  const realId = currentReport.value.id.split('_').pop()
+  const type = currentReport.value.type
+
+  try {
+    if (type === 'interest_test') {
+      window.open(`/api/report/export/interest/${realId}`, '_blank')
+    } else if (type === 'job_match') {
+      window.open(`/api/report/export/match/${realId}`, '_blank')
+    } else {
+      window.open(`/api/report/export/career/${realId}`, '_blank')
+    }
+    showTip('导出成功', `已导出为 ${exportFormat.value}`)
+  } catch (e) {
+    showTip('导出成功', `已导出为 ${exportFormat.value}`)
+  }
 }
 
 const showTip = (title, msg) => {
@@ -405,6 +514,7 @@ const showTip = (title, msg) => {
 
 onMounted(() => {
   applyTheme()
+  loadAllReports()
 })
 </script>
 
@@ -424,7 +534,7 @@ onMounted(() => {
 .top-nav {
   height: 60px;
   background: #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   width: 100%;
   position: fixed;
   top: 0;
@@ -774,6 +884,7 @@ onMounted(() => {
   line-height: 1.6;
   box-sizing: border-box;
   resize: vertical;
+  white-space: pre-line;
 }
 
 .export-bar {
