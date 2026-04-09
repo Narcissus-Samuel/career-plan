@@ -11,8 +11,8 @@
           <ul class="nav-menu">
             <li class="menu-item active" @click="$router.push('/')">首页</li>
             <li class="menu-item" @click="$router.push('/career-planning-intro')">职业规划</li>
-            <li class="menu-item" @click="$router.push('/resource-library')">资源库</li>
-            <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
+            <li class="menu-item" @click="$router.push('/report-export')">报告导出</li>
+            <!-- <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
             <li class="menu-item dropdown">
               核心功能 ▼
               <ul class="dropdown-menu">
@@ -29,7 +29,7 @@
                   <span class="color-dot blue"></span> 规划报告导出
                 </li>
               </ul>
-            </li>
+            </li> -->
           </ul>
         </div>
         <div class="nav-right">
@@ -44,7 +44,7 @@
             <img :src="userAvatar || 'https://picsum.photos/seed/avatar/40/40'" alt="用户头像" class="avatar" @click="toggleUserMenu">
             <div class="user-menu" v-show="isUserMenuOpen">
               <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
-              <div class="menu-item" @click="$router.push('/settings')">账号设置</div>
+              <!-- <div class="menu-item" @click="$router.push('/settings')">账号设置</div> -->
               <div class="menu-item logout" @click="handleLogout">退出登录</div>
             </div>
           </div>
@@ -86,27 +86,27 @@
       </div>
     </section>
 
-    <!-- 功能模块（不变） -->
+    <!-- 功能模块（已修改） -->
     <section class="function-modules">
       <div class="modules-wrap">
-        <div class="module-item" @click="$router.push('/job-portrait')">
+        <div class="module-item" @click="$router.push('/interest-test')">
           <div class="module-content">
-            <div class="module-title">岗位画像</div>
-            <div class="module-desc">优秀岗位信息展示</div>
+            <div class="module-title">兴趣测试</div>
+            <div class="module-desc">职业兴趣在线测评</div>
           </div>
           <span class="module-arrow">></span>
         </div>
-        <div class="module-item" @click="$router.push('/career-planning')">
+        <div class="module-item" @click="$router.push('/career-planning-intro')">
           <div class="module-content">
             <div class="module-title">AI职业规划</div>
             <div class="module-desc">智能生成职业规划</div>
           </div>
           <span class="module-arrow">></span>
         </div>
-        <div class="module-item" @click="$router.push('/match-result')">
+        <div class="module-item" @click="$router.push('/report-export')">
           <div class="module-content">
-            <div class="module-title">人岗匹配结果</div>
-            <div class="module-desc">查看个人匹配岗位</div>
+            <div class="module-title">报告导出</div>
+            <div class="module-desc">规划报告一键导出</div>
           </div>
           <span class="module-arrow">></span>
         </div>
@@ -170,7 +170,7 @@
       </div>
     </section>
 
-    <!-- 最适配十大岗位传送带 -->
+    <!-- 最适配十大岗位传送带
     <section class="top-ten-jobs-section">
       <div class="section-header">
         <h2 class="section-title">最适配十大岗位</h2>
@@ -187,7 +187,7 @@
           </div>
         </div>
       </div>
-    </section>
+    </section> -->
 
     <!-- 热门岗位画像卡片区域 -->
     <section class="job-portrait-card-section" ref="portraitSectionRef">

@@ -11,7 +11,7 @@
             <li class="menu-item" @click="$router.push('/')">首页</li>
             <li class="menu-item active" @click="$router.push('/career-planning-intro')">职业规划</li>
             <li class="menu-item" @click="$router.push('/report-export')">报告导出</li>
-            <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
+            <!-- <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
             <li class="menu-item dropdown">
               核心功能 ▼
               <ul class="dropdown-menu">
@@ -28,7 +28,7 @@
                   <span class="color-dot blue"></span> 规划报告导出
                 </li>
               </ul>
-            </li>
+            </li> -->
           </ul>
         </div>
 
@@ -57,7 +57,7 @@
             >
             <div class="user-menu" v-show="isUserMenuOpen">
               <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
-              <div class="menu-item" @click="$router.push('/settings')">账号设置</div>
+              <!-- <div class="menu-item" @click="$router.push('/settings')">账号设置</div> -->
               <div class="menu-item logout" @click="handleLogout">退出登录</div>
             </div>
           </div>
@@ -72,13 +72,6 @@
           <h1>职业测评</h1>
         </div>
         <div class="page-nav">
-          <button 
-            class="report-btn" 
-            @click="showReportModal = true" 
-            v-if="testCompleted"
-          >
-            📄 查看测评报告
-          </button>
         </div>
       </div>
     </div>
@@ -271,7 +264,6 @@
         <div class="result-actions">
           <button class="restart-btn" @click="restartTest">重新测评</button>
           <button class="export-btn" @click="exportReport">导出测评报告</button>
-          <button class="share-btn" @click="shareResult">分享测评结果</button>
           <button class="career-plan-btn" @click="goToMatchResult">
             📋 进行人岗匹配分析
           </button>
@@ -776,7 +768,6 @@ const restartTest = () => {
 }
 
 const exportReport = () => showReportModal.value = true
-const shareResult = () => ElMessage.success('已复制结果')
 const goToMatchResult = () => router.push('/jobmatch-analysis')
 const printReport = () => window.print()
 const downloadReport = () => ElMessage.success('开始下载')
@@ -1067,14 +1058,6 @@ onUnmounted(() => {
 .page-nav {
   display: flex;
   gap: 10px;
-}
-.report-btn {
-  padding: 6px 15px;
-  background: #2f54eb;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
 }
 
 .test-intro {
@@ -1522,7 +1505,7 @@ onUnmounted(() => {
   gap: 20px;
   flex-wrap: wrap;
 }
-.restart-btn, .export-btn, .share-btn, .career-plan-btn {
+.restart-btn, .export-btn, .career-plan-btn {
   padding: 10px 30px;
   border-radius: 4px;
   font-size: 16px;
@@ -1537,11 +1520,6 @@ onUnmounted(() => {
   border: none;
   background: #2f54eb;
   color: #fff;
-}
-.share-btn {
-  border: 1px solid #2f54eb;
-  color: #2f54eb;
-  background: #fff;
 }
 .career-plan-btn {
   border: none;

@@ -11,8 +11,8 @@
             <li class="menu-item" @click="$router.push('/')">首页</li>
             <li class="menu-item active" @click="$router.push('/student-ability')">职业规划</li>
             <li class="menu-item" @click="$router.push('/report-export')">报告导出</li>
-            <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
-            <li class="menu-item dropdown">
+            <!-- <li class="menu-item" @click="$router.push('/about-us')">关于我们</li> -->
+            <!-- <li class="menu-item dropdown">
               核心功能 ▼
               <ul class="dropdown-menu">
                 <li class="dropdown-item" @click="goToFeature('测评')">
@@ -28,7 +28,7 @@
                   <span class="color-dot blue"></span> 规划报告导出
                 </li>
               </ul>
-            </li>
+            </li> -->
           </ul>
         </div>
         <div class="nav-right">
@@ -43,7 +43,7 @@
             <img :src="userAvatar || 'https://picsum.photos/seed/avatar/40/40'" alt="头像" class="avatar" @click="toggleUserMenu" />
             <div class="user-menu" v-show="isUserMenuOpen">
               <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
-              <div class="menu-item" @click="$router.push('/settings')">账号设置</div>
+              <!-- <div class="menu-item" @click="$router.push('/settings')">账号设置</div> -->
               <div class="menu-item logout" @click="handleLogout">退出登录</div>
             </div>
           </div>

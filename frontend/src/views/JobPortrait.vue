@@ -10,10 +10,9 @@
           </div>
           <ul class="nav-menu">
             <li class="menu-item" :class="{active: $route.path === '/'}" @click="$router.push('/')">首页</li>
-            <li class="menu-item" :class="{active: $route.path.includes('/job-portrait')}" @click="$router.push('/job-portrait')">岗位画像</li>
-            <li class="menu-item" :class="{active: $route.path === '/career-planning'}" @click="$router.push('/career-planning')">职业规划</li>
-            <li class="menu-item" :class="{active: $route.path === '/resource-library'}" @click="$router.push('/resource-library')">资源库</li>
-            <li class="menu-item" :class="{active: $route.path === '/about-us'}" @click="$router.push('/about-us')">关于我们</li>
+            <li class="menu-item" :class="{active: $route.path === '/career-planning'}" @click="$router.push('/career-planning-intro')">职业规划</li>
+            <li class="menu-item" :class="{active: $route.path === '/report-export'}" @click="$router.push('/report-export')">报告导出</li>
+            <!-- <li class="menu-item" :class="{active: $route.path === '/about-us'}" @click="$router.push('/about-us')">关于我们</li>
             <li class="menu-item dropdown">
               核心功能 ▼
               <ul class="dropdown-menu">
@@ -30,7 +29,7 @@
                   <span class="color-dot blue"></span> 规划报告导出
                 </li>
               </ul>
-            </li>
+            </li> -->
           </ul>
         </div>
 
@@ -60,7 +59,7 @@
             >
             <div class="user-menu" v-show="isUserMenuOpen">
               <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
-              <div class="menu-item" @click="$router.push('/settings')">账号设置</div>
+              <!-- <div class="menu-item" @click="$router.push('/settings')">账号设置</div> -->
               <div class="menu-item logout" @click="handleLogout">退出登录</div>
             </div>
           </div>
@@ -333,7 +332,7 @@
           v-model="graphVisible" 
           :title="`${currentJob?.job_name || '岗位'} - 职业发展路径图谱`" 
           width="90%"
-          top="50px"
+          center
           class="graph-dialog"
           custom-class="custom-dialog"
           append-to-body
@@ -508,7 +507,7 @@ const initRadarChart = () => {
       left: 'center',
       textStyle: {
         fontSize: 16,
-        fontWeight: 600,
+        fontWeight: 60,
         color: '#303133'
       }
     },
@@ -616,7 +615,7 @@ const openGraphDialog = () => {
   })
 }
 
-// 初始化岗位发展路径图谱
+// 初始化岗位发展路径图谱 - 【仅修改这里，修复ECharts报错】
 const initJobGraph = () => {
   if (!graphChartRef.value) return
   
@@ -627,12 +626,25 @@ const initJobGraph = () => {
   graphChart = echarts.init(graphChartRef.value)
   
   const config = jobGraphConfig.value
+  // 严格过滤空值、去重
+  const verticalList = (config.vertical || []).filter(item => item && item.trim())
+  const switchList = (config.switch || []).filter(item => item && item.trim())
+  // 去重，防止节点重复
+  const uniqueVertical = [...new Set(verticalList)]
+  const uniqueSwitch = [...new Set(switchList)]
+  
   const nodes = []
   const links = []
+  const nodeMap = {} // 存储id映射，防止重复
   
-  // 垂直路径节点
-  config.vertical.forEach((item, index) => {
+  // 垂直路径节点 - 添加唯一ID，不重复
+  uniqueVertical.forEach((item, index) => {
+    const nodeId = `v_${index}`
+    if(nodeMap[nodeId]) return
+    nodeMap[nodeId] = true
+    
     nodes.push({ 
+      id: nodeId,
       name: item, 
       category: 0, 
       symbolSize: 50 + (index * 5),
@@ -644,10 +656,11 @@ const initJobGraph = () => {
         shadowBlur: 10
       }
     })
+    // 连线使用ID关联
     if (index > 0) {
       links.push({ 
-        source: config.vertical[index-1], 
-        target: item, 
+        source: `v_${index-1}`, 
+        target: nodeId, 
         lineStyle: { 
           color: '#409EFF', 
           width: 3,
@@ -667,9 +680,14 @@ const initJobGraph = () => {
     }
   })
   
-  // 换岗路径节点
-  config.switch.forEach((item) => {
+  // 换岗路径节点 - 添加唯一ID，不重复
+  uniqueSwitch.forEach((item, index) => {
+    const nodeId = `s_${index}`
+    if(nodeMap[nodeId]) return
+    nodeMap[nodeId] = true
+    
     nodes.push({ 
+      id: nodeId,
       name: item, 
       category: 1, 
       symbolSize: 45,
@@ -681,27 +699,42 @@ const initJobGraph = () => {
         shadowBlur: 10
       }
     })
-    links.push({ 
-      source: config.vertical[2] || config.vertical[0], 
-      target: item, 
-      lineStyle: { 
-        color: '#67C23A', 
-        width: 2, 
-        type: 'dashed',
-        shadowColor: 'rgba(103, 194, 58, 0.2)',
-        shadowBlur: 5
-      },
-      label: { 
-        show: true, 
-        formatter: '换岗',
-        fontSize: 12,
-        color: '#606266',
-        backgroundColor: 'rgba(255,255,255,0.8)',
-        borderRadius: 4,
-        padding: [2, 6]
-      }
-    })
+    // 从垂直路径第3个/第1个节点连线，使用ID
+    const sourceId = uniqueVertical.length >=3 ? 'v_2' : (uniqueVertical[0] ? 'v_0' : '')
+    if(sourceId){
+      links.push({ 
+        source: sourceId, 
+        target: nodeId, 
+        lineStyle: { 
+          color: '#67C23A', 
+          width: 2, 
+          type: 'dashed',
+          shadowColor: 'rgba(103, 194, 58, 0.2)',
+          shadowBlur: 5
+        },
+        label: { 
+          show: true, 
+          formatter: '换岗',
+          fontSize: 12,
+          color: '#606266',
+          backgroundColor: 'rgba(255,255,255,0.8)',
+          borderRadius: 4,
+          padding: [2, 6]
+        }
+      })
+    }
   })
+
+  // 终极兜底：无数据时显示默认节点
+  if(nodes.length === 0){
+    nodes.push({
+      id: 'default',
+      name: '暂无发展路径',
+      category:0,
+      symbolSize:60,
+      itemStyle:{color:'#909399'}
+    })
+  }
   
   const option = {
     backgroundColor: '#ffffff',
@@ -709,7 +742,7 @@ const initJobGraph = () => {
       // 修复：增加空值保护
       text: `${currentJob.value?.job_name || '岗位'} - 职业发展路径图谱`,
       left: 'center',
-      textStyle: { fontSize: 18, fontWeight: 600, color: '#303133' }
+      textStyle: { fontSize: 18, fontWeight: 60, color: '#303133' }
     },
     tooltip: { 
       trigger: 'item',
@@ -1484,7 +1517,7 @@ onMounted(() => {
 
 .cert-icon {
   font-size: 20px;
-  color: #E6A23C;
+  color: '#E6A23C';
   margin-bottom: 6px;
 }
 
@@ -1649,7 +1682,7 @@ onMounted(() => {
 
 .switch-icon {
   font-size: 24px;
-  color: #67C23A;
+  color: '#67C23A';
   margin-bottom: 8px;
 }
 

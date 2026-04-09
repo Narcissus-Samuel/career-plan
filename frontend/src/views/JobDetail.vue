@@ -12,7 +12,7 @@
             <li class="menu-item" @click="$router.push('/')">首页</li>
             <li class="menu-item" @click="$router.push('/career-planning')">职业规划</li>
             <li class="menu-item" @click="$router.push('/report-export')">报告导出</li>
-            <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
+            <!-- <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
             <li class="menu-item dropdown">
               核心功能 ▼
               <ul class="dropdown-menu">
@@ -29,7 +29,7 @@
                   <span class="color-dot blue"></span> 规划报告导出
                 </li>
               </ul>
-            </li>
+            </li> -->
           </ul>
         </div>
 
@@ -58,7 +58,7 @@
             >
             <div class="user-menu" v-show="isUserMenuOpen">
               <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
-              <div class="menu-item" @click="$router.push('/settings')">账号设置</div>
+              <!-- <div class="menu-item" @click="$router.push('/settings')">账号设置</div> -->
               <div class="menu-item logout" @click="handleLogout">退出登录</div>
             </div>
           </div>
@@ -91,14 +91,8 @@
 
           <!-- 顶部信息区：移除岗位标签卡片、岗位编码 -->
           <div class="job-top-section">
-            <div class="job-cover-wrap">
-              <img 
-                :src="`https://picsum.photos/seed/${jobDetail.job_name}/200/260`" 
-                :alt="jobDetail.job_name"
-                class="job-cover"
-              />
-              <!-- 移除：岗位标签卡片 -->
-            </div>
+            <!-- 已删除：岗位封面图片 -->
+            <div class="job-cover-wrap" style="display: none;"></div>
             
             <div class="job-info-wrap">
               <div class="job-header">
@@ -132,9 +126,6 @@
                 <button class="btn-read" @click="goToJobProfile">
                   <i class="action-icon">📊</i> 查看岗位画像
                 </button>
-                <button class="btn-app" @click="handleApply">
-                  <i class="action-icon">📝</i> 申请该岗位
-                </button>
                 <button class="btn-share" @click="handleShare">
                   <i class="action-icon">🔗</i> 分享
                 </button>
@@ -142,9 +133,7 @@
             </div>
             
             <div class="job-author-wrap">
-              <div class="author-avatar">
-                <img :src="`https://picsum.photos/seed/${jobDetail.company}/60/60`" alt="企业头像" />
-              </div>
+              <!-- 已删除：企业头像图片 -->
               <div class="author-info">
                 <div class="author-name">{{ jobDetail.company || '未知公司' }}</div>
                 <div class="author-desc">{{ `${jobDetail.location || '未知地点'} | ${jobDetail.company_size || '未知规模'}` }}</div>
@@ -397,14 +386,6 @@ const goToJobProfile = () => {
     ElMessage.info('即将跳转到岗位画像详情页')
   } else {
     ElMessage.warning('岗位数据未加载完成')
-  }
-}
-
-const handleApply = () => {
-  if (jobDetail.value.job_name) {
-    ElMessage.success(`已成功申请【${jobDetail.value.job_name}】岗位！`)
-  } else {
-    ElMessage.warning('岗位数据未加载完成，暂无法申请')
   }
 }
 
@@ -784,19 +765,6 @@ onMounted(() => {
   position: relative;
 }
 
-.job-cover {
-  width: 100%;
-  height: 260px;
-  object-fit: cover;
-  border-radius: 12px;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.1);
-  transition: transform 0.3s ease;
-}
-
-.job-cover:hover {
-  transform: translateY(-5px);
-}
-
 /* 岗位信息区域 */
 .job-info-wrap {
   flex: 1;
@@ -883,7 +851,7 @@ onMounted(() => {
   gap: 16px;
 }
 
-.btn-read, .btn-app, .btn-share {
+.btn-read, .btn-share {
   padding: 12px 24px;
   border: none;
   border-radius: 8px;
@@ -912,17 +880,6 @@ onMounted(() => {
   box-shadow: 0 4px 12px rgba(255, 122, 69, 0.2);
 }
 
-.btn-app {
-  background: #2f54eb;
-  color: #fff;
-}
-
-.btn-app:hover {
-  background: #1d39c4;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(47, 84, 235, 0.2);
-}
-
 .btn-share {
   background: #fff;
   color: #666;
@@ -944,15 +901,6 @@ onMounted(() => {
   gap: 15px;
   border-left: 1px solid #f0f0f0;
   padding-left: 30px;
-}
-
-.author-avatar img {
-  width: 70px;
-  height: 70px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 3px solid #f8f9fa;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
 .author-info {
