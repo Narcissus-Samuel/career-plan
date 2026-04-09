@@ -167,7 +167,7 @@ def generate():
     if not student_ability:
         return jsonify({'error': '学生不存在'}), 404
 
-    # 如果没有指定岗位，自动匹配最佳岗位
+    # 如果没有指定岗位，自动匹配最佳岗位（原有逻辑不变）
     if not job_name:
         from .match import get_student_ability as get_sa, get_job_abilities, compute_match
         conn = get_db()
@@ -200,10 +200,9 @@ def generate():
 
     path_suggestions = get_path_suggestions(job_name)
     
-    # 调用 LLM 生成报告 (真实调用或测试拦截)
     report_md = generate_report_with_llm(student_ability, job_profile, job_name, path_suggestions)
 
-    # 存储报告到数据库，使用 ISO 字符串格式的时间
+    # 存储报告到数据库
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
@@ -214,13 +213,29 @@ def generate():
         job_name,
         report_md,
         'markdown',
-        datetime.datetime.now().isoformat()   # 改为 ISO 字符串，与默认值一致
+        datetime.datetime.now().isoformat()
     ))
     report_id = cursor.lastrowid
     conn.commit()
     conn.close()
 
-    return jsonify({'report_id': report_id, 'content': report_md, 'job_name': job_name})
+    # 新增：将 Markdown 转为带样式的 HTML
+    html_body = markdown.markdown(report_md, extensions=['extra', 'codehilite'])
+    styled_html = f"""
+    <div class="career-report" style="font-family: 'Microsoft Yahei', sans-serif; line-height: 1.7; color: #2c3e50;">
+        {html_body}
+        <div style="margin-top: 50px; text-align: center; color: #7f8c8d; font-size: 13px; padding-top: 20px; border-top: 1px solid #eee;">
+            —— 大学生职业规划系统 · 智能生成 ——
+        </div>
+    </div>
+    """
+
+    return jsonify({
+        'report_id': report_id,
+        'content': report_md,
+        'html_content': styled_html,
+        'job_name': job_name
+    })
 
 @report_bp.route('/polish', methods=['POST'])
 def polish():
