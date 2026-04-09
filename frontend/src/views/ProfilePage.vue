@@ -9,10 +9,9 @@
           </div>
           <ul class="nav-menu">
             <li class="menu-item" @click="$router.push('/')">首页</li>
-            <li class="menu-item" @click="$router.push('/student-ability')">岗位画像</li>
-            <li class="menu-item" @click="$router.push('/career-planning')">职业规划</li>
-            <li class="menu-item" @click="$router.push('/resource-library')">资源库</li>
-            <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
+            <li class="menu-item" @click="$router.push('/career-planning-intro')">职业规划</li>
+            <li class="menu-item" @click="$router.push('/report-export')">报告导出</li>
+            <!-- <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
             <li class="menu-item dropdown">
               核心功能 ▼
               <ul class="dropdown-menu">
@@ -33,7 +32,7 @@
                   规划报告导出
                 </li>
               </ul>
-            </li>
+            </li> -->
           </ul>
         </div>
         
@@ -59,7 +58,7 @@
             >
             <div class="user-menu" v-show="isUserMenuOpen">
               <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
-              <div class="menu-item" @click="$router.push('/settings')">账号设置</div>
+              <!-- <div class="menu-item" @click="$router.push('/settings')">账号设置</div> -->
               <div class="menu-item logout" @click="handleLogout">退出登录</div>
             </div>
           </div>
@@ -95,19 +94,11 @@
                 <span class="stat-value">{{ userStats.planCount }}</span>
                 <span class="stat-label">规划方案</span>
               </div>
-              <div class="stat-item">
-                <span class="stat-value">0</span>
-                <span class="stat-label">收藏岗位</span>
-              </div>
             </div>
           </div>
 
           <nav class="sidebar-nav">
             <ul class="nav-list">
-              <li class="nav-item" :class="{ active: activeTab === 'basic' }" @click="switchTab('basic')">
-                <span class="nav-icon">👤</span>
-                <span class="nav-text">基本资料</span>
-              </li>
               <li class="nav-item" :class="{ active: activeTab === 'security' }" @click="switchTab('security')">
                 <span class="nav-icon">🔒</span>
                 <span class="nav-text">账号安全</span>
@@ -124,108 +115,11 @@
                 <span class="nav-icon">🎯</span>
                 <span class="nav-text">人岗匹配报告</span>
               </li>
-              <li class="nav-item" :class="{ active: activeTab === 'history' }" @click="switchTab('history')">
-                <span class="nav-icon">🕒</span>
-                <span class="nav-text">浏览历史</span>
-              </li>
             </ul>
           </nav>
         </aside>
 
         <div class="profile-content">
-          <div class="tab-content" v-show="activeTab === 'basic'">
-            <div class="content-header">
-              <h2 class="content-title">基本资料</h2>
-              <button class="edit-btn" @click="isEditingBasic = !isEditingBasic">
-                {{ isEditingBasic ? '取消编辑' : '编辑资料' }}
-              </button>
-            </div>
-
-            <div class="user-card-list">
-              <div 
-                class="user-summary-card" 
-                @dblclick="userInfo.expanded = !userInfo.expanded"
-              >
-                <div class="card-head">
-                  <img :src="userInfo.avatar" alt="头像" class="card-avatar">
-                  <div class="card-name">{{ userInfo.name || userInfo.username }}</div>
-                </div>
-
-                <div class="card-brief">
-                  <div class="brief-item">
-                    <label>专业：</label>
-                    <span>{{ userInfo.education_text ? userInfo.education_text.split(' ')[2] : '未填写' }}</span>
-                  </div>
-                  <div class="brief-item">
-                    <label>手机：</label>
-                    <span>{{ userInfo.phone || '未填写' }}</span>
-                  </div>
-                </div>
-
-                <div class="card-actions">
-                  <button class="view-btn" @click="userInfo.expanded = true">查看详情</button>
-                </div>
-
-                <div class="card-detail" v-show="userInfo.expanded">
-                  <div class="basic-info-card">
-                    <div class="card-row">
-                      <label class="card-label">姓名</label>
-                      <div class="card-value">{{ userInfo.name || '未填写' }}</div>
-                    </div>
-                    <div class="card-row">
-                      <label class="card-label">手机号</label>
-                      <div class="card-value">{{ userInfo.phone || '未填写' }}</div>
-                    </div>
-                    <div class="card-row">
-                      <label class="card-label">邮箱</label>
-                      <div class="card-value">{{ userInfo.email || '未填写' }}</div>
-                    </div>
-                    <div class="card-row">
-                      <label class="card-label">教育经历</label>
-                      <div class="card-value">{{ userInfo.education_text || '未填写' }}</div>
-                    </div>
-                    <div class="card-row">
-                      <label class="card-label">工作/实习经历</label>
-                      <div class="card-value">{{ userInfo.work_text || '未填写' }}</div>
-                    </div>
-                    <div class="card-row">
-                      <label class="card-label">项目经历</label>
-                      <div class="card-value">{{ userInfo.project_text || '未填写' }}</div>
-                    </div>
-                    <div class="card-row">
-                      <label class="card-label">技能与证书描述</label>
-                      <div class="card-value">{{ userInfo.skills_certs_text || '未填写' }}</div>
-                    </div>
-                    <div class="card-row">
-                      <label class="card-label">个人总结</label>
-                      <div class="card-value">{{ userInfo.summary || '未填写' }}</div>
-                    </div>
-                    <div class="card-row">
-                      <label class="card-label">专业技能</label>
-                      <div class="card-value">{{ userInfo.skills || '未填写' }}</div>
-                    </div>
-                    <div class="card-row">
-                      <label class="card-label">证书资质</label>
-                      <div class="card-value">{{ userInfo.certificates || '未填写' }}</div>
-                    </div>
-                    <div class="card-row">
-                      <label class="card-label">软能力</label>
-                      <div class="card-value">{{ userInfo.soft_abilities || '未填写' }}</div>
-                    </div>
-                    <div class="card-row">
-                      <label class="card-label">资料完整度</label>
-                      <div class="card-value">{{ userInfo.completeness || 0 }}%</div>
-                    </div>
-                    <div class="card-row">
-                      <label class="card-label">创建时间</label>
-                      <div class="card-value">{{ formatDate(userInfo.created_at) || '未记录' }}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <div class="tab-content" v-show="activeTab === 'security'">
             <div class="content-header">
               <h2 class="content-title">账号安全</h2>
@@ -259,12 +153,12 @@
           <div class="tab-content" v-show="activeTab === 'career'">
             <div class="content-header">
               <h2 class="content-title">我的职业规划</h2>
-              <button class="create-btn" @click="$router.push('/career-planning')">创建新规划</button>
+              <button class="create-btn" @click="$router.push('/career-planning-intro')">创建新规划</button>
             </div>
             <div v-if="careerPlans.length === 0" class="empty-state">
               <div class="empty-icon">📄</div>
               <div class="empty-text">暂无职业规划方案</div>
-              <button class="empty-btn" @click="$router.push('/career-planning')">立即创建</button>
+              <button class="empty-btn" @click="$router.push('/career-planning-intro')">立即创建</button>
             </div>
             <div class="career-plan-list" v-else>
               <div class="plan-card" v-for="plan in careerPlans" :key="plan.id">
@@ -287,8 +181,6 @@
                   </div>
                 </div>
                 <div class="plan-actions">
-                  <button class="view-btn">查看详情</button>
-                  <button class="edit-btn">编辑</button>
                   <button class="export-btn" @click="exportPlan(plan.id)">导出报告</button>
                 </div>
               </div>
@@ -326,14 +218,12 @@
                   </div>
                 </div>
                 <div class="report-actions">
-                  <button class="view-btn" @click="viewReport('interest', item.id)">查看报告</button>
                   <button class="export-btn" @click="exportReport('interest', item.id)">导出报告</button>
                 </div>
               </div>
             </div>
           </div>
           
-          <!-- 👇👇👇 这是已对接后端的人岗匹配报告页面 👇👇👇 -->
           <div class="tab-content" v-show="activeTab === 'match'">
             <div class="content-header">
               <h2 class="content-title">人岗匹配结果报告</h2>
@@ -365,35 +255,7 @@
                   </div>
                 </div>
                 <div class="report-actions">
-                  <button class="view-btn" @click="viewReport('match', item.id)">查看报告</button>
                   <button class="export-btn" @click="exportReport('match', item.id)">导出报告</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="tab-content" v-show="activeTab === 'history'">
-            <div class="content-header">
-              <h2 class="content-title">浏览历史</h2>
-              <button class="clear-btn" @click="clearHistory">清空历史</button>
-            </div>
-            <div v-if="browseHistory.length === 0" class="empty-state">
-              <div class="empty-icon">🕒</div>
-              <div class="empty-text">暂无浏览记录</div>
-            </div>
-            <div class="history-list" v-else>
-              <div class="history-item" v-for="item in browseHistory" :key="item.id">
-                <div class="item-left">
-                  <img :src="item.cover || 'https://picsum.photos/seed/history/80/80'" alt="" class="history-cover">
-                </div>
-                <div class="item-middle">
-                  <h3 class="history-title">{{ item.title }}</h3>
-                  <p class="history-desc">{{ item.description || '暂无描述' }}</p>
-                  <div class="history-time">{{ formatDate(item.created_at) }}</div>
-                </div>
-                <div class="item-right">
-                  <button class="view-btn">再次查看</button>
-                  <button class="delete-btn" @click="removeHistory(item.id)">删除</button>
                 </div>
               </div>
             </div>
@@ -402,8 +264,9 @@
       </div>
     </main>
 
+    <!-- 美化后的修改密码弹窗 -->
     <div class="modal-overlay" v-show="showChangePwdModal" @click="closeModal('changePwd')">
-      <div class="modal-content" @click.stop>
+      <div class="modal-content modern-modal" @click.stop>
         <div class="modal-header">
           <h3 class="modal-title">修改密码</h3>
           <button class="close-btn" @click="closeModal('changePwd')">×</button>
@@ -429,8 +292,9 @@
       </div>
     </div>
 
+    <!-- 美化后的修改手机号弹窗（无验证码） -->
     <div class="modal-overlay" v-show="showBindPhoneModal" @click="closeModal('bindPhone')">
-      <div class="modal-content" @click.stop>
+      <div class="modal-content modern-modal" @click.stop>
         <div class="modal-header">
           <h3 class="modal-title">{{ userInfo.phone ? '修改手机号' : '绑定手机号' }}</h3>
           <button class="close-btn" @click="closeModal('bindPhone')">×</button>
@@ -439,13 +303,6 @@
           <div class="form-row">
             <label class="form-label">手机号</label>
             <input type="text" class="form-input" v-model="phoneForm.phone" placeholder="请输入手机号">
-          </div>
-          <div class="form-row">
-            <label class="form-label">验证码</label>
-            <div class="code-input-wrap">
-              <input type="text" class="form-input code-input" v-model="phoneForm.code" placeholder="请输入验证码">
-              <button type="button" class="code-btn" @click="sendCode">{{ codeText }}</button>
-            </div>
           </div>
           <div class="modal-actions">
             <button type="button" class="cancel-btn" @click="closeModal('bindPhone')">取消</button>
@@ -474,7 +331,6 @@ if (!token) {
   router.push('/login')
 }
 
-// 带 Bearer 的请求
 const authAxios = axios.create({
   baseURL: '/api',
   headers: {
@@ -482,7 +338,6 @@ const authAxios = axios.create({
   }
 })
 
-// 用户信息
 const userInfo = ref({
   id: '',
   avatar: '',
@@ -509,21 +364,16 @@ const userStats = ref({ assessmentCount: 0, planCount: 0 })
 const careerPlans = ref([])
 const interestReports = ref([])
 const matchReports = ref([])
-const browseHistory = ref([])
 
 const isUserMenuOpen = ref(false)
 const darkMode = ref(localStorage.getItem('darkMode') === 'true')
-const activeTab = ref('basic')
-const isEditingBasic = ref(false)
+const activeTab = ref('security')
 const showChangePwdModal = ref(false)
 const showBindPhoneModal = ref(false)
 
-const phoneForm = ref({ phone: '', code: '' })
+const phoneForm = ref({ phone: '' })
 const pwdForm = ref({ oldPwd: '', newPwd: '', confirmPwd: '' })
-const codeText = ref('获取验证码')
-const codeTimer = ref(null)
 
-// ============== 统一容错加载 ==============
 const loadUserProfile = async () => {
   try {
     const { data } = await authAxios.get('/user/profile')
@@ -547,11 +397,7 @@ const loadCareerPlans = async () => {
       careerPlans.value = []
       return
     }
-
-    // 调用你真实存在的后端接口
     const { data } = await authAxios.get(`/report/history/${studentId}`)
-
-    // 转换为前端可显示的格式
     careerPlans.value = data.map(item => ({
       id: item.id,
       title: `${item.job_name} 职业规划报告`,
@@ -564,19 +410,14 @@ const loadCareerPlans = async () => {
   }
 }
 
-// 修复：动态获取当前登录用户ID，加载真实测评历史
 const loadInterestReports = async () => {
   try {
     if (!userInfo.value.id) {
       interestReports.value = []
       return
     }
-    
-    // 动态使用当前登录用户ID，不再写死6
     const { data } = await authAxios.get(`/assessment/history/${userInfo.value.id}`)
     console.log("当前用户真实测评报告：", data)
-
-    // 兼容后端任意格式
     let list = Array.isArray(data) ? data : (data?.list || [])
     interestReports.value = list.map(item => ({
       id: item.id || 1,
@@ -592,22 +433,14 @@ const loadInterestReports = async () => {
   }
 }
 
-// 最终修复：正确加载人岗匹配报告
-// 最终修复：正确加载人岗匹配报告
 const loadMatchReports = async () => {
   try {
-    // 从本地拿 studentId（你登录时已经存了）
     const studentId = localStorage.getItem('studentId')
-
     if (!studentId) {
       matchReports.value = []
       return
     }
-
-    // ✅ 这是你自己写的正确接口，不会报错
     const { data } = await authAxios.get(`/match/history/${studentId}`)
-
-    // 正确赋值给页面
     matchReports.value = data.history || []
   } catch (e) {
     console.error('加载匹配报告失败', e)
@@ -615,12 +448,6 @@ const loadMatchReports = async () => {
   }
 }
 
-// ✅【修复4】浏览历史
-const loadBrowseHistory = async () => {
-  browseHistory.value = []
-}
-
-// ============== 工具方法 ==============
 const switchTab = (tab) => { activeTab.value = tab }
 
 const formatDate = (s) => {
@@ -642,7 +469,7 @@ const handleAvatarUpload = async (e) => {
   const formData = new FormData()
   formData.append('file', file)
   try {
-    const { data } = await authAxios.post('/user/avatar', formData, {
+    const { data } = await authAxios.post('/api/user/avatar', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
     userInfo.value.avatar = data.avatar
@@ -667,37 +494,14 @@ const changePassword = async () => {
   }
 }
 
-const sendCode = async () => {
-  const phone = phoneForm.value.phone
-  if (!/^1[3-9]\d{9}$/.test(phone)) {
-    ElMessage.error('手机号格式错误')
-    return
-  }
-  try {
-    await authAxios.post('/send_code', { phone })
-    let sec = 60
-    codeText.value = sec + '秒后重发'
-    codeTimer.value = setInterval(() => {
-      sec--
-      codeText.value = sec + '秒后重发'
-      if (sec <= 0) {
-        clearInterval(codeTimer.value)
-        codeText.value = '获取验证码'
-      }
-    }, 1000)
-  } catch (e) {
-    ElMessage.error('发送失败')
-  }
-}
-
 const bindPhone = async () => {
-  const { phone, code } = phoneForm.value
-  if (!phone || !code) {
-    ElMessage.warning('请完善信息')
+  const { phone } = phoneForm.value
+  if (!phone) {
+    ElMessage.warning('请输入手机号')
     return
   }
   try {
-    await authAxios.post('/user/bind-phone', { phone, code })
+    await authAxios.post('/user/bind-phone', { phone })
     userInfo.value.phone = phone
     ElMessage.success('绑定成功')
     showBindPhoneModal.value = false
@@ -711,35 +515,11 @@ const closeModal = (t) => {
   if (t === 'bindPhone') showBindPhoneModal.value = false
 }
 
-const clearHistory = async () => {
-  await authAxios.delete('/user/history/clear')
-  browseHistory.value = []
-  ElMessage.success('已清空')
-}
-
-const removeHistory = async (id) => {
-  await authAxios.delete(`/user/history/${id}`)
-  browseHistory.value = browseHistory.value.filter(i => i.id !== id)
-  ElMessage.success('删除成功')
-}
-
-const viewHistory = () => ElMessage.info('查看')
-
 const exportPlan = (id) => {
   window.open(`/api/report/export/career/${id}`, '_blank')
   ElMessage.success('报告导出中')
 }
 
-// 👇👇👇 查看报告（统一路由，后端有详情接口）
-const viewReport = (type, id) => {
-  if (type === 'interest') {
-    router.push(`/interest-report/${id}`)
-  } else if (type === 'match') {
-    router.push(`/match-report/${id}`)
-  }
-}
-
-// 👇👇👇 导出报告（统一真实接口）
 const exportReport = (type, id) => {
   if (type === 'interest') {
     window.open(`/api/report/export/interest/${id}`, '_blank')
@@ -779,7 +559,6 @@ const handleSearch = () => {
   if (i?.value) router.push(`/search?keyword=${i.value}`)
 }
 
-// ============== 启动 ==============
 onMounted(async () => {
   document.body.classList.toggle('dark', darkMode.value)
   await loadUserProfile()
@@ -787,7 +566,6 @@ onMounted(async () => {
   await loadCareerPlans()
   await loadInterestReports()
   await loadMatchReports()
-  await loadBrowseHistory()
 })
 </script>
 
@@ -1276,6 +1054,7 @@ onMounted(async () => {
   font-size: 16px;
   font-weight: 500;
   margin-bottom: 4px;
+  width: 400px;
 }
 .item-desc {
   font-size: 12px;
@@ -1357,23 +1136,6 @@ onMounted(async () => {
   display: flex;
   gap: 10px;
 }
-.plan-actions .view-btn {
-  padding: 6px 12px;
-  background: #2f54eb;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.plan-actions .edit-btn {
-  padding: 6px 12px;
-  background: #f5f5f5;
-  border: 1px solid #e8e8e8;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
 .plan-actions .export-btn {
   padding: 6px 12px;
   background: #52c41a;
@@ -1422,15 +1184,6 @@ onMounted(async () => {
   display: flex;
   gap: 10px;
 }
-.report-actions .view-btn {
-  padding: 6px 12px;
-  background: #2f54eb;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
 .report-actions .export-btn {
   padding: 6px 12px;
   background: #52c41a;
@@ -1478,7 +1231,7 @@ onMounted(async () => {
   margin: 0 0 8px 0;
   display: -webkit-box;
   -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
+  -webkit-line-orient: vertical;
   overflow: hidden;
 }
 .history-time {
@@ -1535,71 +1288,127 @@ onMounted(async () => {
   cursor: pointer;
   font-size: 14px;
 }
+
+/* 美化弹窗样式 */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0,0,0,0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 9999;
+  backdrop-filter: blur(2px);
 }
 .modal-content {
-  width: 400px;
+  width: 420px;
   background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+  padding: 24px;
+  position: relative;
+}
+.modern-modal {
+  border-top: 4px solid #2f54eb;
 }
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 10px;
+  margin-bottom: 24px;
+  padding-bottom: 12px;
   border-bottom: 1px solid #f0f0f0;
 }
 .modal-title {
   font-size: 18px;
   font-weight: 600;
   margin: 0;
+  color: #262626;
 }
 .close-btn {
   background: none;
   border: none;
-  font-size: 20px;
+  font-size: 22px;
   cursor: pointer;
   color: #999;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: 0.2s;
+}
+.close-btn:hover {
+  background: #f5f5f5;
+  color: #333;
 }
 .modal-form {
   width: 100%;
 }
+.form-row {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.form-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+.form-input {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: 0.2s;
+  outline: none;
+}
+.form-input:focus {
+  border-color: #2f54eb;
+  box-shadow: 0 0 0 2px rgba(47, 84, 235, 0.1);
+}
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 15px;
-  margin-top: 20px;
+  gap: 12px;
+  margin-top: 24px;
 }
 .confirm-btn {
   padding: 8px 20px;
+  height: 40px;
   background: #2f54eb;
   color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
+  font-weight: 500;
+  transition: 0.2s;
+}
+.confirm-btn:hover {
+  background: #274bdb;
 }
 .cancel-btn {
   padding: 8px 20px;
-  background: #f5f5f5;
-  border: 1px solid #e8e8e8;
-  border-radius: 4px;
+  height: 40px;
+  background: #f7f8fa;
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
+  color: #666;
+  transition: 0.2s;
 }
+.cancel-btn:hover {
+  background: #e5e6eb;
+}
+
 .footer {
   background: #fff;
   padding: 20px 0;

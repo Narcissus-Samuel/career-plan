@@ -1,61 +1,67 @@
 <template>
   <div class="ability-profile-page">
+    <!-- 统一导航栏：与个人中心完全一致 -->
     <header class="top-nav">
       <div class="nav-wrap">
         <div class="nav-left">
           <div class="logo">
-            <span class="logo-icon">🎓</span>
-            <span>学生就业能力平台</span>
+            <span class="logo-icon">🎯</span>
+            <span class="logo-text">大学生职业规划系统</span>
           </div>
           <ul class="nav-menu">
             <li class="menu-item" @click="$router.push('/')">首页</li>
             <li class="menu-item active" @click="$router.push('/ability-analysis')">职业规划</li>
             <li class="menu-item" @click="$router.push('/report-export')">报告导出</li>
-            <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
+            <!-- <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
             <li class="menu-item dropdown">
-              <span>功能中心</span>
+              核心功能 ▼
               <ul class="dropdown-menu">
                 <li class="dropdown-item" @click="goToFeature('测评')">
-                  <span class="color-dot orange"></span>兴趣测评
+                  <span class="color-dot red"></span>
+                  职业兴趣测评
                 </li>
                 <li class="dropdown-item" @click="goToFeature('分析')">
-                  <span class="color-dot blue"></span>能力分析
+                  <span class="color-dot orange"></span>
+                  能力短板分析
                 </li>
                 <li class="dropdown-item" @click="goToFeature('规划')">
-                  <span class="color-dot green"></span>发展规划
+                  <span class="color-dot green"></span>
+                  发展路径规划
                 </li>
                 <li class="dropdown-item" @click="goToFeature('导出')">
-                  <span class="color-dot red"></span>报告导出
+                  <span class="color-dot blue"></span>
+                  规划报告导出
                 </li>
               </ul>
-            </li>
+            </li> -->
           </ul>
         </div>
-
+        
         <div class="nav-right">
           <div class="nav-search-wrap">
-            <input class="nav-search-input" placeholder="搜索资源/岗位" />
+            <input 
+              type="text" 
+              class="nav-search-input" 
+              placeholder="搜索职业方向、专业、院校、岗位类型"
+              @keyup.enter="handleSearch"
+            >
             <button class="nav-search-btn" @click="handleSearch">搜索</button>
           </div>
-          <button class="btn-toggle-theme" @click="toggleTheme">
-            {{ darkMode ? '☀️' : '🌙' }}
-          </button>
 
-          <div v-if="isLogin" class="user-profile">
-            <img
-              :src="userAvatar || 'https://picsum.photos/200/200'"
+          <button class="btn-toggle-theme" @click="toggleTheme">{{ darkMode ? '☀️' : '🌙' }}</button>
+          
+          <div class="user-profile">
+            <img 
+              :src="userAvatar || 'https://picsum.photos/seed/avatar/40/40'" 
+              alt="用户头像" 
               class="avatar"
               @click="toggleUserMenu"
-            />
-            <div v-if="isUserMenuOpen" class="user-menu">
-              <div class="menu-item">个人中心</div>
-              <div class="menu-item">我的简历</div>
+            >
+            <div class="user-menu" v-show="isUserMenuOpen">
+              <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
+              <!-- <div class="menu-item" @click="$router.push('/settings')">账号设置</div> -->
               <div class="menu-item logout" @click="handleLogout">退出登录</div>
             </div>
-          </div>
-          <div v-else>
-            <button class="btn-login" @click="$router.push('/login')">登录</button>
-            <button class="btn-register" @click="$router.push('/register')">注册</button>
           </div>
         </div>
       </div>
@@ -201,7 +207,6 @@
           <div class="profile-actions">
             <el-button class="btn-effect" @click="regenerateProfile" :loading="generatingProfile">重新生成画像</el-button>
             <el-button class="btn-effect" type="info" @click="goToEditInfo">重新填写学生信息</el-button>
-            <el-button class="btn-effect" type="primary" @click="exportProfile">导出能力画像</el-button>
             <el-button class="btn-effect" type="success" @click="goToInterestTest">兴趣测试</el-button>
           </div>
         </div>
@@ -383,15 +388,28 @@ const goBack = () => router.push('/student-ability')
 const goToEditInfo = () => router.push('/student-ability')
 const goToInterestTest = () => router.push({ path: '/interest-test', query: { studentId: studentId.value } })
 const toggleUserMenu = () => isUserMenuOpen.value = !isUserMenuOpen.value
-const handleLogout = () => { localStorage.clear(); isLogin.value = false; router.push('/'); ElMessage.success('已退出') }
-const toggleTheme = () => { darkMode.value = !darkMode.value; localStorage.setItem('darkMode', darkMode.value) }
+
+const handleLogout = () => { 
+  localStorage.clear(); 
+  isLogin.value = false; 
+  router.push('/'); 
+  ElMessage.success('已退出') 
+}
+
+const toggleTheme = () => { 
+  darkMode.value = !darkMode.value; 
+  localStorage.setItem('darkMode', darkMode.value);
+  document.body.classList.toggle('dark', darkMode.value)
+}
+
 const goToFeature = t => {
   const map = { '测评': '/interest-test', '分析': '/ability-analysis', '规划': '/development-path', '导出': '/report-export' }
   router.push(map[t] || '/')
 }
+
 const handleSearch = () => {
   const i = document.querySelector('.nav-search-input')
-  if (i.value.trim()) router.push(`/search?keyword=${encodeURIComponent(i.value.trim())}`)
+  if (i?.value.trim()) router.push(`/search?keyword=${encodeURIComponent(i.value.trim())}`)
 }
 </script>
 
@@ -406,10 +424,11 @@ const handleSearch = () => {
   color: #1a2639;
 }
 
+/* 统一导航栏样式 - 与个人中心完全一致 */
 .top-nav {
   height: 60px;
   background: #fff;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   width: 100%;
   position: fixed;
   top: 0;
@@ -424,39 +443,171 @@ const handleSearch = () => {
   align-items: center;
   height: 100%;
 }
-.nav-left { display: flex; align-items: center; }
-.logo { display: flex; align-items: center; margin-right: 40px; font-size: 18px; font-weight: bold; }
-.logo-icon { font-size: 24px; margin-right: 8px; }
-.nav-menu { display: flex; list-style: none; margin: 0; padding: 0; }
-.menu-item { margin: 0 15px; font-size: 14px; cursor: pointer; height: 60px; line-height: 60px; position: relative; }
-.menu-item:hover { color: #2f54eb; }
-.menu-item.active { color: #2f54eb; }
-.menu-item.active::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 3px; background: #2f54eb; }
-.dropdown { position: relative; }
-.dropdown-menu { position: absolute; top: 100%; left: 0; width: 200px; background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.12); border-radius: 8px; list-style: none; padding: 8px 0; display: none; }
-.dropdown:hover .dropdown-menu { display: block; animation: fadeIn 0.3s; }
-.dropdown-item { padding: 12px 20px; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
-.dropdown-item:hover { background: #f0f7ff; }
-.color-dot { width: 8px; height: 8px; border-radius: 50%; }
+.nav-left {
+  display: flex;
+  align-items: center;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  margin-right: 40px;
+  font-size: 18px;
+  font-weight: bold;
+  color: #000;
+}
+.logo-icon {
+  font-size: 24px;
+  margin-right: 8px;
+}
+.nav-menu {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.menu-item {
+  margin: 0 15px;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 5px;
+  position: relative;
+  height: 60px;
+  line-height: 60px;
+  color: #000;
+}
+.menu-item.active {
+  color: #000;
+}
+.menu-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: #2f54eb;
+}
+.dropdown {
+  position: relative;
+}
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 200px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border-radius: 4px;
+  list-style: none;
+  padding: 8px 0;
+  margin: 0;
+  display: none;
+  z-index: 9999;
+}
+.dropdown:hover .dropdown-menu {
+  display: block;
+}
+.dropdown-item {
+  padding: 10px 15px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: auto;
+  line-height: normal;
+  color: #000;
+}
+.dropdown-item:hover {
+  background: #f5f7fa;
+}
+.color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
 .color-dot.red { background: #ff7a45; }
 .color-dot.orange { background: #faad14; }
 .color-dot.green { background: #52c41a; }
 .color-dot.blue { background: #1890ff; }
-.nav-right { display: flex; gap: 15px; align-items: center; }
-.nav-search-wrap { display: flex; width: 200px; height: 24px; border-radius: 12px; border: 1px solid #e8e8e8; }
-.nav-search-input { flex: 1; padding: 0 12px; border: none; outline: none; font-size: 12px; }
-.nav-search-btn { width: 53px; background: #2f54eb; color: #fff; border: none; cursor: pointer; font-size: 12px; }
-.btn-toggle-theme { padding: 6px 10px; border: none; background: #f5f7fa; border-radius: 4px; cursor: pointer; }
-.btn-login { padding: 6px 15px; border: 1px solid #2f54eb; color: #2f54eb; background: #fff; border-radius: 4px; cursor: pointer; }
-.btn-register { padding: 6px 15px; border: none; color: #fff; background: #2f54eb; border-radius: 4px; cursor: pointer; }
-.user-profile { position: relative; }
-.avatar { width: 36px; height: 36px; border-radius: 50%; cursor: pointer; border: 2px solid #f0f0f0; }
-.avatar:hover { border-color: #2f54eb; transform: scale(1.05); }
-.user-menu { position: absolute; top: 50px; right: 0; width: 120px; background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.12); border-radius: 8px; animation: fadeIn 0.3s; }
-.user-menu .menu-item { padding: 10px 15px; font-size: 14px; cursor: pointer; color: #333; }
-.user-menu .menu-item:hover { background: #f0f7ff; }
-.user-menu .logout { color: #ff4d4f; border-top: 1px solid #f0f0f0; }
+.nav-right {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+.nav-search-wrap {
+  display: flex;
+  width: 200px;
+  height: 24px;
+}
+.nav-search-input {
+  flex: 1;
+  height: 100%;
+  padding: 0 10px;
+  border: 1px solid #e8e8e8;
+  border-radius: 4px 0 0 4px;
+  outline: none;
+  font-size: 12px;
+}
+.nav-search-btn {
+  width: 53px;
+  height: 100%;
+  background: #2f54eb;
+  color: #fff;
+  border: none;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  font-size: 12px;
+}
+.btn-toggle-theme {
+  padding: 6px 10px;
+  border: none;
+  background: #f5f7fa;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #000;
+}
+.user-profile {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid #f0f0f0;
+}
+.user-menu {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  width: 120px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  border-radius: 4px;
+  z-index: 9999;
+}
+.user-menu .menu-item {
+  padding: 8px 15px;
+  font-size: 14px;
+  cursor: pointer;
+  height: auto;
+  line-height: normal;
+  margin: 0;
+  color: #000;
+}
+.user-menu .menu-item:hover {
+  background: #f5f7fa;
+}
+.user-menu .logout {
+  color: #ff4d4f;
+  border-top: 1px solid #e8e8e8;
+}
 
+/* 原有页面样式保持不变 */
 .profile-container {
   width: 100%;
   max-width: 1100px;

@@ -220,7 +220,17 @@ def get_current_user():
         'created_at': user['created_at']
     }
     return jsonify(user_data)
-
+# @auth_bp.route('/user/students')
+# @token_required
+# def get_user_students():
+#     # 从请求上下文获取已验证的用户
+#     user = request.user
+#     conn = get_db()
+#     cursor = conn.cursor()
+#     cursor.execute('SELECT id FROM student WHERE user_id = ?', (user['id'],))
+#     rows = cursor.fetchall()
+#     conn.close()
+#     return jsonify([dict(row) for row in rows])
 # ---------- 用户个人信息接口（扩展） ----------
 @auth_bp.route('/user/profile', methods=['GET'])
 @token_required
@@ -280,7 +290,6 @@ def get_user_profile():
         })
 
     return jsonify(profile)
-
 
 @auth_bp.route('/user/profile', methods=['PUT'])
 @token_required
@@ -599,7 +608,6 @@ def get_user_stats():
         'assessmentCount': assessment_count,
         'planCount': plan_count
     })
-
 # ---------- 统一获取用户所有报告列表 ----------
 @auth_bp.route('/user/reports', methods=['GET'])
 @token_required
@@ -638,27 +646,27 @@ def get_all_reports():
             'original_table': 'assessment_results'
         })
 
-    # 3. 人岗匹配报告（match_history，需要student_id）
-    if student_id:
-        cursor.execute('''
-            SELECT id, job_name, match_score, details, created_at
-            FROM match_history
-            WHERE student_id = ?
-            ORDER BY created_at DESC
-        ''', (student_id,))
-        for row in cursor.fetchall():
-            created_at = row['created_at']
-            if isinstance(created_at, (int, float)):
-                created_at = datetime.datetime.fromtimestamp(created_at).isoformat()
-            reports.append({
-                'id': f"match_{row['id']}",
-                'title': f"{row['job_name']} 人岗匹配报告",
-                'type': 'job_match',
-                'summary': f"匹配度: {row['match_score']}%",
-                'created_at': created_at,
-                'original_id': row['id'],
-                'original_table': 'match_history'
-            })
+    # # 3. 人岗匹配报告（match_history，需要student_id）
+    # if student_id:
+    #     cursor.execute('''
+    #         SELECT id, job_name, match_score, details, created_at
+    #         FROM match_history
+    #         WHERE student_id = ?
+    #         ORDER BY created_at DESC
+    #     ''', (student_id,))
+    #     for row in cursor.fetchall():
+    #         created_at = row['created_at']
+    #         if isinstance(created_at, (int, float)):
+    #             created_at = datetime.datetime.fromtimestamp(created_at).isoformat()
+    #         reports.append({
+    #             'id': f"match_{row['id']}",
+    #             'title': f"{row['job_name']} 人岗匹配报告",
+    #             'type': 'job_match',
+    #             'summary': f"匹配度: {row['match_score']}%",
+    #             'created_at': created_at,
+    #             'original_id': row['id'],
+    #             'original_table': 'match_history'
+    #         })
 
     # 4. 职业规划报告（report_history，需要student_id）
     if student_id:
@@ -689,3 +697,4 @@ def get_all_reports():
     # 按创建时间倒序排序（已按数据库顺序，但为了保险再排一次）
     reports.sort(key=lambda x: x['created_at'], reverse=True)
     return jsonify(reports)
+    

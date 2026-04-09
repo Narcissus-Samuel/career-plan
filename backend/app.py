@@ -51,6 +51,10 @@ def test_db():
     except Exception as e:
         return jsonify({"status": "连接失败", "error": str(e)})
 
+@app.route('/uploads/avatars/<filename>')
+def get_avatar(filename):
+    avatar_path = os.path.join(os.path.dirname(__file__), 'uploads', 'avatars')
+    return send_from_directory(avatar_path, filename)
 if __name__ == '__main__':
     # ✅ 修复 2：关闭 debug 避免多进程 + 修复 3：绑定 IPv4
     app.run(

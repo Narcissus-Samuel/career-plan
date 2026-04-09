@@ -51,7 +51,7 @@ def get_job_detail(job_id):
         return jsonify({'error': '岗位不存在'}), 404
     return jsonify(dict(job))
 
-@job_bp.route('/profile/<string:job_name>', methods=['GET'])
+@job_bp.route('/profile/<path:job_name>', methods=['GET'])
 def get_job_profile_by_name(job_name):
     """通过岗位名称获取详情（兼容旧版）"""
     conn = get_db()
@@ -201,10 +201,10 @@ def simple_search():
 @job_bp.route('/<int:job_id>/profile', methods=['GET'])
 def get_job_profile(job_id):
     """
-    获取岗位画像，优先级：
-    1. job_profile 表中是否有该岗位名称的单独画像
-    2. 如果有分类（category_id），返回大类画像
-    3. 否则动态生成并存入 job_profile 表
+    获取岗位画像，新优先级：
+    1. job_profile 表中是否有该岗位名称的单独画像（AI生成/自定义）
+    2. 没有 → 直接动态生成真实画像并存库
+    3. 分类画像不再作为主画像，仅作为附加信息返回
     """
     conn = get_db()
     cursor = conn.cursor()
@@ -224,7 +224,9 @@ def get_job_profile(job_id):
     job_desc = job['job_description']
     category_id = job['category_id']
 
-    # 1. 检查 job_profile 表中是否有该岗位的单独画像
+    # ======================
+    # 1. 优先使用已生成的画像
+    # ======================
     cursor.execute('''
         SELECT skills, certificates, soft_abilities
         FROM job_profile
@@ -232,37 +234,23 @@ def get_job_profile(job_id):
     ''', (job_name,))
     existing = cursor.fetchone()
     if existing:
-        conn.close()
-        return jsonify({
+        profile = {
             'job_name': job_name,
             'skills': json.loads(existing['skills']) if existing['skills'] else [],
             'certificates': json.loads(existing['certificates']) if existing['certificates'] else [],
             'soft_abilities': json.loads(existing['soft_abilities']) if existing['soft_abilities'] else {},
             'source': 'job_profile'
-        })
-
-    # 2. 如果有分类，从 job_categories 获取大类画像
-    if category_id:
-        cursor.execute('''
-            SELECT name, skills, certificates, soft_abilities
-            FROM job_categories
-            WHERE id = ?
-        ''', (category_id,))
-        cat = cursor.fetchone()
-        if cat and cat['skills']:
+        }
+    else:
+        # ======================
+        # 2. 无缓存 → 直接调用大模型生成（关键修改）
+        # ======================
+        dynamic = generate_dynamic_job_profile(job_name)
+        if not dynamic:
             conn.close()
-            return jsonify({
-                'job_name': job_name,
-                'skills': json.loads(cat['skills']),
-                'certificates': json.loads(cat['certificates']) if cat['certificates'] else [],
-                'soft_abilities': json.loads(cat['soft_abilities']) if cat['soft_abilities'] else {},
-                'source': 'category',
-                'category_name': cat['name']
-            })
+            return jsonify({'error': '无法生成画像'}), 404
 
-    # 3. 动态生成画像（长尾岗位）
-    dynamic = generate_dynamic_job_profile(job_name)
-    if dynamic:
+        # 存入数据库
         cursor.execute('''
             INSERT INTO job_profile (job_name, skills, certificates, soft_abilities)
             VALUES (?, ?, ?, ?)
@@ -273,17 +261,35 @@ def get_job_profile(job_id):
             json.dumps(dynamic.get('soft_abilities', {}))
         ))
         conn.commit()
-        conn.close()
-        return jsonify({
+
+        profile = {
             'job_name': job_name,
             'skills': dynamic.get('skills', []),
             'certificates': dynamic.get('certificates', []),
             'soft_abilities': dynamic.get('soft_abilities', {}),
             'source': 'dynamic'
-        })
-    else:
-        conn.close()
-        return jsonify({'error': '无法生成画像'}), 404
+        }
+
+    # ======================
+    # 3. 可选：把分类画像作为附加信息一起返回（不覆盖主画像）
+    # ======================
+    if category_id:
+        cursor.execute('''
+            SELECT name, skills, certificates, soft_abilities
+            FROM job_categories
+            WHERE id = ?
+        ''', (category_id,))
+        cat = cursor.fetchone()
+        if cat:
+            profile['category_reference'] = {
+                'category_name': cat['name'],
+                'skills': json.loads(cat['skills']) if cat['skills'] else [],
+                'certificates': json.loads(cat['certificates']) if cat['certificates'] else [],
+                'soft_abilities': json.loads(cat['soft_abilities']) if cat['soft_abilities'] else {}
+            }
+
+    conn.close()
+    return jsonify(profile)
 # 添加单个岗位的路径查询接口
 @job_bp.route('/<job_name>/vertical', methods=['GET'])
 def get_vertical_path(job_name):

@@ -12,7 +12,7 @@
             <li class="menu-item" @click="$router.push('/')">首页</li>
             <li class="menu-item " @click="$router.push('/career-planning-intro')">职业规划</li>
             <li class="menu-item active" @click="$router.push('/report-export')">报告导出</li>
-            <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
+            <!-- <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
             <li class="menu-item dropdown">
               核心功能 ▼
               <ul class="dropdown-menu">
@@ -29,7 +29,7 @@
                   <span class="color-dot blue"></span> 规划报告导出
                 </li>
               </ul>
-            </li>
+            </li> -->
           </ul>
         </div>
 
@@ -58,7 +58,7 @@
             >
             <div class="user-menu" v-show="isUserMenuOpen">
               <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
-              <div class="menu-item" @click="$router.push('/settings')">账号设置</div>
+              <!-- <div class="menu-item" @click="$router.push('/settings')">账号设置</div> -->
               <div class="menu-item logout" @click="handleLogout">退出登录</div>
             </div>
           </div>
@@ -130,6 +130,7 @@
             <select v-model="exportFormat">
               <option value="pdf">PDF</option>
               <option value="word">Word</option>
+              <option value="md">Markdown</option>
             </select>
             <input v-model="currentReport.title" class="name-input" placeholder="报告名称" />
           </div>
@@ -165,15 +166,6 @@
           </tbody>
         </table>
       </div>
-
-      <!-- 提示弹窗 -->
-      <div class="modal" v-if="showModal">
-        <div class="modal-box">
-          <h3>{{ modalTitle }}</h3>
-          <p>{{ modalMsg }}</p>
-          <button @click="showModal = false">确定</button>
-        </div>
-      </div>
     </div>
 
     <!-- 底部 -->
@@ -190,6 +182,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
+import html2pdf from 'html2pdf.js'
 
 const router = useRouter()
 
@@ -303,8 +296,7 @@ ${item.recommendation || '暂无分析'}
   }
 }
 
-// 2. 加载人岗匹配报告 —— ✅ 直接读取数据库 details 字段，无需额外接口
-// 2. 加载人岗匹配报告 —— 终极稳定版
+// 2. 加载人岗匹配报告（学生ID版）
 const loadMatchReports = async () => {
   try {
     if (!studentId) return []
@@ -313,14 +305,14 @@ const loadMatchReports = async () => {
 
     return history.map(item => {
       const detail = JSON.parse(item.details || '{}')
-const gap = detail.gap_analysis || {}
+      const gap = detail.gap_analysis || {}
 
-const skillFit = detail.skill_fit ?? 0
-const certCov = detail.cert_coverage ?? 0
-const eduScore = detail.education_score ?? 0
-const expScore = detail.experience_score ?? 0
-const softGap = detail.soft_gap ?? 0
-const softAbility = (100 - softGap).toFixed(1)
+      const skillFit = detail.skill_fit ?? 0
+      const certCov = detail.cert_coverage ?? 0
+      const eduScore = detail.education_score ?? 0
+      const expScore = detail.experience_score ?? 0
+      const softGap = detail.soft_gap ?? 0
+      const softAbility = (100 - softGap).toFixed(1)
 
       const content = `
 【人岗匹配分析报告】
@@ -354,7 +346,7 @@ ${gap.potential || '根据匹配结果制定阶段性学习计划，逐步积累
 ${gap.recommended_resources || '推荐：Vue官方文档、慕课网实战课程、LeetCode算法练习、GitHub开源项目。'}
 `
       return {
-        id: 'match_' + item.id,
+        id:item.id,
         title: `${item.job_name} 匹配报告`,
         type: 'job_match',
         content: content,
@@ -366,14 +358,15 @@ ${gap.recommended_resources || '推荐：Vue官方文档、慕课网实战课程
     return []
   }
 }
-// 3. 加载职业规划报告
+
+// 3. 加载职业规划报告（学生ID版）
 const loadCareerPlans = async () => {
   try {
     if (!studentId) return []
     const { data } = await authAxios.get(`/report/history/${studentId}`)
     const realList = Array.isArray(data) ? data : []
     return realList.map(item => ({
-      id: 'plan_' + (item.id || Date.now()),
+      id: item.id,
       title: `${item.job_name} 职业生涯规划报告`,
       type: 'career_plan',
       content: item.content || '暂无内容',
@@ -413,10 +406,6 @@ const filterType = ref('')
 const filterName = ref('')
 const exportFormat = ref('pdf')
 
-const showModal = ref(false)
-const modalTitle = ref('')
-const modalMsg = ref('')
-
 // =============== 计算属性 ===============
 const filteredReports = computed(() => {
   let list = [...allReports.value]
@@ -447,12 +436,16 @@ const loadReport = (item) => {
 
 const checkContent = () => {
   if (!editContent.value) {
-    showTip('检查结果', '无报告内容')
+    ElMessage.warning('无报告内容')
     return
   }
   const len = editContent.value.length
   const ok = /匹配|得分|建议|分析/.test(editContent.value)
-  showTip('内容检查', ok ? `✅ 结构完整，${len}字` : '⚠️ 结构不完整')
+  if(ok){
+    ElMessage.success(`✅ 结构完整，${len}字`)
+  }else{
+    ElMessage.warning('⚠️ 结构不完整')
+  }
 }
 
 const polishReport = () => {
@@ -462,12 +455,12 @@ const polishReport = () => {
     .replace(/\n+/g, '\n')
     .replace(/一、|二、|三、/g, '\n$&')
   editContent.value = t
-  showTip('润色完成', '已优化排版')
+  ElMessage.success('已优化排版')
 }
 
 const resetContent = () => {
   editContent.value = originalContent.value
-  showTip('恢复成功', '已回到原始内容')
+  ElMessage.success('已恢复原始内容')
 }
 
 const saveEdit = () => {
@@ -476,7 +469,7 @@ const saveEdit = () => {
   if (i > -1) {
     allReports.value[i].title = currentReport.value.title
     allReports.value[i].content = editContent.value
-    showTip('保存成功', '已更新报告')
+    ElMessage.success('保存成功')
   }
 }
 
@@ -485,31 +478,87 @@ const quickExport = (item) => {
   setTimeout(() => exportFinalReport(), 300)
 }
 
-const exportFinalReport = () => {
+// =============== 导出报告（安全带token版）===============
+const exportFinalReport = async () => {
   if (!currentReport.value) return
   saveEdit()
-  
-  const realId = currentReport.value.id.split('_').pop()
+
   const type = currentReport.value.type
+  const content = editContent.value
+  const title = currentReport.value.title
+  const format = exportFormat.value
 
   try {
-    if (type === 'interest_test') {
-      window.open(`/api/report/export/interest/${realId}`, '_blank')
-    } else if (type === 'job_match') {
-      window.open(`/api/report/export/match/${realId}`, '_blank')
-    } else {
-      window.open(`/api/report/export/career/${realId}`, '_blank')
-    }
-    showTip('导出成功', `已导出为 ${exportFormat.value}`)
-  } catch (e) {
-    showTip('导出成功', `已导出为 ${exportFormat.value}`)
-  }
-}
+    if (format === 'pdf') {
+      // 导出 PDF
+      const html = `
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Microsoft Yahei; line-height:1.7; padding:30px; }
+            h1 { color:#1890ff; border-left:4px solid #1890ff; padding-left:10px; }
+            h2 { color:#2f54eb; margin-top:24px; }
+            p { font-size:15px; color:#333; }
+            table { border-collapse:collapse; width:100%; margin:16px 0; }
+            th,td { border:1px solid #eee; padding:10px; }
+            th { background:#f5f7fa; }
+          </style>
+        </head>
+        <body>
+          <h1>${title}</h1>
+          ${content.replace(/\n/g, '<br>')}
+        </body>
+        </html>
+      `
+      const opt = {
+        margin: 10,
+        filename: `${title}.pdf`,
+        html2canvas: { scale: 2 },
+        jsPDF: { format: 'a4' }
+      }
+      html2pdf().set(opt).from(html).save()
+      ElMessage.success('PDF 导出成功')
 
-const showTip = (title, msg) => {
-  modalTitle.value = title
-  modalMsg.value = msg
-  showModal.value = true
+    } else if (format === 'word') {
+      // 导出 Word
+      const html = `
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Microsoft Yahei; line-height:1.7; padding:20px; }
+            h1 { color:#2f54eb; }
+            h2 { color:#1890ff; }
+          </style>
+        </head>
+        <body>
+          <h1>${title}</h1>
+          ${content.replace(/\n/g, '<br>')}
+        </body>
+        </html>
+      `
+      const blob = new Blob([html], { type: 'application/msword' })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = `${title}.doc`
+      link.click()
+      ElMessage.success('Word 导出成功')
+
+    } else {
+      // 导出 MD
+      const blob = new Blob([content], { type: 'text/markdown' })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = `${title}.md`
+      link.click()
+      ElMessage.success('Markdown 导出成功')
+    }
+
+  } catch (err) {
+    console.error(err)
+    ElMessage.error('导出失败，请检查内容或重试')
+  }
 }
 
 onMounted(() => {
@@ -534,7 +583,7 @@ onMounted(() => {
 .top-nav {
   height: 60px;
   background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3 rgba(0, 0, 0, 0.1);
   width: 100%;
   position: fixed;
   top: 0;
@@ -602,7 +651,7 @@ onMounted(() => {
   left: 0;
   width: 200px;
   background: #fff;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8 rgba(0,0,0,0.1);
   border-radius: 4px;
   list-style: none;
   padding: 8px 0;
@@ -692,6 +741,8 @@ onMounted(() => {
   border-radius: 4px;
   cursor: pointer;
 }
+
+/* ========== 这里是修改的头像下拉菜单样式，和首页完全一致 ========== */
 .user-profile {
   position: relative;
   display: flex;
@@ -805,7 +856,7 @@ onMounted(() => {
   border-radius: 10px;
   padding: 20px;
   position: relative;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  box-shadow: 0 2px 8 rgba(0,0,0,0.06);
 }
 .card-tag {
   position: absolute;
@@ -847,7 +898,7 @@ onMounted(() => {
   background: #fff;
   border-radius: 12px;
   padding: 24px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  box-shadow: 0 2px 12 rgba(0,0,0,0.06);
   margin-bottom: 40px;
 }
 .edit-header {
@@ -930,7 +981,7 @@ onMounted(() => {
   background: #fff;
   border-radius: 10px;
   padding: 20px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 10 rgba(0,0,0,0.05);
 }
 .history-table {
   width: 100%;
@@ -956,37 +1007,6 @@ onMounted(() => {
 .mini-btn.export {
   background: #e6f7ff;
   color: #1890ff;
-}
-
-/* 弹窗 */
-.modal {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-.modal-box {
-  background: #fff;
-  width: 380px;
-  border-radius: 10px;
-  padding: 25px;
-  text-align: center;
-}
-.modal-box h3 {
-  margin-top: 0;
-  color: #2f54eb;
-}
-.modal-box button {
-  margin-top: 15px;
-  padding: 8px 25px;
-  background: #2f54eb;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
 }
 
 /* 底部 */

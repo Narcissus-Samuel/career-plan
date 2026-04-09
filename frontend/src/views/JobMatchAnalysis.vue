@@ -12,24 +12,6 @@
             <li class="menu-item" @click="$router.push('/')">首页</li>
             <li class="menu-item active" @click="$router.push('/career-planning-intro')">职业规划</li>
             <li class="menu-item" @click="$router.push('/report-export')">报告导出</li>
-            <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
-            <li class="menu-item dropdown">
-              核心功能 ▼
-              <ul class="dropdown-menu">
-                <li class="dropdown-item" @click="goToFeature('测评')">
-                  <span class="color-dot red"></span> 职业兴趣测评
-                </li>
-                <li class="dropdown-item" @click="goToFeature('分析')">
-                  <span class="color-dot orange"></span> 能力短板分析
-                </li>
-                <li class="dropdown-item" @click="goToFeature('规划')">
-                  <span class="color-dot green"></span> 发展路径规划
-                </li>
-                <li class="dropdown-item" @click="goToFeature('导出')">
-                  <span class="color-dot blue"></span> 匹配报告导出
-                </li>
-              </ul>
-            </li>
           </ul>
         </div>
 
@@ -59,7 +41,6 @@
             >
             <div class="user-menu" v-show="isUserMenuOpen">
               <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
-              <div class="menu-item" @click="$router.push('/settings')">账号设置</div>
               <div class="menu-item logout" @click="handleLogout">退出登录</div>
             </div>
           </div>
@@ -70,35 +51,6 @@
     <div class="match-container">
       <div class="page-header">
         <h1>岗位信息</h1>
-      </div>
-
-      <div class="recommended-jobs-section">
-        <div class="section-header">
-          <h2>为你推荐的适配岗位</h2>
-          <span class="match-rate-tip">基于大模型能力画像智能推荐</span>
-        </div>
-        
-        <div class="recommended-jobs-list">
-          <div 
-            class="recommended-job-card" 
-            v-for="(job,index) in recommendedJobs" 
-            :key="job.id"
-            :class="{ active: selectedJob.id === job.id }"
-            @click="selectJob(job)"
-          >
-            <div class="card-corner" :style="getCornerStyle(index)"></div>
-            
-            <div class="match-rate-badge">
-              {{ job.overall_score }}%
-            </div>
-            <div class="job-info">
-              <h4 class="job-name">{{ job.job_name }}</h4>
-              <div class="match-tag">
-                <span>匹配度：{{ job.overall_score }}%</span>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       <div class="all-job-selection">
@@ -180,17 +132,6 @@ const allJobs = ref([])
 const allJobsSearchKeyword = ref('')
 const selectedJob = ref({})
 
-const recommendedJobs = ref([
-  { id: 1, job_name: '后端开发工程师', overall_score: 92 },
-  { id: 2, job_name: 'Java开发工程师', overall_score: 88 },
-  { id: 3, job_name: 'Python开发工程师', overall_score: 85 },
-  { id: 4, job_name: '全栈开发工程师', overall_score: 82 },
-  { id: 5, job_name: '软件开发工程师', overall_score: 80 },
-  { id: 6, job_name: '大数据开发工程师', overall_score: 78 },
-  { id: 7, job_name: '云计算工程师', overall_score: 75 },
-  { id: 8, job_name: '微服务开发工程师', overall_score: 72 }
-])
-
 // 用户菜单
 const toggleUserMenu = () => {
   isUserMenuOpen.value = !isUserMenuOpen.value
@@ -240,38 +181,6 @@ const handleSearch = () => {
   ElMessage.success(`正在搜索：${keyword}`)
 }
 
-const getFirstLetter = (str) => {
-  const pyMap = {'A':'A','B':'B','C':'C','D':'D','E':'E','F':'F','G':'G','H':'H','J':'J','K':'K','L':'L','M':'M','N':'N','P':'P','Q':'Q','R':'R','S':'S','T':'T','W':'W','X':'X','Y':'Y','Z':'Z'}
-  const chineseFirstLetter = (char) => {
-    const charCode = char.charCodeAt(0)
-    if(charCode >= 19968 && charCode <= 40869) {
-      const index = Math.floor((charCode-19968)/94)
-      const letters = 'ABCDEFGHJKLMNOPQRSTWXYZ'
-      return letters[index] || ''
-    }
-    return ''
-  }
-  for(let i=0;i<str.length;i++){
-    const char = str.charAt(i).toUpperCase()
-    if(pyMap[char]) return pyMap[char]
-    if(/[\u4e00-\u9fa5]/.test(char)) return chineseFirstLetter(char)
-  }
-  return ''
-}
-
-const getCornerStyle = (index) => {
-  const colors = [
-    'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-    'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-    'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
-    'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-    'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-    'linear-gradient(135deg, #fa709a 0%, #fad0c4 100%)',
-    'linear-gradient(135deg, #ffd1ff 0%, #c7f4ff 100%)',
-    'linear-gradient(135deg, #2af598 0%, #009efd 100%)'
-  ]
-  return { background: colors[index % colors.length] }
-}
 const getCardColor = (index) => {
   const list = [
     'linear-gradient(135deg, #e0f7ff 0%, #f3fcff 100%)',
@@ -288,7 +197,7 @@ const loadAllJobsFromDB = async () => {
     const res = await axios.get('/api/jobs/search?page=1&size=9999')
     allJobs.value = res.data.items || []
   } catch (err) {
-    allJobs.value = recommendedJobs.value
+    console.error(err)
   }
 }
 
@@ -458,64 +367,6 @@ onMounted(async () => {
   transition: all 0.3s ease;
 }
 
-/* 下拉菜单 */
-.dropdown {
-  position: relative;
-}
-.dropdown-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  width: 200px;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  border-radius: 4px;
-  list-style: none;
-  padding: 8px 0;
-  margin: 0;
-  display: none;
-  z-index: 9999;
-  transition: all 0.3s ease;
-}
-.job-match-page.dark .dropdown-menu {
-  background: #334155;
-}
-.dropdown:hover .dropdown-menu {
-  display: block;
-}
-.dropdown-item {
-  padding: 10px 15px;
-  font-size: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: auto;
-  line-height: normal;
-  color: #000;
-  transition: background 0.3s ease;
-}
-.job-match-page.dark .dropdown-item {
-  color: #f1f5f9;
-}
-.dropdown-item:hover {
-  background: #f5f7fa;
-  color: #2f54eb;
-}
-.job-match-page.dark .dropdown-item:hover {
-  background: #475569;
-}
-.color-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-}
-.color-dot.red { background: #ff7a45; }
-.color-dot.orange { background: #faad14; }
-.color-dot.green { background: #52c41a; }
-.color-dot.blue { background: #1890ff; }
-
 /* 导航右侧 */
 .nav-right {
   display: flex;
@@ -675,111 +526,6 @@ onMounted(async () => {
 .page-header h1 { font-size: 24px; font-weight: 700; color: #1f2937; margin: 0; }
 .job-match-page.dark .page-header h1 { color: #f1f5f9; }
 
-.recommended-jobs-section {
-  background: #f8f9ff;
-  border-radius: 16px;
-  padding: 24px;
-  margin-bottom: 30px;
-  min-height: 400px;
-}
-.job-match-page.dark .recommended-jobs-section {
-  background: #1e293b;
-}
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-.section-header h2 { font-size: 20px; font-weight: 600; color: #1f2937; }
-.job-match-page.dark .section-header h2 { color: #f1f5f9; }
-.match-rate-tip { font-size: 14px; color: #2f54eb; background: #e6f7ff; padding: 4px 12px; border-radius: 16px; }
-.job-match-page.dark .match-rate-tip { background: #1e3a8a; color: #93c5fd; }
-.recommended-jobs-list {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 18px;
-}
-
-.recommended-job-card {
-  background: #fff;
-  border-radius: 20px;
-  padding: 26px;
-  height: 240px;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
-  cursor: pointer;
-  transition: all 0.35s ease;
-  position: relative;
-  border: 1px solid #f0f7ff;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
-.job-match-page.dark .recommended-job-card {
-  background: #334155;
-  border-color: #475569;
-}
-.card-corner {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 50px;
-  height: 50px;
-  border-bottom-right-radius: 20px;
-}
-.recommended-job-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 16px 32px rgba(47,84,235,0.15);
-  border-color: #c0d0ff;
-}
-.recommended-job-card.active {
-  border: 2px solid #2f54eb;
-  background: linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%);
-}
-.job-match-page.dark .recommended-job-card.active {
-  background: #475569;
-}
-.match-rate-badge {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  background: linear-gradient(135deg, #4facfe, #00f2fe);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 5px 11px;
-  border-radius: 20px;
-  box-shadow: 0 3px 8px rgba(79,172,254,0.3);
-}
-.job-info {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
-.job-info .job-name {
-  font-size: 18px;
-  font-weight: 600;
-  color: #1f2937;
-  line-height: 1.5;
-  margin: 0;
-}
-.job-match-page.dark .job-info .job-name { color: #f1f5f9; }
-.match-tag {
-  font-size: 14px;
-  color: #36ad6a;
-  font-weight: 500;
-  padding: 6px 14px;
-  background: #f6ffed;
-  border-radius: 12px;
-}
-.job-match-page.dark .match-tag { background: #065f46; color: #a7f3d0; }
-
 .all-job-selection {
   background: #f8f9ff;
   border-radius: 16px;
@@ -897,7 +643,6 @@ onMounted(async () => {
 @media (max-width: 768px) {
   .nav-menu { display: none; }
   .nav-wrap { width: 95%; }
-  .recommended-jobs-list { grid-template-columns: repeat(2, 1fr); }
   .job-card-list { grid-template-columns: repeat(2, 1fr); }
 }
 </style>

@@ -16,11 +16,11 @@ MAX_FILE_SIZE = 10 * 1024 * 1024
 
 # 【固定必须返回的5个软能力维度】
 REQUIRED_SOFT_ABILITIES = {
-    "创新能力": {"score": 3, "description": "未详细评估，默认中等水平"},
-    "学习能力": {"score": 3, "description": "未详细评估，默认中等水平"},
-    "抗压能力": {"score": 3, "description": "未详细评估，默认中等水平"},
-    "沟通能力": {"score": 3, "description": "未详细评估，默认中等水平"},
-    "实习能力": {"score": 3, "description": "未详细评估，默认中等水平"}
+    "创新能力": {"score": "--", "description": "未详细评估，默认无水平"},
+    "学习能力": {"score": "--", "description": "未详细评估，默认无水平"},
+    "抗压能力": {"score": "--", "description": "未详细评估，默认无水平"},
+    "沟通能力": {"score": "--", "description": "未详细评估，默认无水平"},
+    "实习能力": {"score": "--", "description": "未详细评估，默认无水平"}
 }
 
 def allowed_file(filename):
