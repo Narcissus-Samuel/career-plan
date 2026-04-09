@@ -206,6 +206,7 @@ import { ElLoading, ElMessage } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
 import * as echarts from 'echarts'
 import axios from 'axios'
+import jsPDF from 'jspdf'
 
 const router = useRouter()
 const route = useRoute()
@@ -374,14 +375,79 @@ const getMatchSuggestion = () => {
   return matchResult.value.gapAnalysis?.base || 'AI 正在生成建议...'
 }
 
-// 导出
+// ======================
+// 纯 jsPDF 导出 PDF（无任何其他依赖）
+// ======================
 const exportResult = () => {
-  const blob = new Blob([JSON.stringify(matchResult.value, null, 2)], { type: 'application/json' })
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = `${jobName.value}_匹配结果.json`
-  a.click()
-  ElMessage.success('导出成功')
+  try {
+    const doc = new jsPDF()
+    let yPos = 20
+
+    // 标题
+    doc.setFontSize(18)
+    doc.text(`${jobName.value} 人岗匹配报告`, 14, yPos)
+    yPos += 15
+
+    // 总分
+    doc.setFontSize(14)
+    doc.text(`匹配总分：${matchResult.value.totalScore} 分`, 14, yPos)
+    yPos += 10
+    doc.text(`匹配等级：${getScoreLevelText()}`, 14, yPos)
+    yPos += 15
+
+    // 维度详情
+    doc.setFontSize(14)
+    doc.text('各维度匹配详情：', 14, yPos)
+    yPos += 10
+
+    doc.setFontSize(12)
+    matchResult.value.dimensionScores.forEach(item => {
+      if (yPos > 270) {
+        doc.addPage()
+        yPos = 20
+      }
+      const line = `${item.dimension}：${item.score} 分 | 权重 ${(item.weight * 100).toFixed(0)}% | 得分 ${item.contribution}`
+      doc.text(line, 14, yPos)
+      yPos += 8
+    })
+
+    yPos += 10
+
+    // 差距分析
+    if (yPos > 270) {
+      doc.addPage()
+      yPos = 20
+    }
+    doc.setFontSize(14)
+    doc.text('差距分析与提升建议：', 14, yPos)
+    yPos += 10
+    doc.setFontSize(12)
+
+    const gaps = matchResult.value.gapAnalysis
+    const gapList = [
+      { t: '基础要求', c: gaps.base || '无' },
+      { t: '职业技能', c: gaps.skills || '无' },
+      { t: '职业素养', c: gaps.quality || '无' },
+      { t: '发展潜力', c: gaps.potential || '无' }
+    ]
+
+    gapList.forEach(g => {
+      if (yPos > 270) {
+        doc.addPage()
+        yPos = 20
+      }
+      doc.text(`${g.t}：`, 14, yPos)
+      const lines = doc.splitTextToSize(g.c, 170)
+      doc.text(lines, 14, yPos + 7)
+      yPos += lines.length * 7 + 5
+    })
+
+    doc.save(`${jobName.value}_人岗匹配报告.pdf`)
+    ElMessage.success('PDF 导出成功！')
+  } catch (e) {
+    console.error('导出失败', e)
+    ElMessage.error('导出失败')
+  }
 }
 
 // 更换岗位

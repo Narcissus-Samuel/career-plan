@@ -11,28 +11,6 @@
             <li class="menu-item" @click="$router.push('/')">首页</li>
             <li class="menu-item" @click="$router.push('/career-planning-intro')">职业规划</li>
             <li class="menu-item" @click="$router.push('/report-export')">报告导出</li>
-            <!-- <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
-            <li class="menu-item dropdown">
-              核心功能 ▼
-              <ul class="dropdown-menu">
-                <li class="dropdown-item" @click="goToFeature('测评')">
-                  <span class="color-dot red"></span>
-                  职业兴趣测评
-                </li>
-                <li class="dropdown-item" @click="goToFeature('分析')">
-                  <span class="color-dot orange"></span>
-                  能力短板分析
-                </li>
-                <li class="dropdown-item" @click="goToFeature('规划')">
-                  <span class="color-dot green"></span>
-                  发展路径规划
-                </li>
-                <li class="dropdown-item" @click="goToFeature('导出')">
-                  <span class="color-dot blue"></span>
-                  规划报告导出
-                </li>
-              </ul>
-            </li> -->
           </ul>
         </div>
         
@@ -58,7 +36,6 @@
             >
             <div class="user-menu" v-show="isUserMenuOpen">
               <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
-              <!-- <div class="menu-item" @click="$router.push('/settings')">账号设置</div> -->
               <div class="menu-item logout" @click="handleLogout">退出登录</div>
             </div>
           </div>
@@ -120,6 +97,7 @@
         </aside>
 
         <div class="profile-content">
+          <!-- 账号安全 -->
           <div class="tab-content" v-show="activeTab === 'security'">
             <div class="content-header">
               <h2 class="content-title">账号安全</h2>
@@ -150,6 +128,7 @@
             </div>
           </div>
 
+          <!-- 职业规划报告 -->
           <div class="tab-content" v-show="activeTab === 'career'">
             <div class="content-header">
               <h2 class="content-title">我的职业规划</h2>
@@ -181,12 +160,13 @@
                   </div>
                 </div>
                 <div class="plan-actions">
-                  <button class="export-btn" @click="exportPlan(plan.id)">导出报告</button>
+                  <button class="export-btn" @click="exportCareerPDF(plan.id)">导出PDF报告</button>
                 </div>
               </div>
             </div>
           </div>
           
+          <!-- 兴趣测试报告 -->
           <div class="tab-content" v-show="activeTab === 'interest'">
             <div class="content-header">
               <h2 class="content-title">兴趣测试报告</h2>
@@ -218,12 +198,13 @@
                   </div>
                 </div>
                 <div class="report-actions">
-                  <button class="export-btn" @click="exportReport('interest', item.id)">导出报告</button>
+                  <button class="export-btn" @click="exportInterestPDF(item.id)">导出PDF报告</button>
                 </div>
               </div>
             </div>
           </div>
           
+          <!-- 人岗匹配报告 -->
           <div class="tab-content" v-show="activeTab === 'match'">
             <div class="content-header">
               <h2 class="content-title">人岗匹配结果报告</h2>
@@ -255,7 +236,7 @@
                   </div>
                 </div>
                 <div class="report-actions">
-                  <button class="export-btn" @click="exportReport('match', item.id)">导出报告</button>
+                  <button class="export-btn" @click="exportMatchPDF(item.id)">导出PDF报告</button>
                 </div>
               </div>
             </div>
@@ -264,7 +245,7 @@
       </div>
     </main>
 
-    <!-- 美化后的修改密码弹窗 -->
+    <!-- 修改密码弹窗 -->
     <div class="modal-overlay" v-show="showChangePwdModal" @click="closeModal('changePwd')">
       <div class="modal-content modern-modal" @click.stop>
         <div class="modal-header">
@@ -292,7 +273,7 @@
       </div>
     </div>
 
-    <!-- 美化后的修改手机号弹窗（无验证码） -->
+    <!-- 绑定手机号弹窗 -->
     <div class="modal-overlay" v-show="showBindPhoneModal" @click="closeModal('bindPhone')">
       <div class="modal-content modern-modal" @click.stop>
         <div class="modal-header">
@@ -374,6 +355,7 @@ const showBindPhoneModal = ref(false)
 const phoneForm = ref({ phone: '' })
 const pwdForm = ref({ oldPwd: '', newPwd: '', confirmPwd: '' })
 
+// 加载用户信息
 const loadUserProfile = async () => {
   try {
     const { data } = await authAxios.get('/user/profile')
@@ -417,18 +399,12 @@ const loadInterestReports = async () => {
       return
     }
     const { data } = await authAxios.get(`/assessment/history/${userInfo.value.id}`)
-    console.log("当前用户真实测评报告：", data)
     let list = Array.isArray(data) ? data : (data?.list || [])
     interestReports.value = list.map(item => ({
       id: item.id || 1,
-      title: item.title || '职业兴趣测评',
-      type: item.type || '霍兰德测试',
-      result: item.result || '已完成测评',
-      suitableJobs: item.suitableJobs || '待查看',
-      created_at: item.created_at || item.createTime || item.time || new Date()
+      created_at: item.created_at || item.createTime || new Date()
     }))
   } catch (e) {
-    console.error("兴趣报告加载失败", e)
     interestReports.value = []
   }
 }
@@ -443,33 +419,27 @@ const loadMatchReports = async () => {
     const { data } = await authAxios.get(`/match/history/${studentId}`)
     matchReports.value = data.history || []
   } catch (e) {
-    console.error('加载匹配报告失败', e)
     matchReports.value = []
   }
 }
 
 const switchTab = (tab) => { activeTab.value = tab }
-
 const formatDate = (s) => {
   if (!s) return ''
-  try {
-    return new Date(s).toLocaleString()
-  } catch {
-    return ''
-  }
+  try { return new Date(s).toLocaleString() } catch { return '' }
 }
 
+// 头像上传
 const triggerAvatarUpload = () => {
   document.querySelector('.avatar-upload-btn input')?.click()
 }
-
 const handleAvatarUpload = async (e) => {
   const file = e.target.files[0]
   if (!file) return
   const formData = new FormData()
   formData.append('file', file)
   try {
-    const { data } = await authAxios.post('/api/user/avatar', formData, {
+    const { data } = await authAxios.post('/user/avatar', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
     userInfo.value.avatar = data.avatar
@@ -479,6 +449,7 @@ const handleAvatarUpload = async (e) => {
   }
 }
 
+// 密码/手机
 const changePassword = async () => {
   const { oldPwd, newPwd, confirmPwd } = pwdForm.value
   if (!oldPwd || !newPwd || newPwd !== confirmPwd) {
@@ -493,7 +464,6 @@ const changePassword = async () => {
     ElMessage.error('原密码错误')
   }
 }
-
 const bindPhone = async () => {
   const { phone } = phoneForm.value
   if (!phone) {
@@ -509,51 +479,88 @@ const bindPhone = async () => {
     ElMessage.error('绑定失败')
   }
 }
-
 const closeModal = (t) => {
   if (t === 'changePwd') showChangePwdModal.value = false
   if (t === 'bindPhone') showBindPhoneModal.value = false
 }
 
-const exportPlan = (id) => {
-  window.open(`/api/report/export/career/${id}`, '_blank')
-  ElMessage.success('报告导出中')
+// ====================== 导出PDF（对接你给的后端接口） ======================
+// 导出职业规划报告 PDF
+const exportCareerPDF = async (id) => {
+  try {
+    ElMessage.success('正在生成PDF报告，请稍候...')
+    const response = await authAxios.get(`/report/export/career/${id}`, {
+      responseType: 'blob'
+    })
+    const blob = new Blob([response.data], { type: 'application/pdf' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `职业规划报告_${id}.pdf`
+    a.click()
+    window.URL.revokeObjectURL(url)
+    ElMessage.success('PDF报告导出成功！')
+  } catch (err) {
+    ElMessage.error('PDF导出失败，已自动下载MD报告')
+    window.open(`/api/report/export/career/${id}`, '_blank')
+  }
 }
 
-const exportReport = (type, id) => {
-  if (type === 'interest') {
+// 导出兴趣测评报告 PDF
+const exportInterestPDF = async (id) => {
+  try {
+    ElMessage.success('正在生成PDF报告，请稍候...')
+    const response = await authAxios.get(`/report/export/interest/${id}`, {
+      responseType: 'blob'
+    })
+    const blob = new Blob([response.data], { type: 'application/pdf' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `兴趣测评报告_${id}.pdf`
+    a.click()
+    window.URL.revokeObjectURL(url)
+    ElMessage.success('PDF报告导出成功！')
+  } catch (err) {
+    ElMessage.error('PDF导出失败，已自动下载MD报告')
     window.open(`/api/report/export/interest/${id}`, '_blank')
-  } else if (type === 'match') {
+  }
+}
+
+// 导出人岗匹配报告 PDF
+const exportMatchPDF = async (id) => {
+  try {
+    ElMessage.success('正在生成PDF报告，请稍候...')
+    const response = await authAxios.get(`/report/export/match/${id}`, {
+      responseType: 'blob'
+    })
+    const blob = new Blob([response.data], { type: 'application/pdf' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `人岗匹配报告_${id}.pdf`
+    a.click()
+    window.URL.revokeObjectURL(url)
+    ElMessage.success('PDF报告导出成功！')
+  } catch (err) {
+    ElMessage.error('PDF导出失败，已自动下载MD报告')
     window.open(`/api/report/export/match/${id}`, '_blank')
   }
-  ElMessage.success('报告导出中')
 }
+// ========================================================================
 
 const toggleTheme = () => {
   darkMode.value = !darkMode.value
   localStorage.setItem('darkMode', darkMode.value)
   document.body.classList.toggle('dark', darkMode.value)
 }
-
 const handleLogout = () => {
   localStorage.clear()
   router.push('/login')
 }
-
 const toggleUserMenu = () => {
   isUserMenuOpen.value = !isUserMenuOpen.value
 }
-
-const goToFeature = (t) => {
-  const map = {
-    '测评': '/interest-test',
-    '分析': '/ability-analysis',
-    '规划': '/development-path',
-    '导出': '/report-export'
-  }
-  router.push(map[t] || '/')
-}
-
 const handleSearch = () => {
   const i = document.querySelector('.nav-search-input')
   if (i?.value) router.push(`/search?keyword=${i.value}`)
@@ -641,50 +648,6 @@ onMounted(async () => {
   height: 2px;
   background: #2f54eb;
 }
-.dropdown {
-  position: relative;
-}
-.dropdown-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  width: 200px;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  border-radius: 4px;
-  list-style: none;
-  padding: 8px 0;
-  margin: 0;
-  display: none;
-  z-index: 9999;
-}
-.dropdown:hover .dropdown-menu {
-  display: block;
-}
-.dropdown-item {
-  padding: 10px 15px;
-  font-size: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: auto;
-  line-height: normal;
-  color: #000;
-}
-.dropdown-item:hover {
-  background: #f5f7fa;
-}
-.color-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-}
-.color-dot.red { background: #ff7a45; }
-.color-dot.orange { background: #faad14; }
-.color-dot.green { background: #52c41a; }
-.color-dot.blue { background: #1890ff; }
 .nav-right {
   display: flex;
   gap: 15px;
@@ -906,7 +869,7 @@ onMounted(async () => {
   font-weight: 600;
   margin: 0;
 }
-.edit-btn, .create-btn {
+.create-btn {
   padding: 6px 15px;
   background: #2f54eb;
   color: #fff;
@@ -914,113 +877,6 @@ onMounted(async () => {
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
-}
-.clear-btn {
-  padding: 6px 15px;
-  background: #f5f5f5;
-  color: #666;
-  border: 1px solid #e8e8e8;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-}
-.user-card-list {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-.user-summary-card {
-  background: #f9f9f9;
-  border-radius: 8px;
-  padding: 20px;
-  border: 1px solid #e8e8e8;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.user-summary-card:hover {
-  border-color: #2f54eb;
-  background: #f5f7ff;
-}
-.card-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-.card-avatar {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid #fff;
-}
-.card-name {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
-}
-.card-brief {
-  margin-bottom: 15px;
-}
-.brief-item {
-  display: flex;
-  margin-bottom: 6px;
-  font-size: 14px;
-}
-.brief-item label {
-  width: 50px;
-  color: #666;
-  font-weight: 500;
-}
-.brief-item span {
-  color: #333;
-}
-.card-actions {
-  margin-bottom: 15px;
-}
-.view-btn {
-  padding: 6px 15px;
-  background: #2f54eb;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-}
-.card-detail {
-  margin-top: 15px;
-  padding-top: 15px;
-  border-top: 1px dashed #eee;
-}
-.basic-info-card {
-  background: #f9f9f9;
-  border-radius: 8px;
-  padding: 24px;
-  border: 1px solid #e8e8e8;
-}
-.card-row {
-  display: flex;
-  align-items: flex-start;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px dashed #eee;
-}
-.card-row:last-child {
-  margin-bottom: 0;
-  border-bottom: none;
-}
-.card-label {
-  width: 140px;
-  flex-shrink: 0;
-  font-size: 14px;
-  color: #666;
-  font-weight: 500;
-}
-.card-value {
-  flex: 1;
-  font-size: 14px;
-  color: #333;
-  line-height: 1.6;
 }
 .security-settings {
   width: 100%;
@@ -1068,37 +924,18 @@ onMounted(async () => {
   cursor: pointer;
   font-size: 14px;
 }
-.code-input-wrap {
-  display: flex;
-  gap: 10px;
-  flex: 1;
-}
-.code-input {
-  flex: 1;
-}
-.code-btn {
-  width: 120px;
-  padding: 0 10px;
-  background: #2f54eb;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-  white-space: nowrap;
-}
-.career-plan-list {
+.career-plan-list, .report-list {
   display: flex;
   flex-direction: column;
   gap: 15px;
 }
-.plan-card {
+.plan-card, .report-card {
   background: #f9f9f9;
   border-radius: 8px;
   padding: 20px;
   border: 1px solid #e8e8e8;
 }
-.plan-header {
+.plan-header, .report-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1106,19 +943,19 @@ onMounted(async () => {
   padding-bottom: 10px;
   border-bottom: 1px solid #e8e8e8;
 }
-.plan-title {
+.plan-title, .report-title {
   font-size: 16px;
   font-weight: 600;
   margin: 0;
 }
-.plan-date {
+.plan-date, .report-date {
   font-size: 12px;
   color: #999;
 }
-.plan-content {
+.plan-content, .report-content {
   margin-bottom: 15px;
 }
-.plan-item {
+.plan-item, .report-item {
   display: flex;
   margin-bottom: 8px;
 }
@@ -1132,131 +969,15 @@ onMounted(async () => {
   flex: 1;
   font-size: 14px;
 }
-.plan-actions {
+.plan-actions, .report-actions {
   display: flex;
   gap: 10px;
 }
-.plan-actions .export-btn {
+.export-btn {
   padding: 6px 12px;
   background: #52c41a;
   color: #fff;
   border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.report-list {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-.report-card {
-  background: #f9f9f9;
-  border-radius: 8px;
-  padding: 20px;
-  border: 1px solid #e8e8e8;
-}
-.report-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #e8e8e8;
-}
-.report-title {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0;
-}
-.report-date {
-  font-size: 12px;
-  color: #999;
-}
-.report-content {
-  margin-bottom: 15px;
-}
-.report-item {
-  display: flex;
-  margin-bottom: 8px;
-}
-.report-actions {
-  display: flex;
-  gap: 10px;
-}
-.report-actions .export-btn {
-  padding: 6px 12px;
-  background: #52c41a;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.history-list {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-.history-item {
-  display: flex;
-  align-items: center;
-  padding: 15px;
-  background: #f9f9f9;
-  border-radius: 8px;
-  border: 1px solid #e8e8e8;
-}
-.item-left {
-  width: 60px;
-  flex-shrink: 0;
-}
-.history-cover {
-  width: 60px;
-  height: 60px;
-  object-fit: cover;
-  border-radius: 4px;
-}
-.item-middle {
-  flex: 1;
-  padding: 0 15px;
-}
-.history-title {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 8px 0;
-}
-.history-desc {
-  font-size: 14px;
-  color: #666;
-  margin: 0 0 8px 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-line-orient: vertical;
-  overflow: hidden;
-}
-.history-time {
-  font-size: 12px;
-  color: #999;
-}
-.item-right {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.item-right .view-btn {
-  padding: 6px 12px;
-  background: #2f54eb;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.item-right .delete-btn {
-  padding: 6px 12px;
-  background: #fff;
-  color: #ff4d4f;
-  border: 1px solid #ff4d4f;
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
@@ -1289,7 +1010,7 @@ onMounted(async () => {
   font-size: 14px;
 }
 
-/* 美化弹窗样式 */
+/* 弹窗样式 */
 .modal-overlay {
   position: fixed;
   top: 0;

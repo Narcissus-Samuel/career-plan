@@ -11,24 +11,6 @@
             <li class="menu-item" @click="$router.push('/')">首页</li>
             <li class="menu-item active" @click="$router.push('/career-planning-intro')">职业规划</li>
             <li class="menu-item" @click="$router.push('/report-export')">报告导出</li>
-            <!-- <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
-            <li class="menu-item dropdown">
-              核心功能 ▼
-              <ul class="dropdown-menu">
-                <li class="dropdown-item active" @click="goToFeature('测评')">
-                  <span class="color-dot red"></span> 职业测评
-                </li>
-                <li class="dropdown-item" @click="goToFeature('分析')">
-                  <span class="color-dot orange"></span> 能力短板分析
-                </li>
-                <li class="dropdown-item" @click="goToFeature('规划')">
-                  <span class="color-dot green"></span> 发展路径规划
-                </li>
-                <li class="dropdown-item" @click="goToFeature('导出')">
-                  <span class="color-dot blue"></span> 规划报告导出
-                </li>
-              </ul>
-            </li> -->
           </ul>
         </div>
 
@@ -57,7 +39,6 @@
             >
             <div class="user-menu" v-show="isUserMenuOpen">
               <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
-              <!-- <div class="menu-item" @click="$router.push('/settings')">账号设置</div> -->
               <div class="menu-item logout" @click="handleLogout">退出登录</div>
             </div>
           </div>
@@ -263,7 +244,8 @@
 
         <div class="result-actions">
           <button class="restart-btn" @click="restartTest">重新测评</button>
-          <button class="export-btn" @click="exportReport">导出测评报告</button>
+          <!-- 这里改为：查看详情 -->
+          <button class="export-btn" @click="exportReport">查看详情</button>
           <button class="career-plan-btn" @click="goToMatchResult">
             📋 进行人岗匹配分析
           </button>
@@ -346,8 +328,7 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button class="print-btn" @click="printReport">打印报告</button>
-          <button class="download-btn" @click="downloadReport">下载PDF</button>
+          <!-- 已删除 打印报告、下载PDF 按钮，只保留关闭 -->
           <button class="close-btn" @click="showReportModal = false">关闭</button>
         </div>
       </div>
@@ -769,8 +750,6 @@ const restartTest = () => {
 
 const exportReport = () => showReportModal.value = true
 const goToMatchResult = () => router.push('/jobmatch-analysis')
-const printReport = () => window.print()
-const downloadReport = () => ElMessage.success('开始下载')
 
 const getRadarAxisStyle = (i) => ({
   transform: `rotate(${i*60-30}deg)`, transformOrigin: 'bottom'
@@ -1431,7 +1410,7 @@ onUnmounted(() => {
   background: #fff;
   border-radius: 8px;
   padding: 30px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8 rgba(0,0,0,0.05);
 }
 .detail-analysis h3 {
   font-size: 20px;
@@ -1673,21 +1652,6 @@ onUnmounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-}
-.print-btn, .download-btn {
-  padding: 8px 20px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.print-btn {
-  border: 1px solid #2f54eb;
-  color: #2f54eb;
-  background: #fff;
-}
-.download-btn {
-  border: none;
-  background: #2f54eb;
-  color: #fff;
 }
 
 .page-footer {
