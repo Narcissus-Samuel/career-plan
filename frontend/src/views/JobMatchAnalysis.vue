@@ -1,6 +1,5 @@
 <template>
   <div class="job-match-page">
-    <!-- 顶部导航栏（与职业规划介绍页完全一致） -->
     <header class="top-nav">
       <div class="nav-wrap">
         <div class="nav-left">
@@ -53,6 +52,28 @@
         <h1>岗位信息</h1>
       </div>
 
+      <!-- 🔥 AI 真实推荐岗位 -->
+      <div class="recommend-job-section">
+        <h3>🎯 AI为你推荐的10个最佳匹配岗位</h3>
+        <div v-if="recommendJobs.length === 0" class="loading-tip">
+          <div>正在计算你的最佳匹配岗位...</div>
+        </div>
+        <div class="job-card-list" v-else>
+          <div 
+            class="job-card recommend-card" 
+            v-for="(job,idx) in recommendJobs" 
+            :key="job.job_name"
+            :class="{ active: selectedJob.job_name === job.job_name }"
+            @click="selectRecommendJob(job)"
+            :style="getCardColor(idx)"
+          >
+            <h4 class="job-name">{{ job.job_name }}</h4>
+            <div class="score-tag">{{ job.overall_score }}分</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 所有岗位 -->
       <div class="all-job-selection">
         <h3>所有岗位列表</h3>
         <div class="job-category-tabs">
@@ -116,12 +137,9 @@ import axios from 'axios'
 const router = useRouter()
 const route = useRoute()
 
-// 登录状态 & 用户信息
 const isLogin = ref(!!localStorage.getItem('token'))
 const userAvatar = ref(localStorage.getItem('avatar') || '')
 const isUserMenuOpen = ref(false)
-
-// 主题切换
 const darkMode = ref(localStorage.getItem('darkMode') === 'true')
 const searchKeyword = ref('')
 
@@ -132,10 +150,13 @@ const allJobs = ref([])
 const allJobsSearchKeyword = ref('')
 const selectedJob = ref({})
 
-// 用户菜单
+// 🔥 AI推荐岗位（空数组，完全靠接口返回）
+const recommendJobs = ref([])
+
 const toggleUserMenu = () => {
   isUserMenuOpen.value = !isUserMenuOpen.value
 }
+
 const handleLogout = () => {
   localStorage.clear()
   isLogin.value = false
@@ -143,7 +164,6 @@ const handleLogout = () => {
   ElMessage.success('退出登录成功')
 }
 
-// 主题切换
 function applyTheme() {
   if (darkMode.value) {
     document.body.classList.add('dark')
@@ -151,6 +171,7 @@ function applyTheme() {
     document.body.classList.remove('dark')
   }
 }
+
 const toggleTheme = () => {
   darkMode.value = !darkMode.value
   localStorage.setItem('darkMode', darkMode.value)
@@ -158,18 +179,6 @@ const toggleTheme = () => {
   ElMessage.success(`已切换为${darkMode.value ? '暗黑' : '明亮'}模式`)
 }
 
-// 功能跳转
-const goToFeature = (type) => {
-  const map = {
-    '测评': '/interest-test',
-    '分析': '/ability-analysis',
-    '规划': '/development-path',
-    '导出': '/report-export'
-  }
-  router.push(map[type] || '/')
-}
-
-// 导航搜索
 const handleSearch = () => {
   const keyword = searchKeyword.value.trim()
   if (!keyword) {
@@ -190,6 +199,34 @@ const getCardColor = (index) => {
     'linear-gradient(135deg, #f6ffed 0%, #fafff0 100%)'
   ]
   return { background: list[index % list.length] }
+}
+
+// 🔥 从后端获取真实推荐岗位
+const loadRecommendJobs = async () => {
+  try {
+    const studentId = localStorage.getItem('studentId') 
+                   || localStorage.getItem('student_id') 
+                   || localStorage.getItem('id')
+
+    if (!studentId) {
+      ElMessage.warning('请先登录并完善个人信息')
+      return
+    }
+
+    const { data } = await axios.get('/api/match/recommend', {
+      params: { student_id: studentId, limit: 10 }
+    })
+
+    if (data.results && data.results.length > 0) {
+      recommendJobs.value = data.results
+      ElMessage.success(`AI 为你匹配到 ${data.results.length} 个最佳岗位`)
+    } else {
+      ElMessage.warning('暂无匹配岗位，请完善个人信息')
+    }
+  } catch (err) {
+    console.error('获取推荐失败：', err)
+    ElMessage.error('推荐岗位加载失败')
+  }
 }
 
 const loadAllJobsFromDB = async () => {
@@ -219,6 +256,7 @@ const filteredAllJobs = computed(() => {
   }
   return list
 })
+
 const uniqueFilteredJobs = computed(() => {
   const seen = new Set()
   return filteredAllJobs.value.filter(item => {
@@ -229,28 +267,38 @@ const uniqueFilteredJobs = computed(() => {
   })
 })
 
-// 选择岗位
+// 选择普通岗位
 const selectJob = (job) => {
-  selectedJob.value = job
+  selectedJob.value = { ...job, source: 'all' }
   localStorage.setItem('selectedJob', JSON.stringify(job))
   ElMessage.success(`已选择：${job.job_name}`)
+}
+
+// 选择AI推荐岗位
+const selectRecommendJob = (job) => {
+  const fullJob = allJobs.value.find(j => j.job_name === job.job_name) || {
+    id: 9999,
+    job_name: job.job_name
+  }
+  selectedJob.value = { ...fullJob, source: 'recommend' }
+  localStorage.setItem('selectedJob', JSON.stringify(fullJob))
+  ElMessage.success(`已选择推荐岗位：${job.job_name}`)
 }
 
 const handleAllJobsSearch = () => {
   ElMessage.success(`找到 ${uniqueFilteredJobs.value.length} 个岗位`)
 }
 
-// 开始匹配
 const startJobMatch = async () => {
-  if (!selectedJob.value.id) {
+  if (!selectedJob.value.id && !selectedJob.value.job_name) {
     ElMessage.warning('请先选择一个岗位')
     return
   }
   router.push({
     path: '/match-result',
     query: {
-      jobId: selectedJob.value.id,
-      jobName: selectedJob.job_name
+      jobId: selectedJob.value.id || 9999,
+      jobName: selectedJob.value.job_name
     }
   })
 }
@@ -260,6 +308,7 @@ onMounted(async () => {
   hasAbilityProfile.value = true
   await loadAllJobsFromDB()
   await loadJobCategories()
+  await loadRecommendJobs()
 
   if (route.query.jobId) {
     const job = allJobs.value.find(j => j.id == route.query.jobId)
@@ -269,7 +318,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* 页面全局样式（适配暗黑模式） */
 .job-match-page {
   width: 100%;
   min-height: 100vh;
@@ -285,9 +333,6 @@ onMounted(async () => {
   color: #f1f5f9;
 }
 
-/* ————————————————————————————————————————
-   导航栏样式（与职业规划页完全一致）
-———————————————————————————————————————— */
 .top-nav {
   height: 60px;
   background: #fff;
@@ -326,7 +371,7 @@ onMounted(async () => {
   color: #f1f5f9;
 }
 .logo-icon {
-  font-size: 24px;
+  font: 24px;
   margin-right: 8px;
 }
 .nav-menu {
@@ -367,7 +412,6 @@ onMounted(async () => {
   transition: all 0.3s ease;
 }
 
-/* 导航右侧 */
 .nav-right {
   display: flex;
   gap: 15px;
@@ -456,7 +500,6 @@ onMounted(async () => {
   background: #1d3ecf;
 }
 
-/* 用户头像菜单 */
 .user-profile {
   position: relative;
   display: flex;
@@ -510,9 +553,6 @@ onMounted(async () => {
   border-top: 1px solid #e8e8e8;
 }
 
-/* ————————————————————————————————————————
-   原有页面样式（保持不变）
-———————————————————————————————————————— */
 .match-container {
   width: 100%;
   max-width: 1200px;
@@ -525,6 +565,50 @@ onMounted(async () => {
 .page-header { margin-bottom: 20px; }
 .page-header h1 { font-size: 24px; font-weight: 700; color: #1f2937; margin: 0; }
 .job-match-page.dark .page-header h1 { color: #f1f5f9; }
+
+.recommend-job-section {
+  background: linear-gradient(135deg, #f0f7ff 0%, #f8fcff 100%);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 30px;
+  border: 1px solid #d0e8ff;
+}
+.job-match-page.dark .recommend-job-section {
+  background: #1e293b;
+  border-color: #334155;
+}
+.recommend-job-section h3 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: #2f54eb;
+}
+.job-match-page.dark .recommend-job-section h3 {
+  color: #60a5fa;
+}
+.loading-tip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100px;
+  color: #666;
+}
+.recommend-card {
+  position: relative;
+  border: 2px solid #fff !important;
+  box-shadow: 0 8px 20px rgba(47,84,235,0.1) !important;
+}
+.score-tag {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: #2f54eb;
+  color: #fff;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
 
 .all-job-selection {
   background: #f8f9ff;
@@ -605,6 +689,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   text-align: center;
+  position: relative;
 }
 .job-match-page.dark .job-card {
   background: #334155 !important;
@@ -616,8 +701,8 @@ onMounted(async () => {
   border-color: #b8d0ff;
 }
 .job-card.active {
-  border: 2px solid #2f54eb;
-  background: linear-gradient(135deg, #e6f7ff 0%, #ffffff 100%) !important;
+  border: 2px solid #2f54eb !important;
+  background: #e6f7ff !important;
 }
 .job-match-page.dark .job-card.active { background: #475569 !important; }
 .job-card .job-name {
@@ -639,7 +724,6 @@ onMounted(async () => {
   border-radius: 10px;
 }
 
-/* 响应式 */
 @media (max-width: 768px) {
   .nav-menu { display: none; }
   .nav-wrap { width: 95%; }
