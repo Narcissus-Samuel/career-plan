@@ -1,6 +1,6 @@
 <template>
   <div class="job-match-container" :class="{ dark: darkMode }">
-    <!-- 顶部导航栏（与岗位选择页完全一致） -->
+    <!-- 顶部导航栏 -->
     <header class="top-nav">
       <div class="nav-wrap">
         <div class="nav-left">
@@ -12,24 +12,6 @@
             <li class="menu-item" @click="$router.push('/')">首页</li>
             <li class="menu-item active" @click="$router.push('/career-planning-intro')">职业规划</li>
             <li class="menu-item" @click="$router.push('/report-export')">报告导出</li>
-            <!-- <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
-            <li class="menu-item dropdown">
-              核心功能 ▼
-              <ul class="dropdown-menu">
-                <li class="dropdown-item" @click="goToFeature('测评')">
-                  <span class="color-dot red"></span> 职业兴趣测评
-                </li>
-                <li class="dropdown-item" @click="goToFeature('分析')">
-                  <span class="color-dot orange"></span> 能力短板分析
-                </li>
-                <li class="dropdown-item" @click="goToFeature('规划')">
-                  <span class="color-dot green"></span> 发展路径规划
-                </li>
-                <li class="dropdown-item" @click="goToFeature('导出')">
-                  <span class="color-dot blue"></span> 匹配报告导出
-                </li>
-              </ul>
-            </li> -->
           </ul>
         </div>
 
@@ -59,7 +41,6 @@
             >
             <div class="user-menu" v-show="isUserMenuOpen">
               <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
-              <!-- <div class="menu-item" @click="$router.push('/settings')">账号设置</div> -->
               <div class="menu-item logout" @click="handleLogout">退出登录</div>
             </div>
           </div>
@@ -201,15 +182,14 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElLoading, ElMessage } from 'element-plus'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import axios from 'axios'
 import jsPDF from 'jspdf'
 
 const router = useRouter()
-const route = useRoute()
 
 const isLogin = ref(!!localStorage.getItem('token'))
 const userAvatar = ref(localStorage.getItem('avatar') || '')
@@ -224,78 +204,74 @@ const matchResult = ref({
   gapAnalysis: { base: '', skills: '', quality: '', potential: '' }
 })
 
-// 加载匹配数据 + 匹配完成自动保存到数据库
+// 加载匹配数据（流式接口，收到 base 后立即关闭 loading）
 const loadProfileAndMatch = async () => {
-  const loading = ElLoading.service({ text: 'AI大模型分析中...' })
-  
+  const loading = ElLoading.service({ text: 'AI 正在分析匹配度...' })
+  let loadingClosed = false
+  const closeLoading = () => {
+    if (!loadingClosed) {
+      loading.close()
+      loadingClosed = true
+    }
+  }
+
   try {
     const studentId = localStorage.getItem('studentId') || localStorage.getItem('userId')
-    if (!studentId) {
-      throw new Error('请先登录')
-    }
+    if (!studentId) throw new Error('请先登录')
 
     const job = localStorage.getItem('selectedJob')
     const selected = job ? JSON.parse(job) : { job_name: '软件工程师' }
     jobName.value = selected.job_name
 
-    const postData = {
-      student_id: Number(studentId),
-      job_name: jobName.value
-    }
-
-    const res = await axios.post('/api/match/match', postData, {
-      timeout: 15000
+    const response = await fetch('/api/match/match-stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id: Number(studentId), job_name: jobName.value })
     })
+    if (!response.ok) throw new Error('请求失败')
 
-    const data = res.data
-    matchResult.value = {
-      totalScore: data.overall_score || 0,
-      dimensionScores: [
-        { dimension: '基础要求', score: data.education_score || 0, weight: 0.2, contribution: ((data.education_score||0)*0.2).toFixed(1) },
-        { dimension: '职业技能', score: data.skill_fit || 0, weight: 0.3, contribution: ((data.skill_fit||0)*0.3).toFixed(1) },
-        { dimension: '职业素养', score: 100 - (data.soft_gap || 0), weight: 0.25, contribution: ((100 - (data.soft_gap||0))*0.25).toFixed(1) },
-        { dimension: '发展潜力', score: data.experience_score || 0, weight: 0.25, contribution: ((data.experience_score||0)*0.25).toFixed(1) }
-      ],
-      gapAnalysis: data.gap_analysis || {}
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n\n')
+      for (let i = 0; i < lines.length - 1; i++) {
+        const line = lines[i]
+        if (line.startsWith('data: ')) {
+          const data = JSON.parse(line.slice(6))
+          if (data.type === 'base') {
+            const d = data.data
+            matchResult.value.totalScore = d.overall_score
+            matchResult.value.dimensionScores = [
+              { dimension: '基础要求', score: d.education_score || 0, weight: 0.2, contribution: ((d.education_score||0)*0.2).toFixed(1) },
+              { dimension: '职业技能', score: d.skill_fit || 0, weight: 0.3, contribution: ((d.skill_fit||0)*0.3).toFixed(1) },
+              { dimension: '职业素养', score: 100 - (d.soft_gap || 0), weight: 0.25, contribution: ((100 - (d.soft_gap||0))*0.25).toFixed(1) },
+              { dimension: '发展潜力', score: d.experience_score || 0, weight: 0.25, contribution: ((d.experience_score||0)*0.25).toFixed(1) }
+            ]
+            // 收到基础数据后立即关闭全屏 loading
+            closeLoading()
+            nextTick(() => initMatchChart())
+          } else if (data.type === 'gap') {
+            // 实时更新差距分析字段
+            matchResult.value.gapAnalysis[data.field] = data.text
+          } else if (data.type === 'done') {
+            ElMessage.success('匹配分析完成！')
+            closeLoading()
+          }
+        }
+      }
+      buffer = lines[lines.length - 1]
     }
-
-    ElMessage.success('AI大模型匹配完成！')
-
-    await autoSaveToDatabase()
-
   } catch (err) {
-    console.error("错误：", err)
-    const errMsg = err.response?.data?.error || '大模型调用失败，请检查技能是否完善'
-    ElMessage.error(errMsg)
-
-    if (errMsg.includes('技能') || errMsg.includes('不完整')) {
-      setTimeout(() => {
-        router.push('/student-ability')
-      }, 1500)
-    }
+    console.error(err)
+    ElMessage.error(err.message || '获取匹配失败')
+    closeLoading()
   } finally {
-    loading.close()
-    nextTick(initMatchChart)
-  }
-}
-
-// 自动保存到数据库
-const autoSaveToDatabase = async () => {
-  try {
-    const studentId = localStorage.getItem('studentId') || localStorage.getItem('userId')
-    if (!studentId) return
-
-    await axios.post('/api/match/match', {
-      student_id: Number(studentId),
-      job_name: jobName.value
-    })
-
-    localStorage.setItem('lastMatchResult', JSON.stringify(matchResult.value))
-    localStorage.setItem('lastMatchJob', jobName.value)
-
-    console.log('✅ 匹配结果已自动保存到数据库')
-  } catch (e) {
-    console.warn('自动保存失败', e)
+    closeLoading()
   }
 }
 
@@ -305,7 +281,6 @@ const generateAndSaveReport = async () => {
     ElLoading.service({ text: '正在生成报告...' })
     localStorage.setItem('lastMatchResult', JSON.stringify(matchResult.value))
     localStorage.setItem('lastMatchJob', jobName.value)
-
     setTimeout(() => {
       router.push('/career-planning')
       ElMessage.success('生涯规划报告生成成功！')
@@ -328,23 +303,14 @@ const handleLogout = () => {
 
 // 主题切换
 const applyTheme = () => {
-  if (darkMode.value) {
-    document.body.classList.add('dark')
-  } else {
-    document.body.classList.remove('dark')
-  }
+  if (darkMode.value) document.body.classList.add('dark')
+  else document.body.classList.remove('dark')
 }
 const toggleTheme = () => {
   darkMode.value = !darkMode.value
   localStorage.setItem('darkMode', darkMode.value)
   applyTheme()
   ElMessage.success(`已切换为${darkMode.value ? '暗黑' : '明亮'}模式`)
-}
-
-// 功能跳转
-const goToFeature = (type) => {
-  const map = {'测评':'/interest-test','分析':'/ability-analysis','规划':'/development-path','导出':'/report-export'}
-  router.push(map[type] || '/')
 }
 
 // 导航搜索
@@ -372,57 +338,43 @@ const getScoreLevelText = () => {
   return '匹配度较低'
 }
 const getMatchSuggestion = () => {
+  // 如果分数已显示但差距分析尚未返回，显示友好提示
+  if (matchResult.value.totalScore > 0 && !matchResult.value.gapAnalysis?.base) {
+    return '正在生成详细建议...'
+  }
   return matchResult.value.gapAnalysis?.base || 'AI 正在生成建议...'
 }
 
-// ======================
-// 纯 jsPDF 导出 PDF（无任何其他依赖）
-// ======================
+// 导出 PDF
 const exportResult = () => {
   try {
     const doc = new jsPDF()
     let yPos = 20
-
-    // 标题
     doc.setFontSize(18)
     doc.text(`${jobName.value} 人岗匹配报告`, 14, yPos)
     yPos += 15
-
-    // 总分
     doc.setFontSize(14)
     doc.text(`匹配总分：${matchResult.value.totalScore} 分`, 14, yPos)
     yPos += 10
     doc.text(`匹配等级：${getScoreLevelText()}`, 14, yPos)
     yPos += 15
 
-    // 维度详情
     doc.setFontSize(14)
     doc.text('各维度匹配详情：', 14, yPos)
     yPos += 10
-
     doc.setFontSize(12)
     matchResult.value.dimensionScores.forEach(item => {
-      if (yPos > 270) {
-        doc.addPage()
-        yPos = 20
-      }
+      if (yPos > 270) { doc.addPage(); yPos = 20 }
       const line = `${item.dimension}：${item.score} 分 | 权重 ${(item.weight * 100).toFixed(0)}% | 得分 ${item.contribution}`
       doc.text(line, 14, yPos)
       yPos += 8
     })
-
     yPos += 10
-
-    // 差距分析
-    if (yPos > 270) {
-      doc.addPage()
-      yPos = 20
-    }
+    if (yPos > 270) { doc.addPage(); yPos = 20 }
     doc.setFontSize(14)
     doc.text('差距分析与提升建议：', 14, yPos)
     yPos += 10
     doc.setFontSize(12)
-
     const gaps = matchResult.value.gapAnalysis
     const gapList = [
       { t: '基础要求', c: gaps.base || '无' },
@@ -430,18 +382,13 @@ const exportResult = () => {
       { t: '职业素养', c: gaps.quality || '无' },
       { t: '发展潜力', c: gaps.potential || '无' }
     ]
-
     gapList.forEach(g => {
-      if (yPos > 270) {
-        doc.addPage()
-        yPos = 20
-      }
+      if (yPos > 270) { doc.addPage(); yPos = 20 }
       doc.text(`${g.t}：`, 14, yPos)
       const lines = doc.splitTextToSize(g.c, 170)
       doc.text(lines, 14, yPos + 7)
       yPos += lines.length * 7 + 5
     })
-
     doc.save(`${jobName.value}_人岗匹配报告.pdf`)
     ElMessage.success('PDF 导出成功！')
   } catch (e) {
@@ -477,7 +424,6 @@ const initMatchChart = () => {
     ]
   }
   chart.setOption(option)
-  
   resizeListener = () => chart.resize()
   window.addEventListener('resize', resizeListener)
 }
