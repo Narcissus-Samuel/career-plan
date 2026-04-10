@@ -146,35 +146,67 @@ const getStudentId = () => {
 
 const fetchReportData = async () => {
   const loading = ElLoading.service({ text: 'AI 正在生成专属报告...' })
+  let closed = false
+  const closeLoading = () => {
+    if (!closed) {
+      loading.close()
+      closed = true
+    }
+  }
+
   try {
     const studentId = getStudentId()
     if (!studentId) {
       ElMessage.error('未获取到学生信息，请重新登录')
+      closeLoading()
       return
     }
 
-    const { data } = await axios.post('/api/report/generate', {
-      student_id: studentId,
-      job_name: ''
+    const response = await fetch('/api/report/generate-stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id: studentId, job_name: '' })
     })
 
-    if (data.error) {
-      ElMessage.error(data.error)
-      return
+    if (!response.ok) throw new Error('生成失败')
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let fullContent = ''
+    let firstChunkReceived = false
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n\n')
+      for (let i = 0; i < lines.length - 1; i++) {
+        const line = lines[i]
+        if (line.startsWith('data: ')) {
+          const data = JSON.parse(line.slice(6))
+          if (data.chunk) {
+            if (!firstChunkReceived) {
+              firstChunkReceived = true
+              // 收到第一个 chunk，立即关闭全屏 loading 并显示报告区域
+              closeLoading()
+              reportVisible.value = true
+            }
+            fullContent += data.chunk
+            aiReportContent.value = fullContent
+          } else if (data.done) {
+            currentReportId.value = data.report_id
+            reportTime.value = new Date().toLocaleString()
+            ElMessage.success('报告生成并已自动保存！')
+          }
+        }
+      }
+      buffer = lines[lines.length - 1]
     }
-
-    aiReportContent.value = data.content
-    targetJob.value = data.job_name || '前端开发工程师'
-    currentReportId.value = data.report_id
-    reportTime.value = new Date().toLocaleString()
-    reportVisible.value = true
-
-    ElMessage.success('报告生成并已自动保存！')
   } catch (err) {
     console.error(err)
     ElMessage.error('报告生成失败')
-  } finally {
-    loading.close()
+    closeLoading()
   }
 }
 

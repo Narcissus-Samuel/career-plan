@@ -336,6 +336,48 @@ def _calc_text_similarity(text1: str, text2: str) -> float:
     union = words1 | words2
     return len(intersection) / len(union)
 
+# 流式
+def call_llm_stream(prompt: str, temperature=0.7, max_tokens=8000):
+    """
+    阿里云百炼流式调用，每次 yield 一个**增量**文本块。
+    """
+    import dashscope
+    from config import ALIYUN_API_KEY
+    if ALIYUN_API_KEY:
+        dashscope.api_key = ALIYUN_API_KEY
+
+    if not dashscope.api_key:
+        logger.error("❌ 阿里云 API Key 未配置，无法使用流式调用")
+        yield "报告生成失败：未配置 API Key"
+        return
+
+    try:
+        responses = dashscope.Generation.call(
+            model='qwen-plus',
+            prompt=prompt,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stream=True,
+            result_format='message'
+        )
+        previous_text = ""
+        for resp in responses:
+            if resp.output and resp.output.choices:
+                chunk = resp.output.choices[0].message.content
+                if chunk:
+                    # 只返回增量部分
+                    if chunk.startswith(previous_text):
+                        new_part = chunk[len(previous_text):]
+                    else:
+                        # 如果 chunk 不是累积的，直接返回
+                        new_part = chunk
+                    previous_text = chunk
+                    if new_part:
+                        yield new_part
+    except Exception as e:
+        logger.error(f"流式调用失败：{e}")
+        yield f"报告生成失败：{str(e)}"
+
 # ---------- 技能合并辅助函数 ----------
 def _merge_skills(skills_list: List[str]) -> List[str]:
     """
