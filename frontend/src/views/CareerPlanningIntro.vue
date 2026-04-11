@@ -84,7 +84,7 @@
           <el-button type="primary" size="large" @click="startPlanning">
             立即开始规划
           </el-button>
-          <el-button size="large" @click="goToMyPlan">我的规划</el-button>
+          <!-- <el-button size="large" @click="goToMyPlan">我的规划</el-button> -->
         </div>
       </div>
     </div>

@@ -271,7 +271,7 @@
               >
                 查看岗位发展路径图谱
               </el-button>
-              <p class="path-desc">清晰的职业发展路径，助力你的职业规划</p>
+              <p class="path-desc">清晰的职业发展路径，助力你的职业规划（鼠标悬浮查看晋升要求）</p>
             </div>
             
             <!-- 路径展示 - 双列布局 -->
@@ -285,11 +285,37 @@
                     v-for="(item, index) in jobGraphConfig.vertical" 
                     :key="index" 
                     class="timeline-item"
+                    @mouseenter="showPromotionTip(item, index)"
+                    @mouseleave="hidePromotionTip"
                   >
                     <div class="timeline-dot" :style="{backgroundColor: getStepColor(index)}"></div>
                     <div class="timeline-content">
                       <div class="timeline-step">第{{ index + 1 }}阶段</div>
                       <div class="timeline-position">{{ item }}</div>
+                    </div>
+
+                    <!-- 悬浮提示框：晋升要求 -->
+                    <div 
+                      v-if="hoverIndex === index" 
+                      class="promotion-tooltip"
+                    >
+                      <div class="tooltip-title">📌 {{ item }} 晋升要求</div>
+                      <div class="tooltip-section">
+                        <div class="label">经验要求</div>
+                        <div class="text">{{ getPromotionInfo(item).exp }}</div>
+                      </div>
+                      <div class="tooltip-section">
+                        <div class="label">技能要求</div>
+                        <div class="text">{{ getPromotionInfo(item).skills }}</div>
+                      </div>
+                      <div class="tooltip-section">
+                        <div class="label">能力要求</div>
+                        <div class="text">{{ getPromotionInfo(item).abilities }}</div>
+                      </div>
+                      <div class="tooltip-section">
+                        <div class="label">证书/资质</div>
+                        <div class="text">{{ getPromotionInfo(item).certs }}</div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -304,11 +330,23 @@
                     v-for="(item, index) in jobGraphConfig.switch" 
                     :key="index" 
                     class="switch-card"
+                    @mouseenter="showSwitchTip(item, index)"
+                    @mouseleave="hideSwitchTip"
                   >
                     <div class="switch-icon">
                       <i class="el-icon-refresh"></i>
                     </div>
                     <div class="switch-position">{{ item }}</div>
+
+                    <div 
+                      v-if="switchHoverIndex === index" 
+                      class="switch-tooltip"
+                    >
+                      <div class="tooltip-title">🔄 转岗方向：{{ item }}</div>
+                      <div class="tooltip-section">
+                        <div class="text">{{ getSwitchInfo(item).desc }}</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -380,6 +418,74 @@ const graphVisible = ref(false) // 图谱弹窗可见性
 // 存储echarts实例，防止内存泄漏
 let graphChart = null
 let radarChart = null // 雷达图实例
+
+// 悬浮提示
+const hoverIndex = ref(-1)
+const switchHoverIndex = ref(-1)
+const promotionTip = ref({})
+const switchTip = ref({})
+
+// 显示晋升提示
+const showPromotionTip = (item, index) => {
+  hoverIndex.value = index
+}
+const hidePromotionTip = () => {
+  hoverIndex.value = -1
+}
+
+// 显示转岗提示
+const showSwitchTip = (item, index) => {
+  switchHoverIndex.value = index
+}
+const hideSwitchTip = () => {
+  switchHoverIndex.value = -1
+}
+
+// 获取晋升要求（自动生成真实描述）
+const getPromotionInfo = (position) => {
+  const job = currentJob.value.job_name || '岗位'
+  const baseSkills = currentJob.value.skills?.slice(0,3).join('、') || '专业技能'
+  
+  const map = {
+    exp: '1-3年相关工作经验',
+    skills: baseSkills,
+    abilities: '沟通、管理、执行能力',
+    certs: '相关职业证书优先'
+  }
+
+  if(position.includes('初级')) {
+    map.exp = '0-1年经验 | 实习/应届生可'
+    map.skills = baseSkills
+    map.abilities = '基础学习与执行能力'
+    map.certs = '无强制要求'
+  } 
+  else if(position.includes('中级')) {
+    map.exp = '2-3年独立工作经验'
+    map.skills = baseSkills + '进阶技术'
+    map.abilities = '需求分析、项目推进能力'
+    map.certs = '相关技能证书'
+  }
+  else if(position.includes('高级') || position.includes('主管')) {
+    map.exp = '3-5年团队经验'
+    map.skills = baseSkills + '架构/管理能力'
+    map.abilities = '团队管理、项目统筹'
+    map.certs = '中高级职业证书'
+  }
+  else if(position.includes('经理') || position.includes('总监')) {
+    map.exp = '5年以上管理经验'
+    map.skills = '战略规划、团队管理'
+    map.abilities = '决策、战略、资源整合'
+    map.certs = '高级管理/行业认证'
+  }
+  return map
+}
+
+// 转岗说明
+const getSwitchInfo = (position) => {
+  return {
+    desc: `从${currentJob.value.job_name}转向${position}，技能相通，发展方向更贴合市场需求`
+  }
+}
 
 // 监听路由变化更新登录状态
 watch(
@@ -1615,6 +1721,7 @@ onMounted(() => {
   position: relative;
   margin-bottom: 24px;
   padding-bottom: 8px;
+  cursor: pointer;
 }
 
 .timeline-item:last-child {
@@ -1673,6 +1780,8 @@ onMounted(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(103, 194, 58, 0.1);
   transition: all 0.3s ease;
+  position: relative;
+  cursor: pointer;
 }
 
 .switch-card:hover {
@@ -1742,6 +1851,55 @@ onMounted(() => {
   width: 100%;
   height: 600px;
   background: #ffffff !important;
+}
+
+/* 悬浮提示框 - 你要的样式 + 防遮挡 */
+.promotion-tooltip {
+  position: absolute;
+  left: 110%;
+  top: 0;
+  width: 280px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  padding: 14px;
+  z-index: 99999;
+  border-left: 4px solid #409EFF;
+  transition: all 0.2s ease;
+}
+
+.switch-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 240px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  padding: 12px;
+  z-index: 99999;
+  margin-bottom: 8px;
+  border-top: 4px solid #67C23A;
+}
+
+.tooltip-title {
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #333;
+}
+.tooltip-section {
+  margin-bottom: 6px;
+}
+.label {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 2px;
+}
+.text {
+  font-size: 13px;
+  color: #333;
+  line-height: 1.4;
 }
 
 /* 动画效果 */
