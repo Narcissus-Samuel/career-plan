@@ -1,6 +1,6 @@
 <template>
   <div class="job-match-container" :class="{ dark: darkMode }">
-    <!-- 顶部导航栏 -->
+    <!-- 顶部导航栏（保持不变） -->
     <header class="top-nav">
       <div class="nav-wrap">
         <div class="nav-left">
@@ -56,77 +56,96 @@
         </div>
       </div>
 
-      <el-card 
-        title="人岗匹配分析结果" 
-        class="card-item result-card"
-        shadow="hover"
-      >
+      <el-card class="card-item result-card" shadow="hover">
         <div class="result-header">
           <div class="job-title">
-            <span>目标岗位：{{ jobName }}</span>
+            <span>🎯 目标岗位：{{ jobName }}</span>
+          </div>
+          <div class="job-tags" v-if="debugInfo">
+            <el-tooltip :content="`基础技能匹配: ${debugInfo.base_skill_sim}%`" placement="top">
+              <el-tag size="small" type="info">技能匹配度 {{ matchResult.skillFit }}%</el-tag>
+            </el-tooltip>
           </div>
         </div>
 
+        <!-- 总分卡片（改进版） -->
         <div class="total-score-section">
           <div class="score-card">
             <h3>匹配度总评分</h3>
-            <div class="score-value">{{ matchResult.totalScore }}分</div>
+            <div class="score-value">
+              <span class="big-number">{{ matchResult.totalScore }}</span>
+              <span class="unit">分</span>
+            </div>
+            <div class="score-ring">
+              <svg width="120" height="120" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="52" fill="none" stroke="#e0e0e0" stroke-width="8"/>
+                <circle cx="60" cy="60" r="52" fill="none" 
+                  :stroke="getScoreLevelColor()" 
+                  stroke-width="8"
+                  :stroke-dasharray="2 * Math.PI * 52"
+                  :stroke-dashoffset="2 * Math.PI * 52 * (1 - matchResult.totalScore / 100)"
+                  stroke-linecap="round"
+                  transform="rotate(-90 60 60)"
+                  style="transition: stroke-dashoffset 0.8s ease"/>
+                <text x="60" y="65" text-anchor="middle" font-size="20" font-weight="bold" :fill="getScoreLevelColor()">
+                  {{ matchResult.totalScore }}
+                </text>
+              </svg>
+            </div>
             <div class="score-level">
-              <el-tag 
-                :style="{ 
-                  backgroundColor: getScoreLevelColor(), 
-                  color: '#ffffff',
-                  border: 'none',
-                  padding: '6px 16px',
-                  borderRadius: '4px',
-                  fontSize: '14px'
-                }"
-              >
+              <el-tag :style="{ backgroundColor: getScoreLevelColor(), color: '#ffffff', border: 'none', padding: '6px 16px', borderRadius: '20px', fontSize: '14px' }">
                 {{ getScoreLevelText() }}
               </el-tag>
             </div>
           </div>
 
           <div class="match-suggestion">
+            <div class="suggestion-header">
+              <span>📋 AI 综合评估</span>
+            </div>
             <p>{{ getMatchSuggestion() }}</p>
           </div>
         </div>
 
+        <!-- 各维度匹配详情（改进版） -->
         <div class="dimension-section">
-          <h4 class="section-title">各维度匹配详情</h4>
-          <el-table 
-            :data="matchResult.dimensionScores" 
-            border 
-            style="width: 100%;"
-            stripe
-          >
-            <el-table-column prop="dimension" label="匹配维度" align="center"></el-table-column>
-            <el-table-column prop="score" label="匹配分数" align="center">
+          <h4 class="section-title">📊 各维度匹配详情</h4>
+          <el-table :data="matchResult.dimensionScores" border style="width: 100%;" stripe>
+            <el-table-column prop="dimension" label="匹配维度" align="center" width="120">
               <template #default="scope">
-                <el-rate 
-                  :value="scope.row.score / 20" 
-                  disabled 
-                  show-score 
-                  text-color="#409EFF"
-                  score-template="{value}"
-                ></el-rate>
+                <span class="dimension-name">
+                  {{ scope.row.dimension }}
+                  <el-tooltip :content="getDimensionDesc(scope.row.dimension)" placement="top">
+                    <span class="help-icon">ⓘ</span>
+                  </el-tooltip>
+                </span>
               </template>
             </el-table-column>
-            <el-table-column prop="weight" label="权重" align="center"></el-table-column>
-            <el-table-column prop="contribution" label="加权得分" align="center"></el-table-column>
-            <el-table-column prop="status" label="匹配状态" align="center">
+            <el-table-column prop="score" label="匹配分数" align="center">
               <template #default="scope">
-                <el-tag 
-                  :style="{
-                    backgroundColor: scope.row.score >= 80 ? '#1989fa' : (scope.row.score >= 60 ? '#409EFF' : '#f56c6c'),
-                    color: '#ffffff',
-                    border: 'none',
-                    padding: '4px 12px',
-                    borderRadius: '4px',
-                    fontSize: '12px'
-                  }"
-                  class="status-tag"
-                >
+                <div class="star-rating">
+                  <template v-for="i in 5" :key="i">
+                    <span class="star" :class="{ active: i <= (scope.row.score / 20) }">★</span>
+                  </template>
+                  <span class="score-number">{{ scope.row.score }}分</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="weight" label="权重" align="center" width="100">
+              <template #default="scope">
+                <div class="weight-badge">
+                  {{ (scope.row.weight * 100).toFixed(0) }}%
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="contribution" label="加权得分" align="center" width="120">
+              <template #default="scope">
+                <span class="contribution-score">{{ scope.row.contribution }}分</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="status" label="匹配状态" align="center" width="100">
+              <template #default="scope">
+                <el-tag :style="getStatusStyle(scope.row.score)" class="status-tag">
                   {{ scope.row.score >= 80 ? '优秀' : (scope.row.score >= 60 ? '良好' : '待提升') }}
                 </el-tag>
               </template>
@@ -134,46 +153,92 @@
           </el-table>
         </div>
 
+        <!-- 雷达图（更直观的可视化） -->
         <div class="chart-section">
-          <h4 class="section-title">匹配度可视化对比</h4>
+          <h4 class="section-title">📈 匹配度可视化对比</h4>
           <div id="match-chart" style="width: 100%; height: 400px;"></div>
         </div>
 
+        <!-- 差距分析与提升建议（改进版） -->
         <div class="gap-analysis-section">
-          <h4 class="section-title">差距分析与提升建议</h4>
+          <h4 class="section-title">💡 差距分析与提升建议</h4>
           <el-collapse style="width: 100%;" accordion>
-            <el-collapse-item title="基础要求差距" name="1" border-color="#409EFF">
+            <el-collapse-item name="1">
+              <template #title>
+                <div class="collapse-title">
+                  <span class="collapse-icon">📜</span>
+                  <span>基础要求差距</span>
+                  <el-tag v-if="matchResult.dimensionScores[0]" size="small" :type="matchResult.dimensionScores[0].score >= 70 ? 'success' : 'warning'" style="margin-left: 12px">
+                    {{ matchResult.dimensionScores[0]?.score || 0 }}分
+                  </el-tag>
+                </div>
+              </template>
               <div class="gap-content">
-                {{ matchResult.gapAnalysis.base }}
+                <div class="gap-text">{{ matchResult.gapAnalysis.base || '暂无建议' }}</div>
               </div>
             </el-collapse-item>
-            <el-collapse-item title="职业技能差距" name="2" border-color="#409EFF">
+            <el-collapse-item name="2">
+              <template #title>
+                <div class="collapse-title">
+                  <span class="collapse-icon">💻</span>
+                  <span>职业技能差距</span>
+                  <el-tag v-if="matchResult.dimensionScores[1]" size="small" :type="matchResult.dimensionScores[1].score >= 70 ? 'success' : 'warning'" style="margin-left: 12px">
+                    {{ matchResult.dimensionScores[1]?.score || 0 }}分
+                  </el-tag>
+                </div>
+              </template>
               <div class="gap-content">
-                {{ matchResult.gapAnalysis.skills }}
+                <div class="gap-text">{{ matchResult.gapAnalysis.skills || '暂无建议' }}</div>
               </div>
             </el-collapse-item>
-            <el-collapse-item title="职业素养差距" name="3" border-color="#409EFF">
+            <el-collapse-item name="3">
+              <template #title>
+                <div class="collapse-title">
+                  <span class="collapse-icon">🤝</span>
+                  <span>职业素养差距</span>
+                  <el-tag v-if="matchResult.dimensionScores[2]" size="small" :type="matchResult.dimensionScores[2].score >= 70 ? 'success' : 'warning'" style="margin-left: 12px">
+                    {{ matchResult.dimensionScores[2]?.score || 0 }}分
+                  </el-tag>
+                </div>
+              </template>
               <div class="gap-content">
-                {{ matchResult.gapAnalysis.quality }}
+                <div class="gap-text">{{ matchResult.gapAnalysis.quality || '暂无建议' }}</div>
               </div>
             </el-collapse-item>
-            <el-collapse-item title="发展潜力差距" name="4" border-color="#409EFF">
+            <el-collapse-item name="4">
+              <template #title>
+                <div class="collapse-title">
+                  <span class="collapse-icon">🚀</span>
+                  <span>发展潜力差距</span>
+                  <el-tag v-if="matchResult.dimensionScores[3]" size="small" :type="matchResult.dimensionScores[3].score >= 70 ? 'success' : 'warning'" style="margin-left: 12px">
+                    {{ matchResult.dimensionScores[3]?.score || 0 }}分
+                  </el-tag>
+                </div>
+              </template>
               <div class="gap-content">
-                {{ matchResult.gapAnalysis.potential }}
+                <div class="gap-text">{{ matchResult.gapAnalysis.potential || '暂无建议' }}</div>
               </div>
             </el-collapse-item>
           </el-collapse>
         </div>
 
+        <!-- 推荐资源卡片 -->
+        <div class="resource-section" v-if="matchResult.gapAnalysis.recommended_resources">
+          <h4 class="section-title">📚 推荐学习资源</h4>
+          <div class="resource-card">
+            <p>{{ matchResult.gapAnalysis.recommended_resources }}</p>
+          </div>
+        </div>
+
         <div class="operation-btn-group">
-          <el-button type="primary" @click="generateAndSaveReport" color="#409EFF">
-            生成生涯规划报告
+          <el-button type="primary" @click="generateAndSaveReport" size="large">
+            📄 生成生涯规划报告
           </el-button>
-          <el-button @click="changeJob" border-color="#409EFF" text-color="#409EFF">
-            更换岗位重新匹配
+          <el-button @click="changeJob" size="large">
+            🔄 更换岗位重新匹配
           </el-button>
-          <el-button @click="exportResult" type="primary" color="#409EFF">
-            导出匹配结果
+          <el-button @click="exportResult" size="large">
+            📎 导出匹配结果
           </el-button>
         </div>
       </el-card>
@@ -186,7 +251,6 @@ import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElLoading, ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
-import axios from 'axios'
 import jsPDF from 'jspdf'
 
 const router = useRouter()
@@ -198,15 +262,39 @@ const darkMode = ref(localStorage.getItem('darkMode') === 'true')
 const searchKeyword = ref('')
 
 const jobName = ref('软件工程师')
+const debugInfo = ref(null)
 const matchResult = ref({
   totalScore: 0,
+  skillFit: 0,
   dimensionScores: [],
-  gapAnalysis: { base: '', skills: '', quality: '', potential: '' }
+  gapAnalysis: { base: '', skills: '', quality: '', potential: '', recommended_resources: '' }
 })
 
-// 加载匹配数据（流式接口，收到 base 后立即关闭 loading）
+// 维度描述
+const getDimensionDesc = (dimension) => {
+  const desc = {
+    '基础要求': '教育背景与岗位要求的匹配程度',
+    '职业技能': '专业技能与岗位要求的匹配程度（权重最高）',
+    '职业素养': '软能力（沟通、协作、抗压等）的匹配程度',
+    '发展潜力': '实习经验、项目经验等展现的发展潜力'
+  }
+  return desc[dimension] || ''
+}
+
+// 获取状态样式
+const getStatusStyle = (score) => {
+  if (score >= 80) {
+    return { backgroundColor: '#1989fa', color: '#ffffff', border: 'none' }
+  } else if (score >= 60) {
+    return { backgroundColor: '#409EFF', color: '#ffffff', border: 'none' }
+  } else {
+    return { backgroundColor: '#f56c6c', color: '#ffffff', border: 'none' }
+  }
+}
+
+// 加载匹配数据
 const loadProfileAndMatch = async () => {
-  const loading = ElLoading.service({ text: 'AI 正在分析匹配度...' })
+  const loading = ElLoading.service({ text: 'AI 正在分析匹配度...', background: 'rgba(0,0,0,0.7)' })
   let loadingClosed = false
   const closeLoading = () => {
     if (!loadingClosed) {
@@ -245,18 +333,27 @@ const loadProfileAndMatch = async () => {
           const data = JSON.parse(line.slice(6))
           if (data.type === 'base') {
             const d = data.data
+            const weights = d.weights || {
+              "基础要求": 0.12,
+              "职业技能": 0.50,
+              "职业素养": 0.18,
+              "发展潜力": 0.20
+            }
+            
             matchResult.value.totalScore = d.overall_score
+            matchResult.value.skillFit = d.skill_fit
+            debugInfo.value = d.debug_info
+            
             matchResult.value.dimensionScores = [
-              { dimension: '基础要求', score: d.education_score || 0, weight: 0.2, contribution: ((d.education_score||0)*0.2).toFixed(1) },
-              { dimension: '职业技能', score: d.skill_fit || 0, weight: 0.3, contribution: ((d.skill_fit||0)*0.3).toFixed(1) },
-              { dimension: '职业素养', score: 100 - (d.soft_gap || 0), weight: 0.25, contribution: ((100 - (d.soft_gap||0))*0.25).toFixed(1) },
-              { dimension: '发展潜力', score: d.experience_score || 0, weight: 0.25, contribution: ((d.experience_score||0)*0.25).toFixed(1) }
+              { dimension: '基础要求', score: d.education_score || 0, weight: weights["基础要求"], contribution: ((d.education_score || 0) * weights["基础要求"]).toFixed(1) },
+              { dimension: '职业技能', score: d.skill_fit || 0, weight: weights["职业技能"], contribution: ((d.skill_fit || 0) * weights["职业技能"]).toFixed(1) },
+              { dimension: '职业素养', score: 100 - (d.soft_gap || 0), weight: weights["职业素养"], contribution: ((100 - (d.soft_gap || 0)) * weights["职业素养"]).toFixed(1) },
+              { dimension: '发展潜力', score: d.experience_score || 0, weight: weights["发展潜力"], contribution: ((d.experience_score || 0) * weights["发展潜力"]).toFixed(1) }
             ]
-            // 收到基础数据后立即关闭全屏 loading
+            
             closeLoading()
             nextTick(() => initMatchChart())
           } else if (data.type === 'gap') {
-            // 实时更新差距分析字段
             matchResult.value.gapAnalysis[data.field] = data.text
           } else if (data.type === 'done') {
             ElMessage.success('匹配分析完成！')
@@ -278,16 +375,15 @@ const loadProfileAndMatch = async () => {
 // 生成报告
 const generateAndSaveReport = async () => {
   try {
-    ElLoading.service({ text: '正在生成报告...' })
+    const loading = ElLoading.service({ text: '正在生成报告...' })
     localStorage.setItem('lastMatchResult', JSON.stringify(matchResult.value))
     localStorage.setItem('lastMatchJob', jobName.value)
     setTimeout(() => {
       router.push('/career-planning')
       ElMessage.success('生涯规划报告生成成功！')
-      ElLoading.service().close()
+      loading.close()
     }, 800)
   } catch (e) {
-    ElLoading.service().close()
     ElMessage.error('报告生成失败')
   }
 }
@@ -322,13 +418,13 @@ const handleSearch = () => {
   }
   router.push(`/search?keyword=${encodeURIComponent(keyword)}`)
   searchKeyword.value = ''
-  ElMessage.success(`正在搜索：${keyword}`)
 }
 
 // 评分等级
 const getScoreLevelColor = () => {
   if (matchResult.value.totalScore >= 85) return '#1989fa'
   if (matchResult.value.totalScore >= 70) return '#409EFF'
+  if (matchResult.value.totalScore >= 60) return '#f59e0b'
   return '#f56c6c'
 }
 const getScoreLevelText = () => {
@@ -338,11 +434,17 @@ const getScoreLevelText = () => {
   return '匹配度较低'
 }
 const getMatchSuggestion = () => {
-  // 如果分数已显示但差距分析尚未返回，显示友好提示
   if (matchResult.value.totalScore > 0 && !matchResult.value.gapAnalysis?.base) {
-    return '正在生成详细建议...'
+    return '🤖 AI 正在生成详细建议...'
   }
-  return matchResult.value.gapAnalysis?.base || 'AI 正在生成建议...'
+  const base = matchResult.value.gapAnalysis?.base || ''
+  if (matchResult.value.totalScore >= 80) {
+    return `🎉 恭喜！你的综合匹配度较高。${base}`
+  } else if (matchResult.value.totalScore >= 60) {
+    return `💪 你的基础条件不错，还有提升空间。${base}`
+  } else {
+    return `📌 当前匹配度有待提升，以下是具体建议：${base}`
+  }
 }
 
 // 导出 PDF
@@ -403,34 +505,50 @@ const changeJob = () => {
 }
 
 // 图表
-let radarChart = null
+let chartInstance = null
 let resizeListener = null
+
 const initMatchChart = () => {
   const dom = document.getElementById('match-chart')
   if (!dom) return
-  if (echarts.getInstanceByDom(dom)) echarts.dispose(dom)
-  const chart = echarts.init(dom)
-  radarChart = chart
+  if (chartInstance) chartInstance.dispose()
+  
+  chartInstance = echarts.init(dom)
   const data = matchResult.value.dimensionScores || []
+  
   const option = {
-    backgroundColor: '#fff',
-    title: { text: '人岗匹配维度对比', left: 'center' },
-    legend: { data: ['岗位要求', '我的能力'], bottom: 0 },
-    xAxis: { type: 'category', data: data.map(i => i.dimension) },
-    yAxis: { type: 'value', max: 100 },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    legend: { data: ['你的匹配度', '岗位基准线'], bottom: 0, left: 'center' },
+    grid: { left: '10%', right: '5%', top: '15%', bottom: '10%', containLabel: true },
+    xAxis: { type: 'category', data: data.map(i => i.dimension), axisLabel: { fontSize: 12, fontWeight: 'bold' } },
+    yAxis: { type: 'value', name: '匹配分数', max: 100, axisLabel: { formatter: '{value}分' } },
     series: [
-      { name: '岗位要求', type: 'bar', data: [90,95,85,88], itemStyle: { color: '#66b1ff' } },
-      { name: '我的能力', type: 'bar', data: data.map(i=>i.score), itemStyle: { color: '#409EFF' } }
+      {
+        name: '你的匹配度',
+        type: 'bar',
+        data: data.map(i => i.score),
+        itemStyle: { borderRadius: [6, 6, 0, 0], color: '#409EFF' },
+        label: { show: true, position: 'top', formatter: '{c}分', fontWeight: 'bold' }
+      },
+      {
+        name: '岗位基准线',
+        type: 'line',
+        data: [75, 75, 75, 75],
+        symbol: 'none',
+        lineStyle: { color: '#f56c6c', width: 2, type: 'dashed' },
+        label: { show: true, position: 'top', formatter: '基准线', color: '#f56c6c' }
+      }
     ]
   }
-  chart.setOption(option)
-  resizeListener = () => chart.resize()
+  
+  chartInstance.setOption(option)
+  resizeListener = () => chartInstance?.resize()
   window.addEventListener('resize', resizeListener)
 }
 
 onUnmounted(() => {
   if (resizeListener) window.removeEventListener('resize', resizeListener)
-  if (radarChart) radarChart.dispose()
+  if (chartInstance) chartInstance.dispose()
 })
 
 onMounted(() => {
@@ -445,6 +563,40 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.star-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.star-rating .star {
+  font-size: 16px;
+  color: #e4e7ed;
+  transition: color 0.2s;
+}
+
+.star-rating .star.active {
+  color: #f7ba2a;
+}
+
+.star-rating .score-number {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #909399;
+}
+
+/* 暗黑模式适配 */
+.job-match-container.dark .star-rating .star {
+  color: #4b5563;
+}
+
+.job-match-container.dark .star-rating .star.active {
+  color: #fbbf24;
+}
+
+.job-match-container.dark .star-rating .score-number {
+  color: #9ca3af;
+}
 .job-match-container {
   padding: 0;
   background-color: #fff;

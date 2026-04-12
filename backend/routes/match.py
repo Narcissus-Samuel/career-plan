@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, Response, stream_with_context
 from db import get_db
 import json
 import time
@@ -9,15 +9,24 @@ from routes.auth import token_required
 
 match_bp = Blueprint('match', __name__, url_prefix='/api/match')
 
+# ====================== 全局配置 ======================
+DEFAULT_WEIGHTS = {
+    "基础要求": 0.12,
+    "职业技能": 0.50,
+    "职业素养": 0.18,
+    "发展潜力": 0.20
+}
+
+def get_weights():
+    return DEFAULT_WEIGHTS.copy()
+
 
 # ====================== 工具函数 ======================
 def extract_years_from_text(text):
-    """从文本中提取年限（估算，如“2年”、“18个月”）。"""
     if not text:
         return 0.0
     text = str(text)
     years = 0.0
-
     for m in re.findall(r'(\d+(?:\.\d+)?)\s*(?:年|yrs?|years?)', text, flags=re.IGNORECASE):
         try:
             years += float(m)
@@ -32,11 +41,9 @@ def extract_years_from_text(text):
 
 
 def extract_experience_requirement(text):
-    """从岗位描述文本中提取招聘经验要求（min_year, max_year）。"""
     if not text:
         return None
     text = str(text)
-
     m = re.search(r'(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*年', text)
     if m:
         return float(m.group(1)), float(m.group(2))
@@ -52,7 +59,6 @@ def extract_experience_requirement(text):
 
 
 def normalize_education_level(level):
-    """将教育文本映射为数值等级。"""
     if not level:
         return None
     level = str(level).strip().lower()
@@ -69,9 +75,220 @@ def normalize_education_level(level):
     return None
 
 
+# ====================== 学校层次加成 ======================
+def get_school_level(school_name):
+    """识别学校层次，返回加成系数"""
+    if not school_name:
+        return 1.0
+    
+    # C9/顶尖高校
+    top_schools = ['清华大学', '北京大学', '复旦大学', '上海交通大学', '浙江大学', 
+                   '中国科学技术大学', '南京大学', '西安交通大学', '哈尔滨工业大学',
+                   '华中科技大学', '武汉大学', '中山大学', '四川大学', '南开大学',
+                   '天津大学', '山东大学', '东南大学', '吉林大学', '厦门大学', '同济大学',
+                   '北京航空航天大学', '北京理工大学', '中国人民大学', '中南大学', '大连理工大学']
+    
+    for top in top_schools:
+        if top in school_name:
+            return 1.15
+    
+    # 普通本科
+    if '大学' in school_name and len(school_name) <= 15:
+        return 1.05
+    
+    return 1.0
+
+
+# ====================== 大类预筛选（专业为主） ======================
+def get_relevant_categories(student_ability):
+    """
+    根据学生的专业（主）、兴趣（辅）、技能（兜底），返回最相关的一个大类 ID
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name FROM job_categories")
+    all_cats = cursor.fetchall()
+    conn.close()
+
+    # ========== 第一优先级：专业关键词匹配 ==========
+    major = student_ability.get('major') or ''
+    if major:
+        major_lower = major.lower()
+        
+        major_to_cat = {
+            '计算机': '技术研发',
+            '软件': '技术研发',
+            '人工智能': '技术研发',
+            '数据科学': '技术研发',
+            '电子信息': '技术研发',
+            '通信': '技术研发',
+            '自动化': '技术研发',
+            '设计': '产品设计',
+            '艺术': '产品设计',
+            '视觉': '产品设计',
+            '动画': '产品设计',
+            '市场': '市场营销',
+            '营销': '市场营销',
+            '工商': '市场营销',
+            '管理': '运营管理',
+            '人力': '运营管理',
+            '行政': '行政办公',
+            '中文': '运营管理',
+            '新闻': '运营管理',
+            '传播': '运营管理',
+            '英语': '行政办公',
+            '法学': '行政办公'
+        }
+        
+        for kw, cat_name in major_to_cat.items():
+            if kw in major_lower:
+                for cat in all_cats:
+                    if cat['name'] == cat_name:
+                        print(f"[大类筛选] 专业匹配: {major} → {cat_name}")
+                        return [cat['id']]
+
+    # ========== 第二优先级：兴趣测评 ==========
+    interest = student_ability.get('interest', {})
+    if interest:
+        interest_to_cat = {
+            'I': '技术研发',
+            'R': '技术研发',
+            'A': '产品设计',
+            'E': '市场营销',
+            'S': '运营管理',
+            'C': '行政办公'
+        }
+        top_dim = max(interest.items(), key=lambda x: x[1])[0]
+        pref_cat_name = interest_to_cat.get(top_dim, '')
+        if pref_cat_name:
+            for cat in all_cats:
+                if cat['name'] == pref_cat_name:
+                    print(f"[大类筛选] 兴趣匹配: 最高维度 {top_dim} → {pref_cat_name}")
+                    return [cat['id']]
+
+    # ========== 第三优先级：技能关键词匹配 ==========
+    skills = student_ability.get('skills', set())
+    skill_to_cat = {
+        '技术研发': ['python', 'java', 'javascript', 'vue', 'react', 'c++', 'sql', '算法', '开发', '编程', 'html', 'css'],
+        '产品设计': ['ui', 'ux', '设计', 'figma', 'ps', 'ai', 'sketch', '产品'],
+        '市场营销': ['市场', '营销', '销售', '推广', '品牌', '广告', 'crm'],
+        '运营管理': ['运营', '管理', '项目', '协调', 'pm', 'excel', 'word'],
+        '行政办公': ['行政', '办公', '人事', '招聘', '文员']
+    }
+    
+    for cat_name, keywords in skill_to_cat.items():
+        if any(kw in skill.lower() for skill in skills for kw in keywords):
+            for cat in all_cats:
+                if cat['name'] == cat_name:
+                    print(f"[大类筛选] 技能匹配: {cat_name}")
+                    return [cat['id']]
+
+        # ========== 默认：返回技术研发大类 ==========
+    for cat in all_cats:
+        if cat['name'] == '软件开发类':
+            print(f"[大类筛选] 默认（技术研发）")
+            return [cat['id']]
+    
+    if all_cats:
+        print(f"[大类筛选] 默认（第一个）: {all_cats[0]['name']}")
+        return [all_cats[0]['id']]
+    return []
+
+
+# ====================== 专业相关度计算 ======================
+def get_major_relevance(student_ability, job_ability):
+    major = student_ability.get('major') or ''
+    if not major:
+        return 1.0
+    
+    major_lower = major.lower()
+    job_skills = job_ability.get('skills', set())
+    job_skills_str = ' '.join(job_skills).lower()
+    
+    if any(kw in major_lower for kw in ['计算机', '软件', '人工智能', '数据科学', '电子信息']):
+        tech_keywords = ['python', 'java', 'javascript', 'vue', 'react', 'sql', '算法', '开发', '编程']
+        tech_match = sum(1 for kw in tech_keywords if kw in job_skills_str)
+        if tech_match >= 2:
+            return 1.30
+        return 1.15
+    
+    if any(kw in major_lower for kw in ['设计', '艺术', '视觉']):
+        design_keywords = ['ui', 'ux', '设计', 'photoshop', 'figma', 'sketch']
+        design_match = sum(1 for kw in design_keywords if kw in job_skills_str)
+        if design_match >= 1:
+            return 1.20
+        return 1.0
+    
+    if any(kw in major_lower for kw in ['管理', '营销', '经济', '金融', '工商']):
+        business_keywords = ['产品', '运营', '市场', '分析', '管理']
+        business_match = sum(1 for kw in business_keywords if kw in job_skills_str)
+        if business_match >= 1:
+            return 1.15
+        return 0.95
+    
+    return 0.85
+
+
+# ====================== 核心技能覆盖固定加分 ======================
+def get_core_skill_bonus(student_skills, job_skills):
+    if not job_skills or not student_skills:
+        return 0.0
+    
+    core_skills = list(job_skills)[:3] if len(job_skills) >= 3 else list(job_skills)
+    if not core_skills:
+        return 0.0
+    
+    covered = sum(1 for s in core_skills if s in student_skills)
+    
+    if covered >= 3:
+        return 0.35
+    elif covered == 2:
+        return 0.25
+    elif covered == 1:
+        return 0.15
+    else:
+        return 0.0
+
+
+# ====================== 技能深度固定加分 ======================
+def get_skill_depth(student_ability, job_skills):
+    """从项目经历中提取技术栈，评估技能深度，返回加成（0~0.3）"""
+    project_techs = set()
+    for proj in student_ability.get('project_json', []):
+        tech_stack = proj.get('technology_stack', '')
+        if tech_stack:
+            # 如果 tech_stack 是列表，直接遍历
+            if isinstance(tech_stack, list):
+                for tech in tech_stack:
+                    tech_clean = tech.lower().strip()
+                    if tech_clean:
+                        project_techs.add(tech_clean)
+            # 如果是字符串，按分隔符拆分
+            elif isinstance(tech_stack, str):
+                for tech in re.split(r'[,、，]', tech_stack):
+                    tech_clean = tech.lower().strip()
+                    if tech_clean:
+                        project_techs.add(tech_clean)
+    
+    if not project_techs or not job_skills:
+        return 0.0
+    
+    job_skills_lower = {s.lower() for s in job_skills}
+    intersection = project_techs & job_skills_lower
+    matched_count = len(intersection)
+    
+    if matched_count >= 5:
+        return 0.30
+    elif matched_count >= 3:
+        return 0.20
+    elif matched_count >= 1:
+        return 0.10
+    else:
+        return 0.0
+
+
 # ====================== 学生能力获取 ======================
 def get_student_ability(student_id):
-    """获取学生能力画像，同时从 assessment_results 表获取最新兴趣测评得分"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
@@ -88,14 +305,26 @@ def get_student_ability(student_id):
     certificates = set(json.loads(row['certificates']) if row['certificates'] else [])
     soft_abilities = json.loads(row['soft_abilities']) if row['soft_abilities'] else {}
 
-    internships = row['internships'] if 'internships' in row.keys() else ''
-    major = row['major'] if 'major' in row.keys() else None
-    grade = row['grade'] if 'grade' in row.keys() else None
-
-    estimated_exp = extract_years_from_text(internships or '')
-
     education_json = json.loads(row['education_json']) if row['education_json'] else {}
+    degree = education_json.get('degree', '')
+    school_name = education_json.get('school', '')
+    if degree:
+        student_edu = normalize_education_level(degree)
+    else:
+        student_edu = normalize_education_level(row['grade'] or row['major'])
+
     work_json = json.loads(row['work_json']) if row['work_json'] else []
+    total_months = 0
+    for exp in work_json:
+        date_range = exp.get('date_range', '')
+        match = re.search(r'(\d{4})\.(\d{1,2})-(\d{4})\.(\d{1,2})', date_range)
+        if match:
+            start_year, start_month, end_year, end_month = map(int, match.groups())
+            total_months += (end_year - start_year) * 12 + (end_month - start_month)
+    estimated_exp = total_months / 12.0
+    if estimated_exp == 0:
+        estimated_exp = extract_years_from_text(row['internships'] or '')
+
     project_json = json.loads(row['project_json']) if row['project_json'] else []
 
     student = {
@@ -103,13 +332,14 @@ def get_student_ability(student_id):
         'certificates': certificates,
         'soft_abilities': soft_abilities,
         'user_id': row['user_id'],
-        'major': major,
-        'grade': grade,
-        'internships': internships,
+        'major': row['major'] or '',
+        'grade': row['grade'] or '',
+        'internships': row['internships'] or '',
         'experience_years': estimated_exp,
         'education_json': education_json,
         'work_json': work_json,
-        'project_json': project_json
+        'project_json': project_json,
+        'school_name': school_name
     }
 
     if student['user_id']:
@@ -127,15 +357,11 @@ def get_student_ability(student_id):
 # ====================== 岗位能力获取（带缓存） ======================
 @lru_cache(maxsize=256)
 def get_job_abilities(job_name):
-    """
-    从 job_profile 和 job 表获取岗位画像信息
-    """
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('SELECT skills, certificates, soft_abilities FROM job_profile WHERE job_name = ?', (job_name,))
     row = cursor.fetchone()
 
-    # 额外从 job 表抓取可能的 experience 要求与教育要求
     cursor.execute('SELECT job_description FROM job WHERE job_name = ?', (job_name,))
     job_row = cursor.fetchone()
     conn.close()
@@ -150,8 +376,9 @@ def get_job_abilities(job_name):
         }
 
     job_description = ''
-    if job_row:
-        job_description = job_row['job_description'] if 'job_description' in job_row.keys() and job_row['job_description'] else ''
+    if job_row and 'job_description' in job_row.keys() and job_row['job_description']:
+        job_description = job_row['job_description']
+    
     exp_req = extract_experience_requirement(job_description)
 
     edu_req = None
@@ -168,70 +395,193 @@ def get_job_abilities(job_name):
     }
 
 
-# ====================== 大类预筛选 ======================
-def get_relevant_categories(student_ability):
-    """
-    根据学生的专业、兴趣、技能，返回可能感兴趣的大类 ID 列表（最多5个）
-    """
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name FROM job_categories")
-    all_cats = cursor.fetchall()
-    conn.close()
+# ====================== 匹配度计算 ======================
+def compute_match(student_ability, job_ability, generate_gap=False):
+    # ========== 1. 技能匹配 ==========
+    if student_ability['skills'] and job_ability['skills']:
+        skill_inter = student_ability['skills'] & job_ability['skills']
+        skill_union = student_ability['skills'] | job_ability['skills']
+        base_skill_sim = len(skill_inter) / len(skill_union) if skill_union else 0.0
+    else:
+        base_skill_sim = 0.0
+    
+    core_bonus = get_core_skill_bonus(student_ability['skills'], job_ability['skills'])
+    depth_bonus = get_skill_depth(student_ability, job_ability['skills'])
+    
+    skill_sim = min(1.0, base_skill_sim + core_bonus + depth_bonus)
+    major_relevance = get_major_relevance(student_ability, job_ability)
+    skill_sim = min(1.0, skill_sim * major_relevance)
 
-    # 规则1：兴趣映射（如果有兴趣测评）
-    interest = student_ability.get('interest', {})
-    interest_to_cat = {
-        'I': '技术研发',
-        'R': '技术研发',
-        'A': '产品设计',
-        'E': '市场营销',
-        'S': '运营管理',
-        'C': '行政办公'
+    # ========== 2. 证书覆盖率 ==========
+    if student_ability['certificates'] and job_ability['certificates']:
+        cert_cov = len(student_ability['certificates'] & job_ability['certificates']) / len(job_ability['certificates'])
+    else:
+        cert_cov = 0.0
+
+    # ========== 3. 软能力相似度（分差加大） ==========
+    stu_soft = student_ability.get('soft_abilities', {})
+    job_soft = job_ability.get('soft_abilities', {})
+    common_dims = set(stu_soft.keys()) & set(job_soft.keys())
+    if common_dims:
+        stu_vec = [float(stu_soft[d].get('score', 0)) for d in common_dims]
+        job_vec = [float(job_soft[d].get('score', 0)) for d in common_dims]
+        dot = sum(a * b for a, b in zip(stu_vec, job_vec))
+        norm_stu = sum(a * a for a in stu_vec) ** 0.5
+        norm_job = sum(b * b for b in job_vec) ** 0.5
+        soft_sim = dot / (norm_stu * norm_job) if norm_stu and norm_job else 0.0
+        soft_gap = 1 - soft_sim
+    else:
+        soft_sim = 0.0
+        soft_gap = 1.0
+    
+    # 软能力得分映射：将相似度映射到0-100分，分差更大
+    # 相似度0.9以上 → 95-100分，0.7-0.9 → 70-89分，0.5-0.7 → 50-69分，低于0.5 → 0-49分
+    soft_score_raw = soft_sim * 100
+    if soft_sim >= 0.9:
+        soft_score = min(100, soft_score_raw + 5)  # 优秀加分
+    elif soft_sim >= 0.7:
+        soft_score = soft_score_raw
+    elif soft_sim >= 0.5:
+        soft_score = soft_score_raw - 10  # 中等扣分
+    else:
+        soft_score = soft_score_raw * 0.6  # 低分严重扣分
+    soft_score = max(0, min(100, soft_score))
+
+    # ========== 4. 教育背景匹配（分差加大：985/211/一本/二本/专科分差20分左右） ==========
+    student_edu = None
+    school_name = student_ability.get('school_name', '')
+    if 'education_json' in student_ability and student_ability['education_json']:
+        degree = student_ability['education_json'].get('degree', '')
+        if degree:
+            student_edu = normalize_education_level(degree)
+    if student_edu is None:
+        student_edu = normalize_education_level(student_ability.get('grade') or student_ability.get('major'))
+    
+    required_edu = job_ability.get('education_required')
+    
+    # 学历基础分（硕士/本科/专科分差20分）
+    if student_edu is None:
+        edu_base_score = 40  # 未知学历
+    elif student_edu >= 3:  # 硕士及以上
+        edu_base_score = 100
+    elif student_edu >= 2:  # 本科
+        edu_base_score = 80
+    elif student_edu >= 1:  # 大专
+        edu_base_score = 60
+    else:  # 高中及以下
+        edu_base_score = 40
+    
+    # 岗位要求学历分
+    if required_edu is None:
+        job_edu_score = 60  # 无要求，按本科基准
+    elif required_edu >= 3:
+        job_edu_score = 100
+    elif required_edu >= 2:
+        job_edu_score = 80
+    elif required_edu >= 1:
+        job_edu_score = 60
+    else:
+        job_edu_score = 40
+    
+    # 学历匹配分：学生学历分 - 岗位要求分，差距每级扣20分
+    edu_match_score = edu_base_score
+    if required_edu is not None and student_edu is not None:
+        edu_gap = student_edu - required_edu
+        if edu_gap < 0:
+            edu_match_score = max(0, edu_base_score + edu_gap * 20)  # 学历不足每级扣20分
+        elif edu_gap > 0:
+            edu_match_score = min(100, edu_base_score + min(edu_gap, 2) * 10)  # 学历超标最多加20分
+    
+    # 学校层次加成（分差加大）
+    school_bonus = get_school_level(school_name)
+    if school_bonus >= 1.15:
+        school_bonus_score = 20  # 985高校加20分
+    elif school_bonus >= 1.05:
+        school_bonus_score = 10  # 普通本科加10分
+    else:
+        school_bonus_score = 0
+    
+    education_score = min(100, edu_match_score + school_bonus_score)
+
+    # ========== 5. 经验匹配（分差加大） ==========
+    stu_exp = float(student_ability.get('experience_years') or 0.0)
+    exp_req = job_ability.get('experience_requirement')
+    
+    if exp_req:
+        min_req, max_req = exp_req
+        if min_req is not None and stu_exp < min_req:
+            # 经验不足，每差1年扣20分
+            gap = min_req - stu_exp
+            exp_score = max(0, 100 - int(gap * 20))
+        elif max_req is not None and stu_exp > max_req:
+            # 经验超标，每超1年扣10分
+            gap = stu_exp - max_req
+            exp_score = max(0, 100 - int(gap * 10))
+        else:
+            exp_score = 100
+    else:
+        # 没有明确要求，根据学生经验给分（分差加大）
+        if stu_exp >= 2:
+            exp_score = 100
+        elif stu_exp >= 1:
+            exp_score = 80
+        elif stu_exp >= 0.5:
+            exp_score = 60
+        elif stu_exp > 0:
+            exp_score = 40
+        else:
+            exp_score = 20  # 无实习经验给低分
+
+    # ========== 6. 证书匹配（分差加大） ==========
+    cert_score = cert_cov * 100
+
+    # ========== 7. 综合得分（调整权重） ==========
+    weights = get_weights()
+    total = (
+        weights["职业技能"] * (skill_sim * 100) +
+        weights["职业素养"] * soft_score +
+        weights["基础要求"] * education_score +
+        weights["发展潜力"] * exp_score +
+        0.03 * cert_score
+    ) / 100
+    total = max(0.0, min(1.0, total))
+
+    match_detail = {
+        'overall_score': round(total * 100, 1),
+        'skill_fit': round(skill_sim * 100, 1),
+        'soft_gap': round(soft_gap * 100, 1),
+        'cert_coverage': round(cert_cov * 100, 1),
+        'education_score': round(education_score, 1),
+        'experience_score': round(exp_score, 1),
+        'debug_info': {
+            'base_skill_sim': round(base_skill_sim * 100, 1),
+            'core_bonus': round(core_bonus * 100, 1),
+            'depth_bonus': round(depth_bonus * 100, 1),
+            'major_relevance': round(major_relevance, 2),
+            'edu_base_score': edu_base_score,
+            'edu_match_score': edu_match_score,
+            'school_bonus_score': school_bonus_score,
+            'soft_score': soft_score
+        }
     }
-    if interest:
-        # 取兴趣得分最高的维度
-        top_dim = max(interest.items(), key=lambda x: x[1])[0]  # 如 'I'
-        pref_cat_name = interest_to_cat.get(top_dim, '')
-        if pref_cat_name:
-            pref_cat_ids = [c['id'] for c in all_cats if c['name'] == pref_cat_name]
-            if pref_cat_ids:
-                return pref_cat_ids[:3]
 
-    # 规则2：专业关键词匹配
-    major = student_ability.get('major', '') or ''
-    major_lower = major.lower()
-    keyword_to_cat = {
-        '计算机': '技术研发',
-        '软件': '技术研发',
-        '设计': '产品设计',
-        '市场': '市场营销',
-        '营销': '市场营销',
-        '人力': '运营管理',
-        '行政': '行政办公'
-    }
-    for kw, cat_name in keyword_to_cat.items():
-        if kw in major_lower:
-            cat_ids = [c['id'] for c in all_cats if c['name'] == cat_name]
-            if cat_ids:
-                return cat_ids[:3]
-
-    # 默认：返回前三个大类（或全量）
-    return [c['id'] for c in all_cats[:3]]
+    if generate_gap:
+        match_detail['gap_analysis'] = generate_gap_analysis_with_llm(student_ability, job_ability, match_detail)
+    else:
+        match_detail['gap_analysis'] = {}
+    return match_detail
 
 
-# ====================== 差距分析生成（仅用于详情接口） ======================
+# ====================== 差距分析生成 ======================
 def generate_gap_analysis_with_llm(student_ability, job_ability, match_detail):
-    """
-    使用大模型根据具体差距生成分析建议
-    """
     need_skills = list(job_ability['skills'] - student_ability['skills'])
     need_certs = list(job_ability['certificates'] - student_ability['certificates'])
 
     soft_gaps = []
     for dim, job_val in job_ability['soft_abilities'].items():
         stu_val = student_ability['soft_abilities'].get(dim, {}).get('score', 0)
-        if job_val.get('score', 0) > stu_val + 1:
+        job_score = job_val.get('score', 0)
+        if isinstance(job_score, (int, float)) and job_score > stu_val + 1:
             soft_gaps.append(dim)
 
     prompt = f"""
@@ -260,6 +610,8 @@ def generate_gap_analysis_with_llm(student_ability, job_ability, match_detail):
 """
     try:
         result = call_llm(prompt, temperature=0.7, max_tokens=800)
+        if not result:
+            raise ValueError("LLM 返回空结果")
         json_match = re.search(r'```json\n(.*?)\n```', result, re.DOTALL)
         if json_match:
             result = json_match.group(1)
@@ -270,7 +622,7 @@ def generate_gap_analysis_with_llm(student_ability, job_ability, match_detail):
                 if field == 'recommended_resources':
                     analysis[field] = "推荐 Coursera、慕课网、书籍等学习资源，并结合项目实战提升。"
                 else:
-                    analysis[field] = f"暂无具体建议，请针对{field}加强学习。"
+                    analysis[field] = f"请针对{field}加强学习。"
         return analysis
     except Exception as e:
         print(f"大模型生成差距分析失败：{e}")
@@ -283,94 +635,9 @@ def generate_gap_analysis_with_llm(student_ability, job_ability, match_detail):
         }
 
 
-# ====================== 匹配度计算（核心） ======================
-def compute_match(student_ability, job_ability, generate_gap=False):
-    """
-    计算学生与岗位的匹配度，可选择是否生成 LLM 差距分析
-    """
-    # 技能相似度（Jaccard）
-    if student_ability['skills'] and job_ability['skills']:
-        skill_inter = student_ability['skills'] & job_ability['skills']
-        skill_union = student_ability['skills'] | job_ability['skills']
-        skill_sim = len(skill_inter) / len(skill_union)
-    else:
-        skill_sim = 0.0
-
-    # 证书覆盖率
-    if student_ability['certificates'] and job_ability['certificates']:
-        cert_cov = len(student_ability['certificates'] & job_ability['certificates']) / len(job_ability['certificates'])
-    else:
-        cert_cov = 0.0
-
-    # 软能力相似度（余弦）
-    all_dims = set(student_ability.get('soft_abilities', {}).keys()) | set(job_ability.get('soft_abilities', {}).keys())
-    if all_dims:
-        stu_vec = [student_ability.get('soft_abilities', {}).get(d, {}).get('score', 0) for d in all_dims]
-        job_vec = [job_ability.get('soft_abilities', {}).get(d, {}).get('score', 0) for d in all_dims]
-        dot = sum(a * b for a, b in zip(stu_vec, job_vec))
-        norm_stu = sum(a * a for a in stu_vec) ** 0.5
-        norm_job = sum(b * b for b in job_vec) ** 0.5
-        soft_sim = dot / (norm_stu * norm_job) if norm_stu and norm_job else 0.0
-    else:
-        soft_sim = 0.0
-
-    # 教育背景匹配
-    education_score = 1.0
-    student_edu = normalize_education_level(student_ability.get('grade') or student_ability.get('major'))
-    required_edu = job_ability.get('education_required')
-    if required_edu is not None:
-        if student_edu is None:
-            education_score = 0.7
-        elif student_edu >= required_edu:
-            education_score = 1.0
-        else:
-            education_score = max(0.0, 1.0 - (required_edu - student_edu) * 0.25)
-
-    # 经验匹配
-    exp_score = 1.0
-    stu_exp = float(student_ability.get('experience_years') or 0.0)
-    exp_req = job_ability.get('experience_requirement')
-    if exp_req:
-        min_req, max_req = exp_req
-        if min_req is not None and stu_exp < min_req:
-            exp_score = max(0.0, 1.0 - (min_req - stu_exp) / max(min_req, 1.0))
-        elif max_req is not None and stu_exp > max_req:
-            exp_score = max(0.0, 1.0 - (stu_exp - max_req) / max(max_req, 1.0) * 0.5)
-        else:
-            exp_score = 1.0
-
-    # 综合得分（权重调整）
-    w_skill = 0.45
-    w_soft = 0.20
-    w_cert = 0.10
-    w_exp = 0.15
-    w_edu = 0.10
-    total = w_skill * skill_sim + w_soft * soft_sim + w_cert * cert_cov + w_exp * exp_score + w_edu * education_score
-    total = max(0.0, min(1.0, total))
-
-    match_detail = {
-        'overall_score': round(total * 100, 1),
-        'skill_fit': round(skill_sim * 100, 1),
-        'soft_gap': round((1 - soft_sim) * 100, 1),
-        'cert_coverage': round(cert_cov * 100, 1),
-        'education_score': round(education_score * 100, 1),
-        'experience_score': round(exp_score * 100, 1)
-    }
-
-    if generate_gap:
-        match_detail['gap_analysis'] = generate_gap_analysis_with_llm(student_ability, job_ability, match_detail)
-    else:
-        match_detail['gap_analysis'] = {}   # 前端可显示“点击查看详细分析”
-    return match_detail
-
-
-# ====================== 接口：推荐岗位列表（优化版，无 LLM 调用） ======================
+# ====================== 接口：推荐岗位列表 ======================
 @match_bp.route('/recommend', methods=['GET'])
 def recommend():
-    """
-    获取推荐岗位列表（基于大类预筛选 + 唯一岗位名称去重 + 缓存）
-    仅计算匹配分数，不生成 LLM 差距分析，响应速度快
-    """
     student_id = request.args.get('student_id', type=int)
     limit = request.args.get('limit', 10, type=int)
 
@@ -384,13 +651,11 @@ def recommend():
     if not student_ability.get('skills'):
         return jsonify({'error': '学生能力数据不完整，请先完善技能信息'}), 400
 
-    # 获取相关的大类ID
     relevant_cat_ids = get_relevant_categories(student_ability)
 
     conn = get_db()
     cursor = conn.cursor()
 
-    # 根据大类筛选唯一的岗位名称
     if relevant_cat_ids:
         placeholders = ','.join('?' for _ in relevant_cat_ids)
         cursor.execute(f"""
@@ -404,7 +669,6 @@ def recommend():
     unique_job_names = [row['job_name'] for row in cursor.fetchall()]
     conn.close()
 
-    # 降级：如果没有找到任何岗位，使用 job_profile 中的名称
     if not unique_job_names:
         conn = get_db()
         cursor = conn.cursor()
@@ -417,8 +681,8 @@ def recommend():
 
     results = []
     for job_name in unique_job_names:
-        job_ability = get_job_abilities(job_name)   # 已加缓存
-        match_detail = compute_match(student_ability, job_ability, generate_gap=False)  # 关键：不生成分析
+        job_ability = get_job_abilities(job_name)
+        match_detail = compute_match(student_ability, job_ability, generate_gap=False)
         item = {'job_name': job_name, **match_detail}
         if 'interest' in student_ability:
             item['interest_scores'] = student_ability['interest']
@@ -430,12 +694,9 @@ def recommend():
     return jsonify({'results': filtered, 'total': len(results)})
 
 
-# ====================== 接口：单岗位详细匹配（生成 LLM 分析并保存） ======================
+# ====================== 接口：单岗位详细匹配 ======================
 @match_bp.route('/match', methods=['POST'])
 def match():
-    """
-    计算指定岗位的详细匹配度，并生成 LLM 差距分析（用于报告生成）
-    """
     data = request.json
     student_id = data.get('student_id')
     job_name = data.get('job_name')
@@ -450,9 +711,8 @@ def match():
         return jsonify({'error': '学生能力数据不完整，请先完善技能信息'}), 400
 
     job_ability = get_job_abilities(job_name)
-    match_detail = compute_match(student_ability, job_ability, generate_gap=True)   # 这里生成分析
+    match_detail = compute_match(student_ability, job_ability, generate_gap=True)
 
-    # 保存到数据库（确保 details 完整）
     try:
         conn = get_db()
         cursor = conn.cursor()
@@ -469,11 +729,12 @@ def match():
             int(time.time())
         ))
         conn.commit()
-        print("✅ 匹配记录已保存，details=", details_json)
+        print("✅ 匹配记录已保存")
     except Exception as e:
         print("❌ 保存失败：", e)
     finally:
-        conn.close()
+        if 'conn' in locals():
+            conn.close()
 
     return jsonify(match_detail)
 
@@ -499,19 +760,15 @@ def get_match_history(student_id):
             'id': r['id'],
             'job_name': r['job_name'],
             'match_score': r['match_score'],
-            'details': r['details'],   # 包含完整的 gap_analysis
+            'details': r['details'],
             'created_at': r['created_at']
         })
     return jsonify({'history': history})
-# ====================== 流式匹配接口（边生成边返回） ======================
-from flask import Response, stream_with_context
-import time
 
+
+# ====================== 流式匹配接口 ======================
 @match_bp.route('/match-stream', methods=['POST'])
 def match_stream():
-    """
-    流式生成人岗匹配报告，实时返回匹配分数和差距分析的各部分内容
-    """
     data = request.json
     student_id = data.get('student_id')
     job_name = data.get('job_name')
@@ -525,33 +782,26 @@ def match_stream():
         return jsonify({'error': '学生能力数据不完整，请先完善技能信息'}), 400
 
     job_ability = get_job_abilities(job_name)
-
-    # 先计算匹配分数（不调用 LLM）
     match_detail = compute_match(student_ability, job_ability, generate_gap=False)
 
     def generate():
-        # 1. 发送基础分数（一次性）
         base_info = {
             'overall_score': match_detail['overall_score'],
             'skill_fit': match_detail['skill_fit'],
             'soft_gap': match_detail['soft_gap'],
             'cert_coverage': match_detail['cert_coverage'],
             'education_score': match_detail['education_score'],
-            'experience_score': match_detail['experience_score']
+            'experience_score': match_detail['experience_score'],
+            'debug_info': match_detail.get('debug_info', {})
         }
         yield f"data: {json.dumps({'type': 'base', 'data': base_info})}\n\n"
 
-        # 2. 生成差距分析（流式）
-        # 调用 LLM 获取五个字段的文本，为了流式效果，我们一次性生成后拆分发送（模拟流式）
-        # 如果您的 call_llm 支持流式，可改为真正的 token 级流式；这里先使用同步生成再拆分。
         full_analysis = generate_gap_analysis_with_llm(student_ability, job_ability, match_detail)
-        # 按字段逐个发送
         for key in ['base', 'skills', 'quality', 'potential', 'recommended_resources']:
             text = full_analysis.get(key, '')
             yield f"data: {json.dumps({'type': 'gap', 'field': key, 'text': text})}\n\n"
-            time.sleep(0.05)  # 轻微延迟，让前端感知流式
+            time.sleep(0.03)
 
-        # 3. 保存完整匹配结果到数据库（可选）
         match_detail['gap_analysis'] = full_analysis
         try:
             conn = get_db()
@@ -572,9 +822,9 @@ def match_stream():
         except Exception as e:
             print("保存失败", e)
         finally:
-            conn.close()
+            if 'conn' in locals():
+                conn.close()
 
-        # 4. 发送完成信号
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
