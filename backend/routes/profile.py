@@ -2,6 +2,7 @@ import os
 import time
 import json
 import tempfile
+import re
 from flask import Blueprint, request, jsonify
 from werkzeug.utils import secure_filename
 from db import get_db
@@ -14,21 +15,142 @@ profile_bp = Blueprint('profile', __name__, url_prefix='/api/profile')
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx'}
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
-# 【固定必须返回的5个软能力维度】
+# 默认软能力（改为数字，避免 NaN）
 REQUIRED_SOFT_ABILITIES = {
-    "创新能力": {"score": "--", "description": "未详细评估，默认无水平"},
-    "学习能力": {"score": "--", "description": "未详细评估，默认无水平"},
-    "抗压能力": {"score": "--", "description": "未详细评估，默认无水平"},
-    "沟通能力": {"score": "--", "description": "未详细评估，默认无水平"},
-    "实习能力": {"score": "--", "description": "未详细评估，默认无水平"}
+    "创新能力": {"score": 3, "description": "未详细评估，默认中等水平"},
+    "学习能力": {"score": 3, "description": "未详细评估，默认中等水平"},
+    "抗压能力": {"score": 3, "description": "未详细评估，默认中等水平"},
+    "沟通能力": {"score": 3, "description": "未详细评估，默认中等水平"},
+    "实习能力": {"score": 3, "description": "未详细评估，默认中等水平"}
 }
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def parse_major_from_education(education_text, education_json):
+    """从教育信息中解析专业（增强版）"""
+    # 1. 优先从 education_json 获取
+    if education_json and education_json.get('major'):
+        return education_json.get('major')
+    
+    if education_text:
+        # 2. 常见专业关键词列表（按优先级排序）
+        majors = [
+            '计算机科学与技术', '软件工程', '人工智能', '数据科学与大数据技术',
+            '电子信息工程', '通信工程', '自动化', '物联网工程', '网络工程',
+            '信息安全', '数字媒体技术', '智能科学与技术', '电子科学与技术',
+            '微电子科学与工程', '光电信息科学与工程', '信息工程',
+            '工商管理', '市场营销', '会计学', '财务管理', '人力资源管理',
+            '金融学', '经济学', '国际经济与贸易', '电子商务',
+            '法学', '英语', '汉语言文学', '新闻学', '广告学',
+            '设计学', '视觉传达设计', '环境设计', '产品设计', '动画',
+            '土木工程', '机械工程', '电气工程', '材料科学与工程'
+        ]
+        
+        # 精确匹配
+        for major in majors:
+            if major in education_text:
+                return major
+        
+        # 模糊匹配（关键词）
+        major_keywords = {
+            '计算机': '计算机科学与技术',
+            '软件': '软件工程',
+            '人工智能': '人工智能',
+            '数据': '数据科学与大数据技术',
+            '电子信息': '电子信息工程',
+            '通信': '通信工程',
+            '自动化': '自动化',
+            '设计': '设计学',
+            '市场': '市场营销',
+            '工商': '工商管理',
+            '金融': '金融学',
+            '经济': '经济学',
+            '法学': '法学',
+            '英语': '英语',
+            '中文': '汉语言文学',
+            '新闻': '新闻学'
+        }
+        
+        for kw, major_name in major_keywords.items():
+            if kw in education_text:
+                return major_name
+        
+        # 尝试从文本中提取“专业：xxx”格式
+        match = re.search(r'专业[：:]\s*([^,，\s]{2,10})', education_text)
+        if match:
+            return match.group(1)
+        
+        # 尝试提取“XX专业”格式
+        match = re.search(r'([\u4e00-\u9fa5]{2,6})专业', education_text)
+        if match:
+            return match.group(1) + '专业'
+    
+    return ''
+
+
+def calculate_internship_score_from_work(work_json):
+    """根据实习经历自动计算实习能力分数（1-5分）"""
+    if not work_json:
+        return 1
+    
+    total_months = 0
+    company_count = 0
+    has_achievement = False
+    
+    for exp in work_json:
+        date_range = exp.get('date_range', '')
+        match = re.search(r'(\d{4})\.(\d{1,2})-(\d{4})\.(\d{1,2})', date_range)
+        if match:
+            start_year, start_month, end_year, end_month = map(int, match.groups())
+            total_months += (end_year - start_year) * 12 + (end_month - start_month)
+            company_count += 1
+        
+        # 检查是否有量化成果
+        achievements = exp.get('achievements', '')
+        if achievements and any(kw in achievements for kw in ['提升', '优化', '增长', '改善', '完成', '开发']):
+            has_achievement = True
+    
+    # 评分规则
+    if total_months >= 12 and company_count >= 2 and has_achievement:
+        return 5
+    elif total_months >= 12 or (total_months >= 6 and has_achievement):
+        return 4
+    elif total_months >= 6:
+        return 3
+    elif total_months >= 3:
+        return 2
+    elif total_months > 0:
+        return 2
+    else:
+        return 1
+
+
+def get_school_level(school_name):
+    """识别学校层次，返回加成系数"""
+    if not school_name:
+        return 1.0
+    
+    # C9/顶尖高校
+    top_schools = ['清华大学', '北京大学', '复旦大学', '上海交通大学', '浙江大学', 
+                   '中国科学技术大学', '南京大学', '西安交通大学', '哈尔滨工业大学',
+                   '华中科技大学', '武汉大学', '中山大学', '四川大学', '南开大学',
+                   '天津大学', '山东大学', '东南大学', '吉林大学', '厦门大学', '同济大学']
+    
+    for top in top_schools:
+        if top in school_name:
+            return 1.15
+    
+    # 普通本科
+    if '大学' in school_name and len(school_name) <= 10:
+        return 1.05
+    
+    return 1.0
+
+
 def _parse_education_text(education_text):
-    """从简单文本（比如“清华大学本科”）抽取学校和学位"""
+    """从简单文本抽取学校和学位"""
     if not education_text:
         return {'school': '', 'major': '', 'degree': ''}
     edu = str(education_text).strip()
@@ -41,16 +163,13 @@ def _parse_education_text(education_text):
     school = edu.replace(found, '').strip() if found else edu
     return {
         'school': school,
-        'major': school,
+        'major': '',
         'degree': found or ''
     }
 
 
 def ensure_required_soft_abilities(soft_abilities):
-    """
-    统一保证：必须包含 5 个固定软能力
-    已有则保留，没有则补充默认值
-    """
+    """统一保证：必须包含 5 个固定软能力"""
     result = REQUIRED_SOFT_ABILITIES.copy()
     if soft_abilities and isinstance(soft_abilities, dict):
         for key, value in soft_abilities.items():
@@ -129,7 +248,6 @@ def submit_profile():
     else:
         try:
             ability = json.loads(result)
-            # 强制补全 5 个能力
             ability['soft_abilities'] = ensure_required_soft_abilities(ability.get('soft_abilities', {}))
         except Exception:
             education_info = _parse_education_text(education)
@@ -142,6 +260,41 @@ def submit_profile():
                 'project_experience': []
             }
 
+    # 解析专业（增强版）
+    major = parse_major_from_education(education, ability.get('education', {}))
+    
+    # 如果专业仍然为空，尝试从技能中推断
+    if not major and ability.get('skills'):
+        skills = ability.get('skills', [])
+        skill_to_major = {
+            'python': '计算机科学与技术',
+            'java': '软件工程',
+            'javascript': '计算机科学与技术',
+            'vue': '软件工程',
+            'react': '软件工程',
+            'sql': '数据科学与大数据技术',
+            'tensorflow': '人工智能',
+            'pytorch': '人工智能',
+            'sketch': '设计学',
+            'figma': '设计学',
+            'ps': '设计学'
+        }
+        for skill in skills:
+            skill_lower = skill.lower()
+            for kw, major_name in skill_to_major.items():
+                if kw in skill_lower:
+                    major = major_name
+                    break
+            if major:
+                break
+    
+    # 计算实习能力分数（从 work_experience 自动计算）
+    internship_score = calculate_internship_score_from_work(ability.get('work_experience', []))
+    # 更新软能力中的实习能力分数
+    if '实习能力' in ability.get('soft_abilities', {}):
+        ability['soft_abilities']['实习能力']['score'] = internship_score
+        ability['soft_abilities']['实习能力']['description'] = f"基于{len(ability.get('work_experience', []))}段实习经历，累计实习时长自动评估"
+    
     completeness = 0
     total = 5
     if education: completeness += 1
@@ -155,14 +308,14 @@ def submit_profile():
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO student (
-            user_id, name, phone, email,
+            user_id, name, phone, email, major,
             education_text, work_text, project_text, skills_certs_text, summary,
             skills, certificates, soft_abilities,
             education_json, work_json, project_json,
             completeness, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
-        user_id, name, phone, email,
+        user_id, name, phone, email, major,
         education, work, project, skills_certs, summary,
         json.dumps(ability.get('skills', []), ensure_ascii=False),
         json.dumps(ability.get('certificates', []), ensure_ascii=False),
@@ -180,6 +333,7 @@ def submit_profile():
     return jsonify({
         'student_id': student_id,
         'completeness': completeness,
+        'major': major,
         'skills': ability.get('skills', []),
         'certificates': ability.get('certificates', []),
         'soft_abilities': ability.get('soft_abilities', {})
@@ -265,18 +419,52 @@ def upload_resume():
                 'work_experience': []
             }
 
+    # 解析专业
+    major = parse_major_from_education('', ability.get('education', {}))
+    
+    # 如果专业仍然为空，尝试从技能中推断
+    if not major and ability.get('skills'):
+        skills = ability.get('skills', [])
+        skill_to_major = {
+            'python': '计算机科学与技术',
+            'java': '软件工程',
+            'javascript': '计算机科学与技术',
+            'vue': '软件工程',
+            'react': '软件工程',
+            'sql': '数据科学与大数据技术',
+            'tensorflow': '人工智能',
+            'pytorch': '人工智能',
+            'sketch': '设计学',
+            'figma': '设计学',
+            'ps': '设计学'
+        }
+        for skill in skills:
+            skill_lower = skill.lower()
+            for kw, major_name in skill_to_major.items():
+                if kw in skill_lower:
+                    major = major_name
+                    break
+            if major:
+                break
+    
+    # 计算实习能力分数
+    internship_score = calculate_internship_score_from_work(ability.get('work_experience', []))
+    if '实习能力' in ability.get('soft_abilities', {}):
+        ability['soft_abilities']['实习能力']['score'] = internship_score
+        ability['soft_abilities']['实习能力']['description'] = f"基于{len(ability.get('work_experience', []))}段实习经历自动评估"
+
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO student (
-            user_id, name, phone, email,
+            user_id, name, phone, email, major,
             education_text, work_text, project_text, skills_certs_text, summary,
             skills, certificates, soft_abilities,
             education_json, work_json, project_json,
             completeness, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
-        user_id, '', '', '',
+        user_id, '', '', '', major,
         ability.get('education', {}).get('school', ''),
         json.dumps(ability.get('work_experience', []), ensure_ascii=False),
         '', '', '',
@@ -295,6 +483,7 @@ def upload_resume():
 
     return jsonify({
         'student_id': student_id,
+        'major': major,
         'skills': ability.get('skills', []),
         'certificates': ability.get('certificates', []),
         'soft_abilities': ability.get('soft_abilities', {}),
@@ -307,7 +496,7 @@ def get_profile(student_id):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT id, user_id, name, phone, email,
+        SELECT id, user_id, name, phone, email, major,
                education_text, work_text, project_text, skills_certs_text, summary,
                skills, certificates, soft_abilities,
                education_json, work_json, project_json,
@@ -323,12 +512,18 @@ def get_profile(student_id):
     profile['skills'] = json.loads(profile['skills']) if profile.get('skills') else []
     profile['certificates'] = json.loads(profile['certificates']) if profile.get('certificates') else []
     profile['soft_abilities'] = json.loads(profile['soft_abilities']) if profile.get('soft_abilities') else {}
-    # 【查询接口也强制保证5项能力存在】
     profile['soft_abilities'] = ensure_required_soft_abilities(profile['soft_abilities'])
     
     profile['education_json'] = json.loads(profile['education_json']) if profile.get('education_json') else {}
     profile['work_json'] = json.loads(profile['work_json']) if profile.get('work_json') else []
     profile['project_json'] = json.loads(profile['project_json']) if profile.get('project_json') else []
+    
+    # 如果 major 为空，尝试从 education_json 中补全
+    if not profile.get('major') and profile['education_json'].get('major'):
+        profile['major'] = profile['education_json'].get('major')
+        # 更新数据库
+        cursor.execute("UPDATE student SET major = ? WHERE id = ?", (profile['major'], student_id))
+        conn.commit()
     
     if profile['user_id']:
         cursor.execute('''

@@ -12,54 +12,21 @@
             <li class="menu-item" :class="{active: $route.path === '/'}" @click="$router.push('/')">首页</li>
             <li class="menu-item" :class="{active: $route.path === '/career-planning'}" @click="$router.push('/career-planning-intro')">职业规划</li>
             <li class="menu-item" :class="{active: $route.path === '/report-export'}" @click="$router.push('/report-export')">报告导出</li>
-            <!-- <li class="menu-item" :class="{active: $route.path === '/about-us'}" @click="$router.push('/about-us')">关于我们</li>
-            <li class="menu-item dropdown">
-              核心功能 ▼
-              <ul class="dropdown-menu">
-                <li class="dropdown-item" @click="goToFeature('测评')">
-                  <span class="color-dot red"></span> 职业兴趣测评
-                </li>
-                <li class="dropdown-item" @click="goToFeature('分析')">
-                  <span class="color-dot orange"></span> 能力短板分析
-                </li>
-                <li class="dropdown-item" @click="goToFeature('规划')">
-                  <span class="color-dot green"></span> 发展路径规划
-                </li>
-                <li class="dropdown-item" @click="goToFeature('导出')">
-                  <span class="color-dot blue"></span> 规划报告导出
-                </li>
-              </ul>
-            </li> -->
           </ul>
         </div>
 
         <div class="nav-right">
           <div class="nav-search-wrap">
-            <input 
-              type="text" 
-              class="nav-search-input" 
-              placeholder="搜索职业方向、专业、院校、岗位类型"
-              @keyup.enter="handleSearch"
-              ref="searchInputRef"
-            >
+            <input type="text" class="nav-search-input" placeholder="搜索职业方向、专业、院校、岗位类型" @keyup.enter="handleSearch" ref="searchInputRef">
             <button class="nav-search-btn" @click="handleSearch">搜索</button>
           </div>
-
           <button class="btn-toggle-theme" @click="toggleTheme">🌙</button>
-          
           <button class="btn-login" @click="$router.push('/login')" v-if="!isLogin">登录</button>
           <button class="btn-register" @click="$router.push('/register')" v-if="!isLogin">注册</button>
-          
           <div class="user-profile" v-if="isLogin">
-            <img 
-              :src="userAvatar || 'https://picsum.photos/seed/avatar/40/40'" 
-              alt="用户头像" 
-              class="avatar"
-              @click="toggleUserMenu"
-            >
+            <img :src="userAvatar || 'https://picsum.photos/seed/avatar/40/40'" alt="用户头像" class="avatar" @click="toggleUserMenu">
             <div class="user-menu" v-show="isUserMenuOpen">
               <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
-              <!-- <div class="menu-item" @click="$router.push('/settings')">账号设置</div> -->
               <div class="menu-item logout" @click="handleLogout">退出登录</div>
             </div>
           </div>
@@ -67,189 +34,95 @@
       </div>
     </header>
   
-    <!-- 岗位画像内容容器（适配固定导航栏，避免遮挡） -->
     <div class="job-portrait-container">
-      <!-- 加载状态 -->
       <div v-if="loading" class="loading-container">
         <el-loading-spinner></el-loading-spinner>
         <p>正在加载岗位画像数据...</p>
       </div>
       
-      <!-- 内容区域（加载完成后显示） -->
       <div v-else>
-        <!-- 面包屑导航 + 岗位标题区域 -->
         <div class="page-header">
           <div class="breadcrumb">
             <span class="breadcrumb-item" @click="$router.push('/')">首页</span>
             <span class="separator">/</span>
-            <!-- 修复：增加空值保护 -->
             <span class="breadcrumb-item">{{ currentJob?.job_name || '岗位画像' }}</span>
             <span class="separator">/</span>
             <span class="breadcrumb-item current">岗位画像详情</span>
           </div>
-          
-          <!-- 岗位标题卡片 -->
           <div class="job-header-card">
-            <!-- 修复：增加空值保护 -->
             <h1 class="job-title">{{ currentJob?.job_name || '岗位画像' }}</h1>
             <div class="job-tag-container">
-              <el-tag 
-                v-for="tag in getCoreTags()" 
-                :key="tag" 
-                size="medium" 
-                class="job-tag"
-              >{{ tag }}</el-tag>
+              <el-tag v-for="tag in getCoreTags()" :key="tag" size="medium" class="job-tag">{{ tag }}</el-tag>
             </div>
           </div>
         </div>
         
-        <!-- 核心信息区域 - 横向滚动排列 -->
+        <!-- 核心信息区域 -->
         <div class="core-info-section">
-          <!-- 专业技能要求 -->
           <div class="ability-card">
-            <el-card 
-              header="专业技能要求" 
-              shadow="hover" 
-              class="info-card skills-card"
-            >
+            <el-card header="专业技能要求" shadow="hover" class="info-card skills-card">
               <div class="skill-grid vertical">
-                <!-- 修复：增加空值保护 -->
-                <div 
-                  v-for="(skill, index) in (currentJob?.skills || [])" 
-                  :key="skill || index" 
-                  class="skill-card"
-                  :style="{animationDelay: `${index * 0.1}s`}"
-                >
-                  <i class="el-icon-s-tools skill-icon"></i> 
-                  <span class="skill-text">{{ skill }}</span>
+                <div v-for="(skill, index) in (currentJob?.skills || [])" :key="skill || index" class="skill-card" :style="{animationDelay: `${index * 0.1}s`}">
+                  <i class="el-icon-s-tools skill-icon"></i> <span class="skill-text">{{ skill }}</span>
                 </div>
               </div>
             </el-card>
           </div>
           
-          <!-- 证书资质要求 -->
           <div class="ability-card">
-            <el-card 
-              header="证书资质要求" 
-              shadow="hover" 
-              class="info-card certs-card"
-            >
+            <el-card header="证书资质要求" shadow="hover" class="info-card certs-card">
               <div class="cert-grid vertical">
-                <!-- 修复：增加空值保护 -->
-                <div 
-                  v-for="(cert, index) in (currentJob?.certificates || [])" 
-                  :key="cert || index" 
-                  class="cert-card"
-                  :style="{animationDelay: `${index * 0.1}s`}"
-                >
-                  <i class="el-icon-trophy cert-icon"></i> 
-                  <span class="cert-text">{{ cert }}</span>
+                <div v-for="(cert, index) in (currentJob?.certificates || [])" :key="cert || index" class="cert-card" :style="{animationDelay: `${index * 0.1}s`}">
+                  <i class="el-icon-trophy cert-icon"></i> <span class="cert-text">{{ cert }}</span>
                 </div>
               </div>
             </el-card>
           </div>
           
-          <!-- 创新能力 -->
-          <!-- 修复：增加空值保护 -->
           <div class="ability-card" v-if="currentJob?.soft_abilities?.创新能力">
-            <el-card 
-              header="创新能力要求" 
-              shadow="hover" 
-              class="info-card skills-card"
-            >
+            <el-card header="创新能力要求" shadow="hover" class="info-card skills-card">
               <div class="skill-grid vertical">
-                <div class="skill-card">
-                  <i class="el-icon-document skill-icon"></i> 
-                  <span class="skill-text">{{ currentJob.soft_abilities.创新能力.description }}</span>
-                </div>
+                <div class="skill-card"><i class="el-icon-document skill-icon"></i> <span class="skill-text">{{ currentJob.soft_abilities.创新能力.description }}</span></div>
               </div>
             </el-card>
           </div>
           
-          <!-- 学习能力 -->
-          <!-- 修复：增加空值保护 -->
           <div class="ability-card" v-if="currentJob?.soft_abilities?.学习能力">
-            <el-card 
-              header="学习能力要求" 
-              shadow="hover" 
-              class="info-card skills-card"
-            >
+            <el-card header="学习能力要求" shadow="hover" class="info-card skills-card">
               <div class="skill-grid vertical">
-                <div class="skill-card">
-                  <i class="el-icon-document skill-icon"></i> 
-                  <span class="skill-text">{{ currentJob.soft_abilities.学习能力.description }}</span>
-                </div>
+                <div class="skill-card"><i class="el-icon-document skill-icon"></i> <span class="skill-text">{{ currentJob.soft_abilities.学习能力.description }}</span></div>
               </div>
             </el-card>
           </div>
           
-          <!-- 抗压能力 -->
-          <!-- 修复：增加空值保护 -->
           <div class="ability-card" v-if="currentJob?.soft_abilities?.抗压能力">
-            <el-card 
-              header="抗压能力要求" 
-              shadow="hover" 
-              class="info-card skills-card"
-            >
+            <el-card header="抗压能力要求" shadow="hover" class="info-card skills-card">
               <div class="skill-grid vertical">
-                <div class="skill-card">
-                  <i class="el-icon-document skill-icon"></i> 
-                  <span class="skill-text">{{ currentJob.soft_abilities.抗压能力.description }}</span>
-                </div>
+                <div class="skill-card"><i class="el-icon-document skill-icon"></i> <span class="skill-text">{{ currentJob.soft_abilities.抗压能力.description }}</span></div>
               </div>
             </el-card>
           </div>
           
-          <!-- 沟通能力 -->
-          <!-- 修复：增加空值保护 -->
           <div class="ability-card" v-if="currentJob?.soft_abilities?.沟通能力">
-            <el-card 
-              header="沟通能力要求" 
-              shadow="hover" 
-              class="info-card skills-card"
-            >
+            <el-card header="沟通能力要求" shadow="hover" class="info-card skills-card">
               <div class="skill-grid vertical">
-                <div class="skill-card">
-                  <i class="el-icon-document skill-icon"></i> 
-                  <span class="skill-text">{{ currentJob.soft_abilities.沟通能力.description }}</span>
-                </div>
+                <div class="skill-card"><i class="el-icon-document skill-icon"></i> <span class="skill-text">{{ currentJob.soft_abilities.沟通能力.description }}</span></div>
               </div>
             </el-card>
           </div>
           
-          <!-- 实践能力 -->
-          <!-- 修复：增加空值保护 -->
           <div class="ability-card" v-if="currentJob?.soft_abilities?.实习能力">
-            <el-card 
-              header="实践能力要求" 
-              shadow="hover" 
-              class="info-card skills-card"
-            >
+            <el-card header="实践能力要求" shadow="hover" class="info-card skills-card">
               <div class="skill-grid vertical">
-                <div class="skill-card">
-                  <i class="el-icon-document skill-icon"></i> 
-                  <span class="skill-text">{{ currentJob.soft_abilities.实习能力.description }}</span>
-                </div>
+                <div class="skill-card"><i class="el-icon-document skill-icon"></i> <span class="skill-text">{{ currentJob.soft_abilities.实习能力.description }}</span></div>
               </div>
             </el-card>
           </div>
           
-          <!-- 其他软能力（动态展示） -->
-          <div 
-            class="ability-card" 
-            v-for="(ability, key) in getOtherSoftAbilities()" 
-            :key="key"
-          >
-            <el-card 
-              :header="`${key}要求`" 
-              shadow="hover" 
-              class="info-card skills-card"
-            >
+          <div class="ability-card" v-for="(ability, key) in getOtherSoftAbilities()" :key="key">
+            <el-card :header="`${key}要求`" shadow="hover" class="info-card skills-card">
               <div class="skill-grid vertical">
-                <div class="skill-card">
-                  <i class="el-icon-user skill-icon"></i> 
-                  <span class="skill-text">{{ ability.description }}</span>
-                </div>
+                <div class="skill-card"><i class="el-icon-user skill-icon"></i> <span class="skill-text">{{ ability.description }}</span></div>
               </div>
             </el-card>
           </div>
@@ -257,95 +130,39 @@
         
         <!-- 岗位发展路径区域 -->
         <div class="career-path-section">
-          <el-card 
-            header="岗位发展路径规划" 
-            shadow="hover" 
-            class="info-card path-card"
-          >
+          <el-card header="岗位发展路径规划" shadow="hover" class="info-card path-card">
             <div class="path-header">
-              <el-button 
-                type="primary" 
-                icon="el-icon-map-location" 
-                @click="openGraphDialog"
-                class="graph-btn"
-              >
-                查看岗位发展路径图谱
-              </el-button>
+              <el-button type="primary" icon="el-icon-map-location" @click="openGraphDialog" class="graph-btn">查看岗位发展路径图谱</el-button>
               <p class="path-desc">清晰的职业发展路径，助力你的职业规划（鼠标悬浮查看晋升要求）</p>
             </div>
             
-            <!-- 路径展示 - 双列布局 -->
             <div class="path-content">
+              <!-- 垂直晋升路径 -->
               <div class="path-column">
-                <h3 class="path-column-title">
-                  <i class="el-icon-arrow-up"></i> 垂直晋升路径
-                </h3>
+                <h3 class="path-column-title"><i class="el-icon-arrow-up"></i> 垂直晋升路径</h3>
                 <div class="path-timeline">
-                  <div 
-                    v-for="(item, index) in jobGraphConfig.vertical" 
-                    :key="index" 
-                    class="timeline-item"
-                    @mouseenter="showPromotionTip(item, index)"
-                    @mouseleave="hidePromotionTip"
-                  >
-                    <div class="timeline-dot" :style="{backgroundColor: getStepColor(index)}"></div>
-                    <div class="timeline-content">
-                      <div class="timeline-step">第{{ index + 1 }}阶段</div>
-                      <div class="timeline-position">{{ item }}</div>
-                    </div>
-
-                    <!-- 悬浮提示框：晋升要求 -->
-                    <div 
-                      v-if="hoverIndex === index" 
-                      class="promotion-tooltip"
-                    >
-                      <div class="tooltip-title">📌 {{ item }} 晋升要求</div>
-                      <div class="tooltip-section">
-                        <div class="label">经验要求</div>
-                        <div class="text">{{ getPromotionInfo(item).exp }}</div>
-                      </div>
-                      <div class="tooltip-section">
-                        <div class="label">技能要求</div>
-                        <div class="text">{{ getPromotionInfo(item).skills }}</div>
-                      </div>
-                      <div class="tooltip-section">
-                        <div class="label">能力要求</div>
-                        <div class="text">{{ getPromotionInfo(item).abilities }}</div>
-                      </div>
-                      <div class="tooltip-section">
-                        <div class="label">证书/资质</div>
-                        <div class="text">{{ getPromotionInfo(item).certs }}</div>
+                  <div v-if="jobGraphConfig.vertical.length === 0" class="empty-tip">暂无晋升路径数据</div>
+                  <div v-else>
+                    <div v-for="(item, index) in jobGraphConfig.vertical" :key="index" class="timeline-item" @mouseenter="showPromotionTip($event, item)" @mouseleave="hideTip">
+                      <div class="timeline-dot" :style="{backgroundColor: getStepColor(index)}"></div>
+                      <div class="timeline-content">
+                        <div class="timeline-step">第{{ index + 1 }}阶段</div>
+                        <div class="timeline-position">{{ item.job_name || item }}</div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
               
+              <!-- 横向换岗路径 -->
               <div class="path-column">
-                <h3 class="path-column-title">
-                  <i class="el-icon-switch"></i> 换岗发展路径
-                </h3>
+                <h3 class="path-column-title"><i class="el-icon-switch"></i> 换岗发展路径</h3>
                 <div class="path-grid">
-                  <div 
-                    v-for="(item, index) in jobGraphConfig.switch" 
-                    :key="index" 
-                    class="switch-card"
-                    @mouseenter="showSwitchTip(item, index)"
-                    @mouseleave="hideSwitchTip"
-                  >
-                    <div class="switch-icon">
-                      <i class="el-icon-refresh"></i>
-                    </div>
-                    <div class="switch-position">{{ item }}</div>
-
-                    <div 
-                      v-if="switchHoverIndex === index" 
-                      class="switch-tooltip"
-                    >
-                      <div class="tooltip-title">🔄 转岗方向：{{ item }}</div>
-                      <div class="tooltip-section">
-                        <div class="text">{{ getSwitchInfo(item).desc }}</div>
-                      </div>
+                  <div v-if="jobGraphConfig.switch.length === 0" class="empty-tip">暂无换岗路径数据</div>
+                  <div v-else>
+                    <div v-for="(item, index) in jobGraphConfig.switch" :key="index" class="switch-card" @mouseenter="showSwitchTip($event, item)" @mouseleave="hideTip">
+                      <div class="switch-icon"><i class="el-icon-refresh"></i></div>
+                      <div class="switch-position">{{ item.job_name || item }}</div>
                     </div>
                   </div>
                 </div>
@@ -356,52 +173,48 @@
         
         <!-- 软能力雷达图区域 -->
         <div class="soft-ability-radar-section">
-          <el-card 
-            header="岗位软能力要求雷达图" 
-            shadow="hover" 
-            class="info-card radar-card"
-          >
+          <el-card header="岗位软能力要求雷达图" shadow="hover" class="info-card radar-card">
             <div ref="radarChartRef" class="radar-chart-container"></div>
           </el-card>
         </div>
         
         <!-- 岗位图谱弹窗 -->
-        <el-dialog 
-          v-model="graphVisible" 
-          :title="`${currentJob?.job_name || '岗位'} - 职业发展路径图谱`" 
-          width="90%"
-          center
-          class="graph-dialog"
-          custom-class="custom-dialog"
-          append-to-body
-        >
+        <el-dialog v-model="graphVisible" :title="`${currentJob?.job_name || '岗位'} - 职业发展路径图谱`" width="90%" center class="graph-dialog" append-to-body>
           <div ref="graphChartRef" class="graph-chart-container"></div>
         </el-dialog>
       </div>
     </div>
+    
+    <!-- 全局悬浮提示框 -->
+    <Teleport to="body">
+      <div v-if="tipVisible" class="floating-tooltip" :style="tipStyle">
+        <div class="tooltip-title">{{ tipTitle }}</div>
+        <div class="tooltip-content">{{ tipContent }}</div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 import axios from 'axios'
 
-// 导航栏相关状态
 const router = useRouter()
 const route = useRoute()
+
+// 导航栏相关状态
 const isLogin = ref(!!localStorage.getItem('token'))
 const userAvatar = ref(localStorage.getItem('avatar') || '')
 const isUserMenuOpen = ref(false)
-const showDropdown = ref(false)
 const searchInputRef = ref(null)
 const graphChartRef = ref(null)
-const radarChartRef = ref(null) // 雷达图ref
-const loading = ref(true) // 加载状态
+const radarChartRef = ref(null)
+const loading = ref(true)
 
-// 关键修复：定义缺失的响应式变量，初始化更完善
+// 岗位数据
 const currentJob = ref({
   job_name: '',
   skills: [],
@@ -409,105 +222,93 @@ const currentJob = ref({
   soft_abilities: {},
   coreTags: []
 })
+
+// 发展路径数据
 const jobGraphConfig = ref({
   vertical: [],
   switch: []
 })
-const graphVisible = ref(false) // 图谱弹窗可见性
 
-// 存储echarts实例，防止内存泄漏
+const graphVisible = ref(false)
 let graphChart = null
-let radarChart = null // 雷达图实例
+let radarChart = null
 
-// 悬浮提示
-const hoverIndex = ref(-1)
-const switchHoverIndex = ref(-1)
-const promotionTip = ref({})
-const switchTip = ref({})
+// 悬浮提示相关
+const tipVisible = ref(false)
+const tipTitle = ref('')
+const tipContent = ref('')
+const tipStyle = ref({})
+let hideTimer = null
 
-// 显示晋升提示
-const showPromotionTip = (item, index) => {
-  hoverIndex.value = index
-}
-const hidePromotionTip = () => {
-  hoverIndex.value = -1
-}
-
-// 显示转岗提示
-const showSwitchTip = (item, index) => {
-  switchHoverIndex.value = index
-}
-const hideSwitchTip = () => {
-  switchHoverIndex.value = -1
-}
-
-// 获取晋升要求（自动生成真实描述）
-const getPromotionInfo = (position) => {
-  const job = currentJob.value.job_name || '岗位'
-  const baseSkills = currentJob.value.skills?.slice(0,3).join('、') || '专业技能'
+const showPromotionTip = (event, item) => {
+  if (hideTimer) clearTimeout(hideTimer)
+  tipTitle.value = `📌 ${item.job_name || item} 晋升要求`
+  tipContent.value = item.description || '暂无详细要求'
   
-  const map = {
-    exp: '1-3年相关工作经验',
-    skills: baseSkills,
-    abilities: '沟通、管理、执行能力',
-    certs: '相关职业证书优先'
+  const rect = event.target.closest('.timeline-item')?.getBoundingClientRect()
+  if (rect) {
+    tipStyle.value = {
+      position: 'fixed',
+      left: (rect.right + 15) + 'px',
+      top: (rect.top + rect.height / 2 - 40) + 'px',
+      zIndex: 99999
+    }
+  } else {
+    tipStyle.value = {
+      position: 'fixed',
+      left: (event.clientX + 20) + 'px',
+      top: (event.clientY - 40) + 'px',
+      zIndex: 99999
+    }
   }
-
-  if(position.includes('初级')) {
-    map.exp = '0-1年经验 | 实习/应届生可'
-    map.skills = baseSkills
-    map.abilities = '基础学习与执行能力'
-    map.certs = '无强制要求'
-  } 
-  else if(position.includes('中级')) {
-    map.exp = '2-3年独立工作经验'
-    map.skills = baseSkills + '进阶技术'
-    map.abilities = '需求分析、项目推进能力'
-    map.certs = '相关技能证书'
-  }
-  else if(position.includes('高级') || position.includes('主管')) {
-    map.exp = '3-5年团队经验'
-    map.skills = baseSkills + '架构/管理能力'
-    map.abilities = '团队管理、项目统筹'
-    map.certs = '中高级职业证书'
-  }
-  else if(position.includes('经理') || position.includes('总监')) {
-    map.exp = '5年以上管理经验'
-    map.skills = '战略规划、团队管理'
-    map.abilities = '决策、战略、资源整合'
-    map.certs = '高级管理/行业认证'
-  }
-  return map
+  tipVisible.value = true
 }
 
-// 转岗说明
-const getSwitchInfo = (position) => {
-  return {
-    desc: `从${currentJob.value.job_name}转向${position}，技能相通，发展方向更贴合市场需求`
+const showSwitchTip = (event, item) => {
+  if (hideTimer) clearTimeout(hideTimer)
+  tipTitle.value = `🔄 转岗方向：${item.job_name || item}`
+  tipContent.value = item.description || '暂无详细说明'
+  
+  const rect = event.target.closest('.switch-card')?.getBoundingClientRect()
+  if (rect) {
+    tipStyle.value = {
+      position: 'fixed',
+      left: (rect.right + 15) + 'px',
+      top: (rect.top + rect.height / 2 - 40) + 'px',
+      zIndex: 99999
+    }
+  } else {
+    tipStyle.value = {
+      position: 'fixed',
+      left: (event.clientX + 20) + 'px',
+      top: (event.clientY - 40) + 'px',
+      zIndex: 99999
+    }
   }
+  tipVisible.value = true
 }
 
-// 监听路由变化更新登录状态
-watch(
-  () => route.path,
-  () => {
-    isLogin.value = !!localStorage.getItem('token')
-    userAvatar.value = localStorage.getItem('avatar') || ''
-  },
-  { immediate: true }
-)
+const hideTip = () => {
+  hideTimer = setTimeout(() => {
+    tipVisible.value = false
+  }, 100)
+}
 
 // 导航栏方法
-const goToFeature = (feature) => {
-  showDropdown.value = false
-  const featureRoutes = {
-    '测评': '/interest-test',
-    '分析': '/ability-analysis',
-    '规划': '/development-path',
-    '导出': '/report-export'
-  }
-  router.push(featureRoutes[feature] || '/')
-  ElMessage.info(`即将前往${feature}功能页面`)
+const toggleUserMenu = () => { isUserMenuOpen.value = !isUserMenuOpen.value }
+const handleLogout = () => {
+  localStorage.clear()
+  isLogin.value = false
+  router.push('/')
+  ElMessage.success('退出登录成功')
+}
+
+const toggleTheme = () => {
+  const darkMode = localStorage.getItem('darkMode') === 'true'
+  localStorage.setItem('darkMode', !darkMode)
+  if (!darkMode) document.body.classList.add('dark')
+  else document.body.classList.remove('dark')
+  ElMessage.success(`已切换${!darkMode ? '暗黑' : '默认'}主题`)
 }
 
 const handleSearch = () => {
@@ -522,549 +323,13 @@ const handleSearch = () => {
   ElMessage.success(`正在搜索：${keyword}`)
 }
 
-const toggleTheme = () => {
-  const darkMode = localStorage.getItem('darkMode') === 'true'
-  localStorage.setItem('darkMode', !darkMode)
-  if (!darkMode) document.body.classList.add('dark')
-  else document.body.classList.remove('dark')
-  ElMessage.success(`已切换${!darkMode ? '暗黑' : '默认'}主题`)
-}
-
-const toggleUserMenu = () => {
-  isUserMenuOpen.value = !isUserMenuOpen.value
-}
-
-const handleLogout = () => {
-  localStorage.removeItem('token')
-  localStorage.removeItem('avatar')
-  localStorage.removeItem('nickname')
-  isLogin.value = false
-  isUserMenuOpen.value = false
-  router.push('/')
-  ElMessage.success('退出登录成功')
-}
-
-// 获取步骤颜色
+// 辅助函数
 const getStepColor = (index) => {
   const colors = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#909399', '#722ED1', '#F7BA1E']
   return colors[index % colors.length]
 }
 
-// 获取其他软能力（排除固定展示的5个）
-const getOtherSoftAbilities = () => {
-  const fixedAbilities = ['创新能力', '学习能力', '抗压能力', '沟通能力', '实习能力']
-  const otherAbilities = {}
-  
-  // 修复：增加空值保护
-  const softAbilities = currentJob.value?.soft_abilities || {}
-  for (const [key, value] of Object.entries(softAbilities)) {
-    if (!fixedAbilities.includes(key) && value && value.description) {
-      otherAbilities[key] = value
-    }
-  }
-  
-  return otherAbilities
-}
-
-// 初始化软能力雷达图
-const initRadarChart = () => {
-  if (!radarChartRef.value) return
-  
-  // 销毁已有实例防止内存泄漏
-  if (radarChart) {
-    radarChart.dispose()
-  }
-  
-  radarChart = echarts.init(radarChartRef.value)
-  
-  // 整理雷达图数据
-  // 修复：增加完整的空值保护
-  const softAbilities = currentJob.value?.soft_abilities || {}
-  const abilityData = [
-    { 
-      name: '创新能力', 
-      value: softAbilities.创新能力?.score || 0 
-    },
-    { 
-      name: '学习能力', 
-      value: softAbilities.学习能力?.score || 0 
-    },
-    { 
-      name: '抗压能力', 
-      value: softAbilities.抗压能力?.score || 0 
-    },
-    { 
-      name: '沟通能力', 
-      value: softAbilities.沟通能力?.score || 0 
-    },
-    { 
-      name: '实践能力', 
-      value: softAbilities.实习能力?.score || 0 
-    }
-  ]
-  
-  // 生成自定义tooltip文本，按能力名称+分数纵向展示
-  const scoreList = abilityData.map(item => `${item.name}：${item.value}分`).join('\n')
-  const option = {
-    backgroundColor: '#ffffff',
-    title: {
-      // 修复：增加空值保护
-      text: `${currentJob.value?.job_name || '岗位'} 软能力要求评估`,
-      left: 'center',
-      textStyle: {
-        fontSize: 16,
-        fontWeight: 60,
-        color: '#303133'
-      }
-    },
-    tooltip: {
-      trigger: 'item',
-      // 保持纵向换行显示完整能力名称+分数列表
-      formatter: (params) => {
-        const data = params.data || {}
-        return `
-          <div style="padding: 8px; line-height: 1.8;">
-            <div style="font-weight: 600; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px;">岗位要求</div>
-            ${abilityData.map(item => `<div>${item.name}：${item.value}分</div>`).join('')}
-            <div style="margin-top: 8px; font-size: 12px; color: #999;">(满分5分)</div>
-          </div>
-        `
-      }
-    },
-    legend: {
-      orient: 'vertical',
-      right: 10,
-      top: 'center',
-      data: ['岗位要求'],
-      textStyle: {
-        color: '#606266'
-      }
-    },
-    radar: {
-      indicator: abilityData.map(item => ({
-        name: item.name,
-        max: 5,
-        min: 0
-      })),
-      shape: 'polygon',
-      splitNumber: 5,
-      name: {
-        textStyle: {
-          color: '#303133',
-          fontSize: 14
-        }
-      },
-      splitLine: {
-        lineStyle: {
-          color: '#e8e8e8'
-        }
-      },
-      splitArea: {
-        areaStyle: {
-          color: ['#f8f9fa', '#ffffff'],
-          opacity: 0.5
-        }
-      },
-      axisLine: {
-        lineStyle: {
-          color: '#dcdfe6'
-        }
-      }
-    },
-    series: [
-      {
-        name: '岗位要求',
-        type: 'radar',
-        data: [
-          {
-            value: abilityData.map(item => item.value),
-            name: '岗位要求',
-            areaStyle: {
-              color: 'rgba(64, 158, 255, 0.2)',
-              opacity: 0.7
-            },
-            lineStyle: {
-              color: '#409EFF',
-              width: 2
-            },
-            itemStyle: {
-              color: '#409EFF',
-              borderColor: '#ffffff',
-              borderWidth: 2
-            },
-            symbol: 'circle',
-            symbolSize: 8
-          }
-        ]
-      }
-    ]
-  }
-  
-  radarChart.setOption(option)
-  
-  // 监听窗口大小变化，自适应雷达图
-  const radarResizeHandler = () => {
-    radarChart.resize()
-  }
-  window.addEventListener('resize', radarResizeHandler)
-  
-  onUnmounted(() => {
-    window.removeEventListener('resize', radarResizeHandler)
-  })
-}
-
-// 打开图谱弹窗
-const openGraphDialog = () => {
-  graphVisible.value = true
-  nextTick(() => {
-    initJobGraph()
-  })
-}
-
-// 初始化岗位发展路径图谱 - 【仅修改这里，修复ECharts报错】
-const initJobGraph = () => {
-  if (!graphChartRef.value) return
-  
-  if (graphChart) {
-    graphChart.dispose()
-  }
-  
-  graphChart = echarts.init(graphChartRef.value)
-  
-  const config = jobGraphConfig.value
-  // 严格过滤空值、去重
-  const verticalList = (config.vertical || []).filter(item => item && item.trim())
-  const switchList = (config.switch || []).filter(item => item && item.trim())
-  // 去重，防止节点重复
-  const uniqueVertical = [...new Set(verticalList)]
-  const uniqueSwitch = [...new Set(switchList)]
-  
-  const nodes = []
-  const links = []
-  const nodeMap = {} // 存储id映射，防止重复
-  
-  // 垂直路径节点 - 添加唯一ID，不重复
-  uniqueVertical.forEach((item, index) => {
-    const nodeId = `v_${index}`
-    if(nodeMap[nodeId]) return
-    nodeMap[nodeId] = true
-    
-    nodes.push({ 
-      id: nodeId,
-      name: item, 
-      category: 0, 
-      symbolSize: 50 + (index * 5),
-      itemStyle: { 
-        color: '#409EFF',
-        borderColor: '#ffffff',
-        borderWidth: 2,
-        shadowColor: 'rgba(64, 158, 255, 0.5)',
-        shadowBlur: 10
-      }
-    })
-    // 连线使用ID关联
-    if (index > 0) {
-      links.push({ 
-        source: `v_${index-1}`, 
-        target: nodeId, 
-        lineStyle: { 
-          color: '#409EFF', 
-          width: 3,
-          shadowColor: 'rgba(64, 158, 255, 0.2)',
-          shadowBlur: 5
-        },
-        label: { 
-          show: true, 
-          formatter: '晋升',
-          fontSize: 12,
-          color: '#606266',
-          backgroundColor: 'rgba(255,255,255,0.8)',
-          borderRadius: 4,
-          padding: [2, 6]
-        }
-      })
-    }
-  })
-  
-  // 换岗路径节点 - 添加唯一ID，不重复
-  uniqueSwitch.forEach((item, index) => {
-    const nodeId = `s_${index}`
-    if(nodeMap[nodeId]) return
-    nodeMap[nodeId] = true
-    
-    nodes.push({ 
-      id: nodeId,
-      name: item, 
-      category: 1, 
-      symbolSize: 45,
-      itemStyle: { 
-        color: '#67C23A',
-        borderColor: '#ffffff',
-        borderWidth: 2,
-        shadowColor: 'rgba(103, 194, 58, 0.5)',
-        shadowBlur: 10
-      }
-    })
-    // 从垂直路径第3个/第1个节点连线，使用ID
-    const sourceId = uniqueVertical.length >=3 ? 'v_2' : (uniqueVertical[0] ? 'v_0' : '')
-    if(sourceId){
-      links.push({ 
-        source: sourceId, 
-        target: nodeId, 
-        lineStyle: { 
-          color: '#67C23A', 
-          width: 2, 
-          type: 'dashed',
-          shadowColor: 'rgba(103, 194, 58, 0.2)',
-          shadowBlur: 5
-        },
-        label: { 
-          show: true, 
-          formatter: '换岗',
-          fontSize: 12,
-          color: '#606266',
-          backgroundColor: 'rgba(255,255,255,0.8)',
-          borderRadius: 4,
-          padding: [2, 6]
-        }
-      })
-    }
-  })
-
-  // 终极兜底：无数据时显示默认节点
-  if(nodes.length === 0){
-    nodes.push({
-      id: 'default',
-      name: '暂无发展路径',
-      category:0,
-      symbolSize:60,
-      itemStyle:{color:'#909399'}
-    })
-  }
-  
-  const option = {
-    backgroundColor: '#ffffff',
-    title: { 
-      // 修复：增加空值保护
-      text: `${currentJob.value?.job_name || '岗位'} - 职业发展路径图谱`,
-      left: 'center',
-      textStyle: { fontSize: 18, fontWeight: 60, color: '#303133' }
-    },
-    tooltip: { 
-      trigger: 'item',
-      backgroundColor: 'rgba(255,255,255,0.95)',
-      borderColor: '#e4e7ed',
-      borderWidth: 1,
-      textStyle: { color: '#303133' }
-    },
-    legend: [{ 
-      data: ['垂直晋升', '换岗路径'], 
-      top: 'bottom',
-      textStyle: { color: '#606266' }
-    }],
-    series: [
-      {
-        type: 'graph',
-        layout: 'force',
-        data: nodes,
-        links: links,
-        categories: [{ name: '垂直晋升' }, { name: '换岗路径' }],
-        roam: true,
-        label: {
-          show: true,
-          fontSize: 14,
-          color: '#fff',
-          fontWeight: 'bold',
-          shadowColor: 'rgba(0,0,0,0.2)',
-          shadowBlur: 2
-        },
-        force: {
-          repulsion: 2800,
-          edgeLength: 220,
-          gravity: 0.15
-        }
-      }
-    ]
-  }
-  
-  graphChart.setOption(option)
-  
-  const resizeHandler = () => {
-    graphChart.resize()
-  }
-  window.addEventListener('resize', resizeHandler)
-  
-  onUnmounted(() => {
-    window.removeEventListener('resize', resizeHandler)
-  })
-}
-
-// 从后端获取岗位画像数据（完整获取大模型生成的所有数据）
-const fetchJobProfile = async () => {
-  try {
-    loading.value = true
-    // 获取路由参数（优先job_id，兼容jobName）
-    const jobId = route.query.job_id
-    const jobName = route.query.jobName
-    
-    let res
-    if (jobId) {
-      // 通过job_id获取画像（后端返回大模型分析的完整数据）
-      res = await axios.get(`/api/jobs/${jobId}/profile`)
-    } else if (jobName) {
-      // 兼容旧版：通过名称获取岗位详情，再获取画像
-      const jobDetail = await axios.get(`/api/jobs/profile/${jobName}`)
-      if (jobDetail.data.id) {
-        res = await axios.get(`/api/jobs/${jobDetail.data.id}/profile`)
-      } else {
-        throw new Error('未找到岗位ID')
-      }
-    } else {
-      // 默认加载第一个岗位
-      const categories = await axios.get('/api/jobs/categories')
-      const firstJob = categories.data[0] || {}
-      currentJob.value = {
-        job_name: firstJob.name || '数据分析师',
-        skills: firstJob.skills || [],
-        certificates: firstJob.certificates || [],
-        soft_abilities: firstJob.soft_abilities || {}, // 使用大类画像的软能力
-        coreTags: firstJob.coreTags || []
-      }
-      loading.value = false
-      await nextTick() // 等待DOM更新
-      await fetchJobPaths(currentJob.value.job_name)
-      initRadarChart() // 初始化雷达图
-      return
-    }
-    
-    if (res && res.data) {
-      // 直接使用后端大模型生成的完整数据
-      currentJob.value = {
-        ...currentJob.value,
-        job_name: res.data.job_name || '',
-        skills: res.data.skills || [],
-        certificates: res.data.certificates || [],
-        soft_abilities: res.data.soft_abilities || {}, // 核心：大模型生成的软能力数据
-        coreTags: res.data.coreTags || []
-      }
-    }
-    
-    // 获取发展路径
-    await fetchJobPaths(currentJob.value.job_name)
-    
-  } catch (error) {
-    console.error('获取岗位画像失败:', error)
-    ElMessage.error('加载岗位画像失败，将显示默认数据')
-    // 加载默认数据（模拟大模型生成的结构）
-    currentJob.value = {
-      job_name: '数据分析师',
-      skills: ['Python', 'SQL', 'Tableau', 'Excel', '数据分析'],
-      certificates: ['计算机二级', 'CDA', '英语六级'],
-      soft_abilities: {
-        '创新能力': {
-          score: 4,
-          description: '需要具备独立思考能力，能够针对业务问题提出创新性的分析方法和解决方案，优化现有分析流程。'
-        },
-        '学习能力': {
-          score: 5,
-          description: '数据领域技术迭代快，需快速学习新的分析工具和算法，掌握行业最新分析方法和思维模式。'
-        },
-        '抗压能力': {
-          score: 3,
-          description: '需应对多任务并行处理，在业务高峰期能够快速响应分析需求，保持工作效率和数据准确性。'
-        },
-        '沟通能力': {
-          score: 4,
-          description: '需要将复杂的数据分析结果转化为易懂的业务结论，与产品、运营、管理层有效沟通分析成果。'
-        },
-        '实习能力': {
-          score: 4,
-          description: '具备实际项目操作经验，能够独立完成数据分析项目，将理论知识落地到实际业务场景中。'
-        }
-      },
-      coreTags: ['Python', 'SQL', '数据分析']
-    }
-    // 默认路径
-    jobGraphConfig.value = {
-      vertical: ['初级数据分析师', '中级数据分析师', '高级数据分析师', '数据分析主管', '数据总监', '数据VP'],
-      switch: ['大数据开发工程师', '产品经理', '金融分析师', '商业分析师']
-    }
-  } finally {
-    loading.value = false
-    nextTick(() => {
-      initRadarChart() // 初始化雷达图
-    })
-  }
-}
-
-// 获取岗位发展路径（从后端大模型生成的图谱数据）
-const fetchJobPaths = async (jobName) => {
-  try {
-    // 获取垂直晋升路径（后端返回大模型生成的路径）
-    const verticalRes = await axios.get(`/api/jobs/${encodeURIComponent(jobName)}/vertical`)
-    // 获取换岗路径（后端返回大模型生成的路径）
-    const lateralRes = await axios.get(`/api/jobs/${encodeURIComponent(jobName)}/lateral`)
-    
-    // 处理垂直路径（确保≥5个）
-    let verticalPaths = verticalRes.data?.map(item => item.to_job) || []
-    if (verticalPaths.length < 5) {
-      // 补充默认路径
-      const defaultVertical = [
-        `初级${jobName}`,
-        `中级${jobName}`,
-        `高级${jobName}`,
-        `${jobName}主管`,
-        `${jobName}经理`,
-        `${jobName}总监`,
-        `${jobName}VP`
-      ]
-      verticalPaths = [...verticalPaths, ...defaultVertical].slice(0, 6)
-    }
-    
-    // 处理换岗路径（确保≥3个）
-    let switchPaths = lateralRes.data?.map(item => item.to_job) || []
-    if (switchPaths.length < 3) {
-      // 补充默认路径
-      const defaultSwitch = [
-        '产品经理',
-        '大数据开发工程师',
-        '商业分析师',
-        '运营分析师'
-      ]
-      switchPaths = [...switchPaths, ...defaultSwitch].slice(0, 4)
-    }
-    
-    jobGraphConfig.value = {
-      vertical: verticalPaths,
-      switch: switchPaths
-    }
-    
-  } catch (error) {
-    console.error('获取发展路径失败:', error)
-    // 默认路径
-    jobGraphConfig.value = {
-      vertical: [
-        `初级${jobName}`,
-        `中级${jobName}`,
-        `高级${jobName}`,
-        `${jobName}主管`,
-        `${jobName}经理`,
-        `${jobName}总监`
-      ],
-      switch: [
-        '产品经理',
-        '大数据开发工程师',
-        '金融分析师',
-        '商业分析师'
-      ]
-    }
-  }
-}
-
-// 获取核心标签
 const getCoreTags = () => {
-  // 从技能中提取核心标签，或使用默认值
-  // 修复：增加空值保护
   const skills = currentJob.value?.skills || []
   if (skills.length > 0) {
     return skills.slice(0, 3).map(skill => {
@@ -1075,37 +340,285 @@ const getCoreTags = () => {
   return ['暂无标签']
 }
 
-// 监听路由参数变化加载对应岗位
+const getOtherSoftAbilities = () => {
+  const fixedAbilities = ['创新能力', '学习能力', '抗压能力', '沟通能力', '实习能力']
+  const otherAbilities = {}
+  const softAbilities = currentJob.value?.soft_abilities || {}
+  for (const [key, value] of Object.entries(softAbilities)) {
+    if (!fixedAbilities.includes(key) && value && value.description) {
+      otherAbilities[key] = value
+    }
+  }
+  return otherAbilities
+}
+
+// 雷达图
+const initRadarChart = () => {
+  if (!radarChartRef.value) return
+  if (radarChart) radarChart.dispose()
+  radarChart = echarts.init(radarChartRef.value)
+
+  const softAbilities = currentJob.value?.soft_abilities || {}
+  const abilityData = [
+    { name: '创新能力', value: softAbilities.创新能力?.score || 0 },
+    { name: '学习能力', value: softAbilities.学习能力?.score || 0 },
+    { name: '抗压能力', value: softAbilities.抗压能力?.score || 0 },
+    { name: '沟通能力', value: softAbilities.沟通能力?.score || 0 },
+    { name: '实践能力', value: softAbilities.实习能力?.score || 0 }
+  ]
+
+  const option = {
+    title: { text: `${currentJob.value?.job_name || '岗位'} 软能力要求评估`, left: 'center' },
+    radar: { indicator: abilityData.map(item => ({ name: item.name, max: 5 })) },
+    series: [{ type: 'radar', data: [{ value: abilityData.map(item => item.value), name: '岗位要求' }] }]
+  }
+  radarChart.setOption(option)
+  window.addEventListener('resize', () => radarChart?.resize())
+}
+
+// 获取发展路径
+const fetchJobPaths = async (jobName) => {
+  try {
+    const res = await axios.get(`/api/jobs/${encodeURIComponent(jobName)}/full-path`)
+    const data = res.data
+    
+    if (data.vertical_path && Array.isArray(data.vertical_path)) {
+      const verticalPaths = data.vertical_path.map(item => ({
+        job_name: item.to_job,
+        description: item.description
+      }))
+      
+      const lateralPaths = (data.lateral_paths || []).map(item => ({
+        job_name: item.job_name,
+        description: item.description
+      }))
+      
+      jobGraphConfig.value.vertical = verticalPaths
+      jobGraphConfig.value.switch = lateralPaths
+    } else {
+      await fetchJobPathsLegacy(jobName)
+    }
+  } catch (error) {
+    console.error('获取发展路径失败:', error)
+    await fetchJobPathsLegacy(jobName)
+  }
+}
+
+const fetchJobPathsLegacy = async (jobName) => {
+  try {
+    const verticalRes = await axios.get(`/api/jobs/${encodeURIComponent(jobName)}/vertical`)
+    const lateralRes = await axios.get(`/api/jobs/${encodeURIComponent(jobName)}/lateral`)
+    
+    const verticalPaths = (verticalRes.data || []).map(item => ({
+      job_name: item.to_job,
+      description: item.description
+    }))
+    
+    const lateralPaths = (lateralRes.data || []).map(item => ({
+      job_name: item.to_job || item.job_name,
+      description: item.description
+    }))
+    
+    jobGraphConfig.value.vertical = verticalPaths
+    jobGraphConfig.value.switch = lateralPaths
+  } catch (error) {
+    console.error('获取发展路径失败:', error)
+    jobGraphConfig.value.vertical = []
+    jobGraphConfig.value.switch = []
+  }
+}
+
+// 获取岗位画像
+const fetchJobProfile = async () => {
+  try {
+    loading.value = true
+    const jobId = route.query.job_id
+    const jobName = route.query.jobName
+    
+    let res
+    if (jobId) {
+      res = await axios.get(`/api/jobs/${jobId}/profile`)
+    } else if (jobName) {
+      const jobDetail = await axios.get(`/api/jobs/profile/${jobName}`)
+      if (jobDetail.data.id) {
+        res = await axios.get(`/api/jobs/${jobDetail.data.id}/profile`)
+      } else {
+        throw new Error('未找到岗位ID')
+      }
+    } else {
+      const categories = await axios.get('/api/jobs/categories')
+      const firstJob = categories.data[0] || {}
+      currentJob.value = {
+        job_name: firstJob.name || '数据分析师',
+        skills: firstJob.skills || [],
+        certificates: firstJob.certificates || [],
+        soft_abilities: firstJob.soft_abilities || {},
+        coreTags: firstJob.coreTags || []
+      }
+      loading.value = false
+      await fetchJobPaths(currentJob.value.job_name)
+      nextTick(() => initRadarChart())
+      return
+    }
+    
+    if (res && res.data) {
+      currentJob.value = {
+        ...currentJob.value,
+        job_name: res.data.job_name || '',
+        skills: res.data.skills || [],
+        certificates: res.data.certificates || [],
+        soft_abilities: res.data.soft_abilities || {},
+        coreTags: res.data.coreTags || []
+      }
+    }
+    await fetchJobPaths(currentJob.value.job_name)
+  } catch (error) {
+    console.error('获取岗位画像失败:', error)
+    ElMessage.error('加载岗位画像失败，将显示默认数据')
+    currentJob.value = {
+      job_name: '数据分析师',
+      skills: ['Python', 'SQL', 'Tableau', 'Excel', '数据分析'],
+      certificates: ['计算机二级', 'CDA', '英语六级'],
+      soft_abilities: {
+        '创新能力': { score: 4, description: '需要具备独立思考能力...' },
+        '学习能力': { score: 5, description: '数据领域技术迭代快...' },
+        '抗压能力': { score: 3, description: '需应对多任务并行处理...' },
+        '沟通能力': { score: 4, description: '需要将复杂的数据分析结果转化为易懂的业务结论...' },
+        '实习能力': { score: 4, description: '具备实际项目操作经验...' }
+      },
+      coreTags: ['Python', 'SQL', '数据分析']
+    }
+    jobGraphConfig.value = {
+      vertical: [{ job_name: '高级数据分析师', description: '需要3-5年经验' }],
+      switch: [{ job_name: '数据产品经理', description: '需要补充产品思维' }]
+    }
+  } finally {
+    loading.value = false
+    nextTick(() => initRadarChart())
+  }
+}
+
+// 图谱弹窗
+const openGraphDialog = () => {
+  graphVisible.value = true
+  nextTick(() => initJobGraph())
+}
+
+const initJobGraph = () => {
+  if (!graphChartRef.value) return
+  if (graphChart) graphChart.dispose()
+  graphChart = echarts.init(graphChartRef.value)
+
+  const vertical = jobGraphConfig.value.vertical || []
+  const lateral = jobGraphConfig.value.switch || []
+
+  const nodes = []
+  const links = []
+  const nodeMap = new Map()
+
+  vertical.forEach((item, index) => {
+    const jobName = item.job_name || item
+    if (!nodeMap.has(jobName)) {
+      nodeMap.set(jobName, { id: jobName, name: jobName, category: 0 })
+      nodes.push(nodeMap.get(jobName))
+    }
+    if (index > 0) {
+      const prevJob = vertical[index - 1].job_name || vertical[index - 1]
+      links.push({ source: prevJob, target: jobName, lineStyle: { color: '#409EFF', width: 2 }, label: { show: true, formatter: '晋升' } })
+    }
+  })
+
+  lateral.forEach(item => {
+    const jobName = item.job_name || item
+    if (!nodeMap.has(jobName)) {
+      nodeMap.set(jobName, { id: jobName, name: jobName, category: 1 })
+      nodes.push(nodeMap.get(jobName))
+    }
+    const currentJobName = currentJob.value.job_name
+    if (currentJobName && !links.some(l => l.source === currentJobName && l.target === jobName)) {
+      links.push({ source: currentJobName, target: jobName, lineStyle: { color: '#67C23A', width: 2, type: 'dashed' }, label: { show: true, formatter: '换岗' } })
+    }
+  })
+
+  if (nodes.length === 0) {
+    nodes.push({ id: 'default', name: '暂无发展路径', category: 0, symbolSize: 60, itemStyle: { color: '#909399' } })
+  }
+
+  const option = {
+    title: { text: `${currentJob.value?.job_name || '岗位'} - 职业发展路径图谱`, left: 'center' },
+    tooltip: { trigger: 'item' },
+    series: [{ type: 'graph', layout: 'force', data: nodes, links: links, roam: true, label: { show: true, fontSize: 12, position: 'right' }, force: { repulsion: 500, edgeLength: 150 } }]
+  }
+  graphChart.setOption(option)
+  window.addEventListener('resize', () => graphChart?.resize())
+}
+
+// 监听路由
 watch([() => route.query.job_id, () => route.query.jobName], () => {
   fetchJobProfile()
 }, { immediate: true })
 
-// 页面挂载时初始化
+// 生命周期
 onMounted(() => {
-  // 初始化暗黑主题
   if (localStorage.getItem('darkMode') === 'true') {
     document.body.classList.add('dark')
   }
-  
-  // 点击页面其他区域关闭下拉菜单
-  const clickHandler = (e) => {
-    if (!e.target.closest('.dropdown')) {
-      showDropdown.value = false
-    }
-    if (!e.target.closest('.user-profile')) {
-      isUserMenuOpen.value = false
-    }
-  }
-  document.addEventListener('click', clickHandler)
-  
-  // 组件卸载时清理
-  onUnmounted(() => {
-    document.removeEventListener('click', clickHandler)
-    if (graphChart) graphChart.dispose()
-    if (radarChart) radarChart.dispose() // 销毁雷达图实例
-  })
+  fetchJobProfile()
+})
+
+onUnmounted(() => {
+  if (graphChart) graphChart.dispose()
+  if (radarChart) radarChart.dispose()
 })
 </script>
+
+<style scoped>
+.empty-tip {
+  text-align: center;
+  padding: 40px 0;
+  color: #909399;
+  font-size: 14px;
+}
+
+.floating-tooltip {
+  position: fixed;
+  background: white;
+  border-radius: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  width: 320px;
+  pointer-events: none;
+  z-index: 99999;
+  animation: fadeIn 0.15s ease-out;
+  border-left: 4px solid #409EFF;
+}
+
+.floating-tooltip .tooltip-title {
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #409EFF;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 6px;
+}
+
+.floating-tooltip .tooltip-content {
+  line-height: 1.6;
+  font-size: 13px;
+  color: #333;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 原有样式保持不变 */
+.promotion-tooltip, .switch-tooltip {
+  display: none;
+}
+</style>
 
 <style scoped>
 /* 全局容器 */

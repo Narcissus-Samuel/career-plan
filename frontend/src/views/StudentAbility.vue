@@ -11,24 +11,6 @@
             <li class="menu-item" @click="$router.push('/')">首页</li>
             <li class="menu-item active" @click="$router.push('/student-ability')">职业规划</li>
             <li class="menu-item" @click="$router.push('/report-export')">报告导出</li>
-            <!-- <li class="menu-item" @click="$router.push('/about-us')">关于我们</li> -->
-            <!-- <li class="menu-item dropdown">
-              核心功能 ▼
-              <ul class="dropdown-menu">
-                <li class="dropdown-item" @click="goToFeature('测评')">
-                  <span class="color-dot red"></span> 职业兴趣测评
-                </li>
-                <li class="dropdown-item" @click="goToFeature('分析')">
-                  <span class="color-dot orange"></span> 能力短板分析
-                </li>
-                <li class="dropdown-item" @click="goToFeature('规划')">
-                  <span class="color-dot green"></span> 发展路径规划
-                </li>
-                <li class="dropdown-item" @click="goToFeature('导出')">
-                  <span class="color-dot blue"></span> 规划报告导出
-                </li>
-              </ul>
-            </li> -->
           </ul>
         </div>
         <div class="nav-right">
@@ -43,7 +25,6 @@
             <img :src="userAvatar || 'https://picsum.photos/seed/avatar/40/40'" alt="头像" class="avatar" @click="toggleUserMenu" />
             <div class="user-menu" v-show="isUserMenuOpen">
               <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
-              <!-- <div class="menu-item" @click="$router.push('/settings')">账号设置</div> -->
               <div class="menu-item logout" @click="handleLogout">退出登录</div>
             </div>
           </div>
@@ -172,18 +153,33 @@ const isLogin = ref(!!localStorage.getItem('token'))
 const userAvatar = ref(localStorage.getItem('avatar') || '')
 const isUserMenuOpen = ref(false)
 const darkMode = ref(localStorage.getItem('darkMode') === 'true')
-const userId = ref(localStorage.getItem('userId') || 1)
 
+// 从 token 解析 userId
+const getUserIdFromToken = () => {
+  const token = localStorage.getItem('token')
+  if (token && token.startsWith('mock-token-')) {
+    const parts = token.split('-')
+    return parseInt(parts[parts.length - 1])
+  }
+  return null
+}
+
+const userId = ref(getUserIdFromToken())
 const historyProfiles = ref([])
 const historyFiles = ref([])
 
 const api = axios.create({
   baseURL: 'http://127.0.0.1:5000/api',
-  headers: { 
-    Authorization: localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '',
-    'Content-Type': 'application/json'
-  },
   timeout: 30000
+})
+
+// 添加请求拦截器，自动添加 token
+api.interceptors.request.use(config => {
+  const token = localStorage.getItem('token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
 })
 
 const formData = reactive({
@@ -233,6 +229,7 @@ const handleLogout = () => {
 const toggleTheme = () => {
   darkMode.value = !darkMode.value
   localStorage.setItem('darkMode', darkMode.value)
+  document.body.classList.toggle('dark', darkMode.value)
 }
 
 const goToFeature = (type) => {
@@ -276,18 +273,26 @@ const validateAndSetFile = (file) => {
 
 const removeFile = () => {
   uploadedFile.value = null
-  fileInput.value.value = ''
+  if (fileInput.value) fileInput.value.value = ''
 }
 
 const submitManualForm = async () => {
+  // 检查登录状态
+  if (!userId.value) {
+    ElMessage.error('请先登录')
+    router.push('/login')
+    return
+  }
+  
   if (!formData.name) {
     ElMessage.warning('请填写姓名')
     return
   }
+  
   submitting.value = true
   try {
     const payload = {
-      user_id: parseInt(userId.value),
+      user_id: userId.value,
       name: formData.name,
       phone: formData.phone,
       email: formData.email,
@@ -297,45 +302,97 @@ const submitManualForm = async () => {
       skills_certs: formData.skills_certs,
       summary: formData.summary
     }
+    
+    console.log('手动提交参数:', payload)
     const res = await api.post('/profile/submit', payload)
-    if (res.data.student_id) {
+    console.log('手动提交响应:', res.data)
+    
+    if (res.data && res.data.student_id) {
       localStorage.setItem('studentId', res.data.student_id)
-      ElMessage.success('信息提交成功')
-      router.push({ path: '/ability-analysis', query: { studentId: res.data.student_id } })
+      ElMessage.success('信息提交成功，正在生成能力画像...')
+      // 跳转到能力画像页面
+      router.push({
+        path: '/ability-analysis',
+        query: { studentId: res.data.student_id }
+      })
+    } else {
+      ElMessage.error('提交失败：' + (res.data.error || '未返回学生ID'))
     }
   } catch (err) {
-    ElMessage.error('提交失败')
+    console.error('手动提交错误:', err)
+    const errorMsg = err.response?.data?.error || err.message || '提交失败'
+    ElMessage.error('提交失败：' + errorMsg)
   } finally {
     submitting.value = false
   }
 }
 
 const submitUploadFile = async () => {
+  if (!userId.value) {
+    ElMessage.error('请先登录')
+    router.push('/login')
+    return
+  }
+  
   if (!uploadedFile.value) {
     ElMessage.warning('请先选择文件')
     return
   }
+  
   uploading.value = true
   try {
     const fd = new FormData()
     fd.append('file', uploadedFile.value)
     fd.append('user_id', userId.value)
-    const res = await api.post('/profile/upload', fd)
-    if (res.data.student_id) {
+    
+    const res = await api.post('/profile/upload', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    
+    console.log('文件上传响应:', res.data)
+    
+    if (res.data && res.data.student_id) {
       localStorage.setItem('studentId', res.data.student_id)
-      ElMessage.success('简历上传成功')
-      router.push({ path: '/ability-analysis', query: { studentId: res.data.student_id } })
+      ElMessage.success('简历上传成功，正在生成能力画像...')
+      router.push({
+        path: '/ability-analysis',
+        query: { studentId: res.data.student_id }
+      })
+    } else {
+      ElMessage.error('上传失败：' + (res.data.error || '未返回学生ID'))
     }
   } catch (err) {
-    ElMessage.error('上传失败')
+    console.error('文件上传错误:', err)
+    const errorMsg = err.response?.data?.error || err.message || '上传失败'
+    ElMessage.error('上传失败：' + errorMsg)
   } finally {
     uploading.value = false
   }
 }
 
+// 获取当前用户信息，确保 userId 正确
+const fetchCurrentUser = async () => {
+  try {
+    const res = await api.get('/user')
+    if (res.data && res.data.id) {
+      userId.value = res.data.id
+      localStorage.setItem('userId', userId.value)
+      console.log('获取到用户ID:', userId.value)
+    }
+  } catch (err) {
+    console.error('获取用户信息失败:', err)
+  }
+}
+
 onMounted(async () => {
+  // 应用主题
+  if (darkMode.value) {
+    document.body.classList.add('dark')
+  }
+  
+  // 检查登录状态
   if (!isLogin.value) {
-    ElMessageBox.confirm('请先登录后再填写信息','提示',{
+    ElMessageBox.confirm('请先登录后再填写信息', '提示', {
       confirmButtonText: '去登录',
       cancelButtonText: '返回首页',
       type: 'warning'
@@ -346,8 +403,16 @@ onMounted(async () => {
     })
     return
   }
+  
+  // 如果 userId 为空，尝试从 /api/user 获取
+  if (!userId.value) {
+    await fetchCurrentUser()
+  }
+  
+  console.log('当前用户ID:', userId.value)
 })
 </script>
+
 
 <style scoped>
 .student-ability-page {

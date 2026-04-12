@@ -369,22 +369,20 @@ const loadUserStats = async () => {
   try {
     const { data } = await authAxios.get('/user/stats')
     userStats.value = data || { assessmentCount: 0, planCount: 0 }
-  } catch (e) {}
+  } catch (e) {
+    console.error('加载统计数据失败', e)
+  }
 }
 
+// 加载职业规划报告（使用 /user/plans 接口）
 const loadCareerPlans = async () => {
   try {
-    const studentId = localStorage.getItem('studentId')
-    if (!studentId) {
-      careerPlans.value = []
-      return
-    }
-    const { data } = await authAxios.get(`/report/history/${studentId}`)
+    const { data } = await authAxios.get('/user/plans')
     careerPlans.value = data.map(item => ({
       id: item.id,
-      title: `${item.job_name} 职业规划报告`,
-      target: item.job_name,
-      created_at: item.created_at
+      title: item.title,
+      target: item.targetJob,
+      created_at: item.createTime
     }))
   } catch (e) {
     console.error('加载职业规划报告失败', e)
@@ -392,33 +390,38 @@ const loadCareerPlans = async () => {
   }
 }
 
+// 加载兴趣测评报告（使用 /user/interest-reports 接口）
 const loadInterestReports = async () => {
   try {
-    if (!userInfo.value.id) {
-      interestReports.value = []
-      return
-    }
-    const { data } = await authAxios.get(`/assessment/history/${userInfo.value.id}`)
-    let list = Array.isArray(data) ? data : (data?.list || [])
-    interestReports.value = list.map(item => ({
-      id: item.id || 1,
-      created_at: item.created_at || item.createTime || new Date()
+    const { data } = await authAxios.get('/user/interest-reports')
+    interestReports.value = data.map(item => ({
+      id: item.id,
+      title: item.title,
+      type: item.type,
+      result: item.result,
+      suitableJobs: item.suitableJobs,
+      created_at: item.createTime
     }))
   } catch (e) {
+    console.error('加载兴趣测评报告失败', e)
     interestReports.value = []
   }
 }
 
+// 加载人岗匹配报告（使用 /user/match-reports 接口）
 const loadMatchReports = async () => {
   try {
-    const studentId = localStorage.getItem('studentId')
-    if (!studentId) {
-      matchReports.value = []
-      return
-    }
-    const { data } = await authAxios.get(`/match/history/${studentId}`)
-    matchReports.value = data.history || []
+    const { data } = await authAxios.get('/user/match-reports')
+    matchReports.value = data.map(item => ({
+      id: item.id,
+      job_name: item.targetJob,
+      match_score: item.score,
+      result: item.result,
+      suggestion: item.suggestion,
+      created_at: item.createTime
+    }))
   } catch (e) {
+    console.error('加载人岗匹配报告失败', e)
     matchReports.value = []
   }
 }
@@ -426,7 +429,12 @@ const loadMatchReports = async () => {
 const switchTab = (tab) => { activeTab.value = tab }
 const formatDate = (s) => {
   if (!s) return ''
-  try { return new Date(s).toLocaleString() } catch { return '' }
+  try { 
+    const date = new Date(s)
+    return date.toLocaleString()
+  } catch { 
+    return ''
+  }
 }
 
 // 头像上传
@@ -449,25 +457,38 @@ const handleAvatarUpload = async (e) => {
   }
 }
 
-// 密码/手机
+// 修改密码
 const changePassword = async () => {
   const { oldPwd, newPwd, confirmPwd } = pwdForm.value
-  if (!oldPwd || !newPwd || newPwd !== confirmPwd) {
-    ElMessage.warning('请检查密码输入')
+  if (!oldPwd || !newPwd) {
+    ElMessage.warning('请填写原密码和新密码')
+    return
+  }
+  if (newPwd !== confirmPwd) {
+    ElMessage.warning('两次输入的新密码不一致')
     return
   }
   try {
     await authAxios.post('/user/change-password', { oldPwd, newPwd })
     ElMessage.success('密码修改成功，请重新登录')
-    handleLogout()
+    showChangePwdModal.value = false
+    setTimeout(() => {
+      handleLogout()
+    }, 1500)
   } catch (e) {
-    ElMessage.error('原密码错误')
+    ElMessage.error(e.response?.data?.error || '密码修改失败')
   }
 }
+
+// 绑定手机
 const bindPhone = async () => {
   const { phone } = phoneForm.value
   if (!phone) {
     ElMessage.warning('请输入手机号')
+    return
+  }
+  if (!/^1[3-9]\d{9}$/.test(phone)) {
+    ElMessage.warning('请输入正确的手机号')
     return
   }
   try {
@@ -476,15 +497,22 @@ const bindPhone = async () => {
     ElMessage.success('绑定成功')
     showBindPhoneModal.value = false
   } catch (e) {
-    ElMessage.error('绑定失败')
+    ElMessage.error(e.response?.data?.error || '绑定失败')
   }
 }
+
 const closeModal = (t) => {
-  if (t === 'changePwd') showChangePwdModal.value = false
-  if (t === 'bindPhone') showBindPhoneModal.value = false
+  if (t === 'changePwd') {
+    showChangePwdModal.value = false
+    pwdForm.value = { oldPwd: '', newPwd: '', confirmPwd: '' }
+  }
+  if (t === 'bindPhone') {
+    showBindPhoneModal.value = false
+    phoneForm.value = { phone: '' }
+  }
 }
 
-// ====================== 导出PDF（对接你给的后端接口） ======================
+// ====================== 导出报告 ======================
 // 导出职业规划报告 PDF
 const exportCareerPDF = async (id) => {
   try {
@@ -501,8 +529,8 @@ const exportCareerPDF = async (id) => {
     window.URL.revokeObjectURL(url)
     ElMessage.success('PDF报告导出成功！')
   } catch (err) {
-    ElMessage.error('PDF导出失败，已自动下载MD报告')
-    window.open(`/api/report/export/career/${id}`, '_blank')
+    console.error('导出失败', err)
+    ElMessage.error('PDF导出失败')
   }
 }
 
@@ -522,8 +550,8 @@ const exportInterestPDF = async (id) => {
     window.URL.revokeObjectURL(url)
     ElMessage.success('PDF报告导出成功！')
   } catch (err) {
-    ElMessage.error('PDF导出失败，已自动下载MD报告')
-    window.open(`/api/report/export/interest/${id}`, '_blank')
+    console.error('导出失败', err)
+    ElMessage.error('PDF导出失败')
   }
 }
 
@@ -543,27 +571,34 @@ const exportMatchPDF = async (id) => {
     window.URL.revokeObjectURL(url)
     ElMessage.success('PDF报告导出成功！')
   } catch (err) {
-    ElMessage.error('PDF导出失败，已自动下载MD报告')
-    window.open(`/api/report/export/match/${id}`, '_blank')
+    console.error('导出失败', err)
+    ElMessage.error('PDF导出失败')
   }
 }
-// ========================================================================
 
+// ====================== 导航功能 ======================
 const toggleTheme = () => {
   darkMode.value = !darkMode.value
   localStorage.setItem('darkMode', darkMode.value)
   document.body.classList.toggle('dark', darkMode.value)
 }
+
 const handleLogout = () => {
   localStorage.clear()
   router.push('/login')
+  ElMessage.success('已退出登录')
 }
+
 const toggleUserMenu = () => {
   isUserMenuOpen.value = !isUserMenuOpen.value
 }
+
 const handleSearch = () => {
-  const i = document.querySelector('.nav-search-input')
-  if (i?.value) router.push(`/search?keyword=${i.value}`)
+  const input = document.querySelector('.nav-search-input')
+  const keyword = input?.value?.trim()
+  if (keyword) {
+    router.push(`/search?keyword=${encodeURIComponent(keyword)}`)
+  }
 }
 
 onMounted(async () => {

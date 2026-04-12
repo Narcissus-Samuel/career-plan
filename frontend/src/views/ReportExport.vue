@@ -1,6 +1,6 @@
 <template>
   <div class="report-export-page">
-    <!-- 顶部导航栏（和测评页面完全一致） -->
+    <!-- 顶部导航栏 -->
     <header class="top-nav">
       <div class="nav-wrap">
         <div class="nav-left">
@@ -10,26 +10,8 @@
           </div>
           <ul class="nav-menu">
             <li class="menu-item" @click="$router.push('/')">首页</li>
-            <li class="menu-item " @click="$router.push('/career-planning-intro')">职业规划</li>
+            <li class="menu-item" @click="$router.push('/career-planning-intro')">职业规划</li>
             <li class="menu-item active" @click="$router.push('/report-export')">报告导出</li>
-            <!-- <li class="menu-item" @click="$router.push('/about-us')">关于我们</li>
-            <li class="menu-item dropdown">
-              核心功能 ▼
-              <ul class="dropdown-menu">
-                <li class="dropdown-item" @click="goToFeature('测评')">
-                  <span class="color-dot red"></span> 职业测评
-                </li>
-                <li class="dropdown-item" @click="goToFeature('分析')">
-                  <span class="color-dot orange"></span> 能力短板分析
-                </li>
-                <li class="dropdown-item" @click="goToFeature('规划')">
-                  <span class="color-dot green"></span> 发展路径规划
-                </li>
-                <li class="dropdown-item active" @click="goToFeature('导出')">
-                  <span class="color-dot blue"></span> 规划报告导出
-                </li>
-              </ul>
-            </li> -->
           </ul>
         </div>
 
@@ -58,7 +40,6 @@
             >
             <div class="user-menu" v-show="isUserMenuOpen">
               <div class="menu-item" @click="$router.push('/profile')">个人中心</div>
-              <!-- <div class="menu-item" @click="$router.push('/settings')">账号设置</div> -->
               <div class="menu-item logout" @click="handleLogout">退出登录</div>
             </div>
           </div>
@@ -83,7 +64,7 @@
 
     <!-- 页面主体内容 -->
     <div class="report-export">
-      <!-- 报告列表（从数据库加载） -->
+      <!-- 报告列表（从三个接口加载） -->
       <div class="report-list-section" v-if="!showHistory">
         <h3 class="section-title">我的报告列表</h3>
         <div class="filter-row">
@@ -162,7 +143,7 @@
                 <button class="mini-btn" @click="loadReport(item)">编辑</button>
                 <button class="mini-btn export" @click="quickExport(item)">导出</button>
               </td>
-            </tr>
+             </tr>
           </tbody>
         </table>
       </div>
@@ -189,6 +170,7 @@ const router = useRouter()
 // 登录校验
 const token = localStorage.getItem('token')
 const studentId = localStorage.getItem('studentId')
+const userId = localStorage.getItem('userId')
 
 if (!token) {
   ElMessage.warning('请先登录')
@@ -242,7 +224,7 @@ const goToFeature = (type) => {
 
 const handleSearch = () => {
   const ipt = document.querySelector('.nav-search-input')
-  const k = ipt.value.trim()
+  const k = ipt?.value?.trim()
   if (k) {
     router.push(`/search?keyword=${encodeURIComponent(k)}`)
     ipt.value = ''
@@ -250,142 +232,148 @@ const handleSearch = () => {
   } else ElMessage.warning('请输入关键词')
 }
 
-// =============== 从后端加载真实报告数据 ===============
+// =============== 从后端加载真实报告数据（使用三个新接口）===============
 const allReports = ref([])
 
-// 1. 加载兴趣测试报告
-const loadInterestReports = async () => {
+// 1. 加载职业规划报告（使用 /api/user/plans）
+const loadCareerPlans = async () => {
   try {
-    const { data: user } = await authAxios.get('/user/profile')
-    if (!user.id) return []
-
-    const { data } = await authAxios.get(`/assessment/history/${user.id}`)
-    const list = Array.isArray(data) ? data : []
-
-    return list.map(item => {
-      const scores = item.dimension_scores || {}
-      const content = `
-【霍兰德职业兴趣测评报告】
-
-一、维度得分
-现实型(R)：${scores.R || 0} 分
-研究型(I)：${scores.I || 0} 分
-艺术型(A)：${scores.A || 0} 分
-社会型(S)：${scores.S || 0} 分
-企业型(E)：${scores.E || 0} 分
-常规型(C)：${scores.C || 0} 分
-
-二、测评结果
-${item.recommendation || '暂无分析'}
-
-三、报告说明
-• 分数越高代表该维度倾向越明显
-• 建议结合专业与兴趣进行职业规划
-`
-      return {
-        id: 'interest_' + item.id,
-        title: `霍兰德测评报告 #${item.id}`,
-        type: 'interest_test',
-        content: content,
-        created_at: item.created_at
-      }
-    })
+    const { data } = await authAxios.get('/user/plans')
+    if (!Array.isArray(data)) return []
+    
+    return data.map(item => ({
+      id: `career_${item.id}`,
+      title: item.title || `${item.targetJob} 职业规划报告`,
+      type: 'career_plan',
+      content: generateCareerPlanContent(item),
+      created_at: item.createTime || new Date().toLocaleString(),
+      originalId: item.id,
+      originalType: 'career'
+    }))
   } catch (e) {
-    console.error('加载兴趣报告失败', e)
+    console.error('加载职业规划报告失败', e)
     return []
   }
 }
 
-// 2. 加载人岗匹配报告（学生ID版）
+// 生成职业规划报告内容
+const generateCareerPlanContent = (item) => {
+  return `
+【职业生涯规划报告】
+
+一、基本信息
+目标岗位：${item.targetJob || '未指定'}
+规划周期：${item.cycle || '1-3年'}
+生成时间：${item.createTime || new Date().toLocaleString()}
+
+二、发展规划
+${item.content || '请通过职业规划功能生成详细报告'}
+
+三、实施建议
+• 定期复盘，每季度评估进展
+• 持续学习，紧跟行业动态
+• 积累项目经验，提升实战能力
+`
+}
+
+// 2. 加载人岗匹配报告（使用 /api/user/match-reports）
 const loadMatchReports = async () => {
   try {
-    if (!studentId) return []
-    const { data } = await authAxios.get(`/match/history/${studentId}`)
-    const history = data.history || []
+    const { data } = await authAxios.get('/user/match-reports')
+    if (!Array.isArray(data)) return []
+    
+    return data.map(item => ({
+      id: `match_${item.id}`,
+      title: item.title || `${item.targetJob} 匹配报告`,
+      type: 'job_match',
+      content: generateMatchReportContent(item),
+      created_at: item.createTime || new Date().toLocaleString(),
+      originalId: item.id,
+      originalType: 'match',
+      matchScore: item.score
+    }))
+  } catch (e) {
+    console.error('加载人岗匹配报告失败', e)
+    return []
+  }
+}
 
-    return history.map(item => {
-      const detail = JSON.parse(item.details || '{}')
-      const gap = detail.gap_analysis || {}
-
-      const skillFit = detail.skill_fit ?? 0
-      const certCov = detail.cert_coverage ?? 0
-      const eduScore = detail.education_score ?? 0
-      const expScore = detail.experience_score ?? 0
-      const softGap = detail.soft_gap ?? 0
-      const softAbility = (100 - softGap).toFixed(1)
-
-      const content = `
+// 生成人岗匹配报告内容
+const generateMatchReportContent = (item) => {
+  return `
 【人岗匹配分析报告】
 
 一、基本信息
-岗位名称：${item.job_name}
-综合匹配度：${item.match_score || 0}%
-生成时间：${new Date(item.created_at * 1000).toLocaleString()}
+目标岗位：${item.targetJob || '未指定'}
+综合匹配度：${item.score || 0}%
+匹配等级：${item.result || '待评估'}
+生成时间：${item.createTime || new Date().toLocaleString()}
 
-二、详细匹配数据
-• 技能匹配度：${skillFit}%
-• 证书覆盖率：${certCov}%
-• 教育背景评分：${eduScore}%
-• 经验匹配度：${expScore}%
-• 软能力匹配度：${softAbility}%
+二、匹配分析
+${item.suggestion || '暂无详细分析'}
 
-三、差距分析与改进建议
-1. 基础要求提升建议
-${gap.base || '当前基础要求与岗位存在一定差距，建议提升学历背景或相关基础证书。'}
-
-2. 职业技能提升建议
-${gap.skills || '建议系统学习岗位所需核心技能，如框架使用、工程化工具、项目实战等。'}
-
-3. 职业素养提升建议
-${gap.quality || '多参与团队协作、沟通表达类实践，提升综合职业素养。'}
-
-4. 发展潜力提升建议
-${gap.potential || '根据匹配结果制定阶段性学习计划，逐步积累项目经验与实战能力。'}
-
-5. 推荐学习资源
-${gap.recommended_resources || '推荐：Vue官方文档、慕课网实战课程、LeetCode算法练习、GitHub开源项目。'}
+三、改进建议
+• 针对薄弱环节制定学习计划
+• 补充相关证书和项目经验
+• 提升软能力和职业素养
 `
-      return {
-        id:item.id,
-        title: `${item.job_name} 匹配报告`,
-        type: 'job_match',
-        content: content,
-        created_at: new Date(item.created_at * 1000).toLocaleString()
-      }
-    })
-  } catch (e) {
-    console.error('加载匹配报告失败', e)
-    return []
-  }
 }
 
-// 3. 加载职业规划报告（学生ID版）
-const loadCareerPlans = async () => {
+// 3. 加载兴趣测评报告（使用 /api/user/interest-reports）
+const loadInterestReports = async () => {
   try {
-    if (!studentId) return []
-    const { data } = await authAxios.get(`/report/history/${studentId}`)
-    const realList = Array.isArray(data) ? data : []
-    return realList.map(item => ({
-      id: item.id,
-      title: `${item.job_name} 职业生涯规划报告`,
-      type: 'career_plan',
-      content: item.content || '暂无内容',
-      created_at: item.created_at || new Date().toLocaleString()
+    const { data } = await authAxios.get('/user/interest-reports')
+    if (!Array.isArray(data)) return []
+    
+    return data.map(item => ({
+      id: `interest_${item.id}`,
+      title: item.title || '霍兰德职业兴趣测评报告',
+      type: 'interest_test',
+      content: generateInterestReportContent(item),
+      created_at: item.createTime || new Date().toLocaleString(),
+      originalId: item.id,
+      originalType: 'interest'
     }))
   } catch (e) {
-    console.error('加载规划报告失败', e)
+    console.error('加载兴趣测评报告失败', e)
     return []
   }
 }
 
-// 统一加载所有报告
+// 生成兴趣测评报告内容
+const generateInterestReportContent = (item) => {
+  return `
+【霍兰德职业兴趣测评报告】
+
+一、测评结果
+${item.result || '根据您的测评结果，建议关注以下职业方向'}
+
+二、推荐岗位
+${item.suitableJobs || '产品经理、人力资源、心理咨询师、市场营销、教育培训'}
+
+三、发展建议
+• 结合兴趣选择适合的职业方向
+• 参加相关实践活动积累经验
+• 持续探索和调整职业规划
+`
+}
+
+// 统一加载所有报告（使用三个新接口）
 const loadAllReports = async () => {
   try {
-    const interest = await loadInterestReports()
-    const match = await loadMatchReports()
-    const plan = await loadCareerPlans()
-    allReports.value = [...interest, ...match, ...plan]
-
+    const [careerPlans, matchReports, interestReports] = await Promise.all([
+      loadCareerPlans(),
+      loadMatchReports(),
+      loadInterestReports()
+    ])
+    
+    allReports.value = [...careerPlans, ...matchReports, ...interestReports]
+    
+    // 按时间倒序排序
+    allReports.value.sort((a, b) => {
+      return new Date(b.created_at) - new Date(a.created_at)
+    })
+    
     if (allReports.value.length === 0) {
       ElMessage.info('暂无报告数据，请先去完成测评或规划')
     }
@@ -478,19 +466,17 @@ const quickExport = (item) => {
   setTimeout(() => exportFinalReport(), 300)
 }
 
-// =============== 导出报告（安全带token版）===============
+// =============== 导出报告 ================
 const exportFinalReport = async () => {
   if (!currentReport.value) return
   saveEdit()
 
-  const type = currentReport.value.type
-  const content = editContent.value
   const title = currentReport.value.title
+  const content = editContent.value
   const format = exportFormat.value
 
   try {
     if (format === 'pdf') {
-      // 导出 PDF
       const html = `
         <html>
         <head>
@@ -506,8 +492,8 @@ const exportFinalReport = async () => {
           </style>
         </head>
         <body>
-          <h1>${title}</h1>
-          ${content.replace(/\n/g, '<br>')}
+          <h1>${escapeHtml(title)}</h1>
+          ${content.replace(/\n/g, '<br>').replace(/\|/g, '｜')}
         </body>
         </html>
       `
@@ -521,7 +507,6 @@ const exportFinalReport = async () => {
       ElMessage.success('PDF 导出成功')
 
     } else if (format === 'word') {
-      // 导出 Word
       const html = `
         <html>
         <head>
@@ -533,7 +518,7 @@ const exportFinalReport = async () => {
           </style>
         </head>
         <body>
-          <h1>${title}</h1>
+          <h1>${escapeHtml(title)}</h1>
           ${content.replace(/\n/g, '<br>')}
         </body>
         </html>
@@ -546,7 +531,6 @@ const exportFinalReport = async () => {
       ElMessage.success('Word 导出成功')
 
     } else {
-      // 导出 MD
       const blob = new Blob([content], { type: 'text/markdown' })
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
@@ -561,12 +545,22 @@ const exportFinalReport = async () => {
   }
 }
 
+// HTML转义
+const escapeHtml = (text) => {
+  if (!text) return ''
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 onMounted(() => {
   applyTheme()
   loadAllReports()
 })
 </script>
-
 <style scoped>
 /* 整体页面布局（和测评完全一致） */
 .report-export-page {
