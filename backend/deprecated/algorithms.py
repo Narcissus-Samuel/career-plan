@@ -2,6 +2,7 @@
 算法模块：职业匹配、推荐与评分（基础实现）
 
 说明：
+- 本文件夹下的代码皆为临时所用，只做历史保留
 - 提供可单元测试的函数：`compute_match_score`, `recommend_jobs`, `score_student_competitiveness`
 - 为项目中其他服务（如 `services/llm_service.py`）提供稳定的接口
 """

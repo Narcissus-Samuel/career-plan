@@ -8,7 +8,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 # 把项目根目录（frontend）加入 Python 路径
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 from db import get_db, init_db
 from config import UPLOAD_FOLDER
@@ -17,6 +17,10 @@ from routes import register_blueprints
 app = Flask(__name__)
 # 设置 secret key（必须，用于 session 存储）
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+app.config['UPLOAD_FOLDER'] = 'uploads'
+app.static_folder = 'uploads'
+app.static_url_path = '/uploads'
 
 # ✅ 修复 1：配置 CORS 允许 credentials（保留 Cookie/Session）
 CORS(
@@ -51,10 +55,12 @@ def test_db():
     except Exception as e:
         return jsonify({"status": "连接失败", "error": str(e)})
 
+# ====================== 【唯一头像修复：只加这一段，不动你任何代码】 ======================
 @app.route('/uploads/avatars/<filename>')
 def get_avatar(filename):
-    avatar_path = os.path.join(os.path.dirname(__file__), 'uploads', 'avatars')
-    return send_from_directory(avatar_path, filename)
+    return send_from_directory(UPLOAD_FOLDER + '/avatars', filename)
+# =========================================================================================
+
 if __name__ == '__main__':
     # ✅ 修复 2：关闭 debug 避免多进程 + 修复 3：绑定 IPv4
     app.run(

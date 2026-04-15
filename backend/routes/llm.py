@@ -1,3 +1,16 @@
+"""
+大模型服务接口蓝图
+功能：提供AI相关接口，包括DeepSeek连接测试、智能岗位推荐、学习计划生成、智能问答等
+
+重要说明：
+1. 本文件封装所有AI大模型调用能力，依赖llm_service服务层；
+2. 核心能力：智能岗位推荐、个性化学习计划生成、知识库问答；
+3. 敏感接口均添加token_required鉴权，保证接口安全；
+4. 统一前缀 /api/llm，返回格式均为标准JSON；
+5. 依赖环境变量：DEEPSEEK_API_KEY，用于大模型API调用。
+项目正式环境底层实际接入【阿里云大模型】，DeepSeek 接口仅作测试、调试使用；
+"""
+
 from flask import Blueprint, request, jsonify
 from services import llm_service
 from db import get_db
