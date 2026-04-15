@@ -1,3 +1,15 @@
+"""
+管理员后台接口蓝图（admin_bp）
+功能：提供管理员登录、用户管理、岗位管理、报告管理、AI 岗位聚类/画像/图谱构建等后台接口。
+
+重要说明：
+1. 本文件包含项目迭代过程中的所有后台管理接口，部分接口为历史版本或废弃功能，未实际使用；
+2. 文件中涉及【短信验证码】相关逻辑已废弃，当前系统未启用，仅保留代码不删除；
+3. 部分 AI 聚类、岗位分类功能为早期设计，当前主程序未使用；
+4. 核心在用接口：管理员登录、用户增删改查、岗位管理、报告管理；
+5. 废弃/未使用：验证码发送、部分 AI 自动分类接口；
+6. 所有代码均为历史迭代保留，不影响当前系统正常运行。
+"""
 from flask import Blueprint, request, jsonify
 from db import get_db
 from .auth import admin_required, verify_token
@@ -141,7 +153,7 @@ def delete_category(cid):
     return jsonify({"status": "deleted"})
 
 
-# ====================== 岗位数据管理（100% 匹配你的数据库） ======================
+# ====================== 岗位数据管理 ======================
 @admin_bp.route('/jobs', methods=['GET'])
 @admin_required
 def get_all_jobs():

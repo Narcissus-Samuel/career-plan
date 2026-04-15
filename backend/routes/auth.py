@@ -1,3 +1,24 @@
+"""
+用户认证与个人中心核心模块 (Auth & Profile Core Module)
+
+本模块是整个系统的**身份验证网关**与**用户数据中枢**，负责处理用户从注册到登录的全生命周期权限管理，
+同时聚合用户的档案、简历、测评报告、浏览历史等核心业务数据。
+
+核心功能：
+1. 【认证安全】提供登录、注册、验证码（功能已删）、图形验证、密码修改、头像上传等基础身份服务
+2. 【权限控制】基于 Mock Token 的身份验证装饰器 (@token_required) 与管理员权限 (@admin_required)
+3. 【个人中心】用户档案读写、简历解析/存储、个人信息完善
+4. 【数据聚合】统一获取用户的兴趣测评、人岗匹配、职业规划等各类报告历史
+5. 【行为追踪】管理用户的浏览历史记录与系统使用统计数据
+
+废弃说明：
+- 以下接口已被注释或临时禁用，属于备用/未使用代码，不会影响系统正常运行：
+  1. `/user/students` (获取用户学生列表) - 已注释，无外部调用
+
+注意事项：
+- 本模块依赖 `db.py` 数据库连接及 `services/llm_service.py` 用于简历文本智能解析
+- 所有接口均经过严格的权限校验，请谨慎移除装饰器
+"""
 import io
 import random
 import string
@@ -346,14 +367,16 @@ def upload_avatar():
     if not file.content_type.startswith('image/'):
         return jsonify({'error': 'invalid image type'}), 400
 
-    # 保存文件
     filename = secure_filename(f"{uuid.uuid4().hex}_{file.filename}")
-    upload_folder = os.path.join(os.path.dirname(__file__), '..', 'uploads', 'avatars')
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    upload_folder = os.path.join(base_dir, '..', 'uploads', 'avatars')
     os.makedirs(upload_folder, exist_ok=True)
+
     file_path = os.path.join(upload_folder, filename)
     file.save(file_path)
 
     avatar_url = f"/uploads/avatars/{filename}"
+
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("UPDATE users SET avatar = ? WHERE id = ?", (avatar_url, request.user['id']))
@@ -697,4 +720,100 @@ def get_all_reports():
     # 按创建时间倒序排序（已按数据库顺序，但为了保险再排一次）
     reports.sort(key=lambda x: x['created_at'], reverse=True)
     return jsonify(reports)
+# ==========================
+# ✅ 添加到 auth.py 末尾
+# ==========================
+
+# 1. 删除职业规划报告
+@auth_bp.route('/user/report/career/<int:report_id>', methods=['DELETE'])
+@token_required
+def delete_career_report(report_id):
+    """删除职业规划报告"""
+    user = request.user
+    conn = get_db()
+    cursor = conn.cursor()
+
+    try:
+        # 验证报告属于当前用户
+        cursor.execute('''
+            SELECT r.id FROM report_history r
+            JOIN student s ON r.student_id = s.id
+            WHERE r.id = ? AND s.user_id = ?
+        ''', (report_id, user['id']))
+        
+        if not cursor.fetchone():
+            return jsonify({'error': '报告不存在或无权限'}), 404
+
+        cursor.execute("DELETE FROM report_history WHERE id = ?", (report_id,))
+        conn.commit()
+        
+        return jsonify({'status': 'deleted', 'message': '职业规划报告已删除'})
+    
+    except Exception as e:
+        print(f"删除职业规划报告失败: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+# 2. 删除兴趣测评报告
+@auth_bp.route('/user/report/interest/<int:result_id>', methods=['DELETE'])
+@token_required
+def delete_interest_report(result_id):
+    """删除兴趣测评报告"""
+    user = request.user
+    conn = get_db()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('''
+            SELECT id FROM assessment_results
+            WHERE id = ? AND user_id = ?
+        ''', (result_id, user['id']))
+        
+        if not cursor.fetchone():
+            return jsonify({'error': '报告不存在或无权限'}), 404
+
+        cursor.execute("DELETE FROM assessment_results WHERE id = ?", (result_id,))
+        conn.commit()
+        
+        return jsonify({'status': 'deleted', 'message': '兴趣测评报告已删除'})
+    
+    except Exception as e:
+        print(f"删除兴趣测评报告失败: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+# 3. 删除人岗匹配报告
+@auth_bp.route('/user/report/match/<int:match_id>', methods=['DELETE'])
+@token_required
+def delete_match_report(match_id):
+    """删除人岗匹配报告"""
+    user = request.user
+    conn = get_db()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('''
+            SELECT m.id FROM match_history m
+            JOIN student s ON m.student_id = s.id
+            WHERE m.id = ? AND s.user_id = ?
+        ''', (match_id, user['id']))
+        
+        if not cursor.fetchone():
+            return jsonify({'error': '报告不存在或无权限'}), 404
+
+        cursor.execute("DELETE FROM match_history WHERE id = ?", (match_id,))
+        conn.commit()
+        
+        return jsonify({'status': 'deleted', 'message': '人岗匹配报告已删除'})
+    
+    except Exception as e:
+        print(f"删除人岗匹配报告失败: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
     

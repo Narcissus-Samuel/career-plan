@@ -49,8 +49,8 @@
           <div class="user-info-card">
             <div class="avatar-container">
               <img :src="userInfo.avatar || 'https://picsum.photos/seed/avatar/200/200'" alt="用户头像" class="user-avatar">
-              <label class="avatar-upload-btn" @click="triggerAvatarUpload">
-                <input type="file" accept="image/*" @change="handleAvatarUpload" hidden ref="avatarInput">
+              <label class="avatar-upload-btn" for="avatarInput">
+                <input type="file" accept="image/*" @change="handleAvatarUpload" hidden ref="avatarInput" id="avatarInput">
                 更换头像
               </label>
             </div>
@@ -160,8 +160,9 @@
                   </div>
                 </div>
                 <div class="plan-actions">
-                  <button class="export-btn" @click="exportCareerPDF(plan.id)">导出PDF报告</button>
-                </div>
+  <button class="export-btn" @click="exportCareerPDF(plan.id)">导出PDF报告</button>
+  <button class="export-btn" style="background:#ff4d4f" @click="deleteCareerReport(plan.id)">删除</button>
+</div>
               </div>
             </div>
           </div>
@@ -198,8 +199,9 @@
                   </div>
                 </div>
                 <div class="report-actions">
-                  <button class="export-btn" @click="exportInterestPDF(item.id)">导出PDF报告</button>
-                </div>
+  <button class="export-btn" @click="exportInterestPDF(item.id)">导出PDF报告</button>
+  <button class="export-btn" style="background:#ff4d4f" @click="deleteInterestReport(item.id)">删除</button>
+</div>
               </div>
             </div>
           </div>
@@ -236,8 +238,9 @@
                   </div>
                 </div>
                 <div class="report-actions">
-                  <button class="export-btn" @click="exportMatchPDF(item.id)">导出PDF报告</button>
-                </div>
+  <button class="export-btn" @click="exportMatchPDF(item.id)">导出PDF报告</button>
+  <button class="export-btn" style="background:#ff4d4f" @click="deleteMatchReport(item.id)">删除</button>
+</div>
               </div>
             </div>
           </div>
@@ -300,10 +303,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
+import { ref, onMounted, nextTick } from 'vue'
 
 const router = useRouter()
 const token = localStorage.getItem('token')
@@ -359,6 +362,9 @@ const pwdForm = ref({ oldPwd: '', newPwd: '', confirmPwd: '' })
 const loadUserProfile = async () => {
   try {
     const { data } = await authAxios.get('/user/profile')
+    if (data.avatar && !data.avatar.startsWith('http')) {
+      data.avatar = 'http://127.0.0.1:5000' + data.avatar
+    }
     userInfo.value = { ...data, expanded: false }
   } catch (e) {
     ElMessage.error('加载用户信息失败')
@@ -426,6 +432,49 @@ const loadMatchReports = async () => {
   }
 }
 
+// ====================== 删除报告 ======================
+// 删除职业规划报告
+const deleteCareerReport = async (id) => {
+  ElMessage.warning('确定要删除这份职业规划报告吗？')
+  setTimeout(async () => {
+    try {
+      await authAxios.delete(`/user/report/career/${id}`)
+      ElMessage.success('删除成功')
+      loadCareerPlans()
+    } catch (e) {
+      ElMessage.error('删除失败')
+    }
+  }, 600)
+}
+
+// 删除兴趣测评报告
+const deleteInterestReport = async (id) => {
+  ElMessage.warning('确定要删除这份兴趣测试报告吗？')
+  setTimeout(async () => {
+    try {
+      await authAxios.delete(`/user/report/interest/${id}`)
+      ElMessage.success('删除成功')
+      loadInterestReports()
+    } catch (e) {
+      ElMessage.error('删除失败')
+    }
+  }, 600)
+}
+
+// 删除人岗匹配报告
+const deleteMatchReport = async (id) => {
+  ElMessage.warning('确定要删除这份匹配报告吗？')
+  setTimeout(async () => {
+    try {
+      await authAxios.delete(`/user/report/match/${id}`)
+      ElMessage.success('删除成功')
+      loadMatchReports()
+    } catch (e) {
+      ElMessage.error('删除失败')
+    }
+  }, 600)
+}
+
 const switchTab = (tab) => { activeTab.value = tab }
 const formatDate = (s) => {
   if (!s) return ''
@@ -438,23 +487,34 @@ const formatDate = (s) => {
 }
 
 // 头像上传
-const triggerAvatarUpload = () => {
-  document.querySelector('.avatar-upload-btn input')?.click()
-}
+
 const handleAvatarUpload = async (e) => {
   const file = e.target.files[0]
   if (!file) return
   const formData = new FormData()
   formData.append('file', file)
   try {
-    const { data } = await authAxios.post('/user/avatar', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
-    userInfo.value.avatar = data.avatar
+    const { data } = await authAxios.post('/user/avatar', formData)
+
+    // 1. 拼接完整地址
+    const fullAvatarUrl = 'http://127.0.0.1:5000' + data.avatar
+    // 2. 加时间戳破缓存
+    const avatarWithCacheBust = fullAvatarUrl + '?t=' + new Date().getTime()
+
+    userInfo.value.avatar = avatarWithCacheBust
+    localStorage.setItem('avatar', avatarWithCacheBust)
+
+    // 3. 等 DOM 下一帧更新（关键！）
+    await nextTick()
+
     ElMessage.success('头像更新成功')
   } catch (e) {
     ElMessage.error('上传失败')
   }
+
+  // 清空 input 值，保证下次 change 能触发
+  const input = e.target
+  input.value = ''
 }
 
 // 修改密码

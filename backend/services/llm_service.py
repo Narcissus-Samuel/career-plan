@@ -1,23 +1,45 @@
 """
 services/llm_service.py
+大模型服务总模块（职业规划AI核心）
 
-提供与职业规划相关的"大模型"接口实现（本地启发式 + 可选调用外部 API 的包装）
+功能定位：
+  本文件是整个系统**AI能力的统一出口**，集成大模型调用、简历解析、岗位推荐、
+  职业规划生成、问答对话、岗位画像自动构建、职业路径图谱生成等全功能。
+  所有需要AI智能的业务都会调用这里。
 
-函数：
-- parse_resume(file_path) -> dict
-- intelligent_recommendation(student_dict, jobs_list)
-- generate_plan_suggestion(student_dict, job_name)
-- chat_qa(question, context)
+核心能力：
+  1. 大模型统一调度：支持本地模板降级 + DeepSeek + 阿里云百炼（通义千问）
+  2. 简历智能解析：从文本提取技能、证书、经历、竞争力
+  3. 岗位智能推荐：基于学生画像做匹配度计算与排序
+  4. 职业规划生成：自动生成学习路径、提升方案、发展建议
+  5. 智能问答对话：支持职业咨询、岗位咨询、规划咨询
+  6. 岗位画像自动化：批量生成岗位技能/证书/软实力要求
+  7. 职业路径图谱：自动生成晋升路径（垂直）+ 转岗路径（横向）
+  8. 技能归一化、同义词合并、文本相似度计算
 
-说明：若配置了环境变量 DEEPSEEK_API_KEY，会尝试使用 DeepSeek；
-否则使用本地启发式模板生成文本，便于离线演示。
+外部依赖：
+  - 数据库：job / job_categories / job_profile / job_relations
+  - 大模型：DeepSeek / 阿里云百炼 API
+  - 工具：jieba分词、requests、dashscope
+  - 配置：API_KEY、LLM_MODE、LLM_MAX_CALLS_PER_RUN
+
+设计特点：
+  - 自动重试与限流保护
+  - 流式输出支持（用于报告生成）
+  - 同义词合并、软能力标准化
+  - 岗位分类、画像、图谱全自动构建
+
+废弃/备注：
+  - 原智谱AI代码已保留注释，可随时切回
+  - 部分算法模块来自 deprecated 目录，仅做兼容兜底
+  - 大模型调用带次数限制，防止测试刷额度
 """
 import os
 import json
 import time
 import logging
 from typing import Dict, Any, List, Optional
-from algorithms import recommend_jobs, compute_match_score
+from backend.deprecated.algorithms import recommend_jobs, compute_match_score
 
 # 配置日志，确保在测试中也能看到输出
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -25,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 # 高级算法类（若存在则优先使用）
 try:
-    from career_ml import CareerRecommend
+    from backend.deprecated.career_ml import CareerRecommend
 except Exception:
     CareerRecommend = None
 

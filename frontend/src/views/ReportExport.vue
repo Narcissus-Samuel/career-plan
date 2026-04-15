@@ -84,7 +84,8 @@
             <p class="card-time">生成时间：{{ item.created_at }}</p>
             <div class="card-actions">
               <button @click="loadReport(item)" class="btn btn-edit">编辑查看</button>
-              <button @click="quickExport(item)" class="btn btn-export">一键导出</button>
+<button @click="quickExport(item)" class="btn btn-export">一键导出</button>
+<button @click="deleteReportItem(item)" class="btn btn-delete">删除</button>
             </div>
           </div>
         </div>
@@ -141,7 +142,8 @@
               <td>{{ item.created_at }}</td>
               <td>
                 <button class="mini-btn" @click="loadReport(item)">编辑</button>
-                <button class="mini-btn export" @click="quickExport(item)">导出</button>
+<button class="mini-btn export" @click="quickExport(item)">导出</button>
+<button class="mini-btn delete" @click="deleteReportItem(item)">删除</button>
               </td>
              </tr>
           </tbody>
@@ -464,6 +466,29 @@ const saveEdit = () => {
 const quickExport = (item) => {
   loadReport(item)
   setTimeout(() => exportFinalReport(), 300)
+}
+
+// ====================== 删除报告 ======================
+const deleteReportItem = async (item) => {
+  try {
+    let url = ''
+    if (item.originalType === 'career') {
+      url = `/user/report/career/${item.originalId}`
+    } else if (item.originalType === 'match') {
+      url = `/user/report/match/${item.originalId}`
+    } else if (item.originalType === 'interest') {
+      url = `/user/report/interest/${item.originalId}`
+    }
+
+    if (!url) return
+
+    await authAxios.delete(url)
+    ElMessage.success('删除成功')
+    loadAllReports()
+    currentReport.value = null
+  } catch (e) {
+    ElMessage.error('删除失败')
+  }
 }
 
 // =============== 导出报告 ================
@@ -886,7 +911,10 @@ onMounted(() => {
 }
 .btn-edit { background: #f5f7fa; color: #333; }
 .btn-export { background: #2f54eb; color: #fff; }
-
+.btn-delete {
+  background: #ff4d4f;
+  color: #fff;
+}
 /* 编辑区 */
 .edit-section {
   background: #fff;
@@ -932,6 +960,10 @@ onMounted(() => {
   white-space: pre-line;
 }
 
+.mini-btn.delete {
+  background: #fff1f0;
+  color: #ff4d4f;
+}
 .export-bar {
   display: flex;
   justify-content: space-between;

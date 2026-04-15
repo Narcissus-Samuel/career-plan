@@ -1,3 +1,8 @@
+"""
+霍兰德职业兴趣测评接口（核心功能）
+提供题目获取、答案提交、维度计分、AI职业推荐、测评记录查询。
+说明：包含测试模式与LLM调用控制，全部为当前在用逻辑，无废弃代码。
+"""
 from flask import Blueprint, request, jsonify, session
 from db import get_db
 import json
