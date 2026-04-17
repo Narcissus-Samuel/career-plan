@@ -45,10 +45,6 @@
 - 职业测评：霍兰德等测评结果提交、测评历史查询
 - 核心接口：`/submit`， `/results`
 
-**`content.py`** - 路由前缀：`/api/content`
-- 资源中心：获取学习路径、学习资源、导师列表、实践机会
-- 核心接口：`/paths`， `/resources`， `/mentors`
-
 **`admin.py`** - 路由前缀：`/api/admin`
 - 管理员后台：管理员权限下的用户管理、数据管理、系统配置
 - 核心装饰器：`@admin_required`

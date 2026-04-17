@@ -2,6 +2,9 @@
 
 本项目为前后端分离的大学生职业规划系统，使用 Vue 3 + Vite 构建前端，Flask + SQLite 构建后端。
 
+测试用户 u1 密码：12345678
+
+
 ```
 frontend/                # 前端代码
   index.html             # 入口html
