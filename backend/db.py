@@ -81,7 +81,7 @@ def init_db():
             col_defs.append(f"{col} {typ}")
         
         # 重建 job 表（先删除旧表，确保结构生效；如果需要保留旧数据，可注释掉 DROP TABLE）
-        cursor.execute("DROP TABLE IF EXISTS job")
+        # cursor.execute("DROP TABLE IF EXISTS job")
         cursor.execute(f"CREATE TABLE job ({', '.join(col_defs)})")
 
         # 批量导入数据，统计导入数量

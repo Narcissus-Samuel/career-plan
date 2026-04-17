@@ -1,3 +1,9 @@
+# ============================================================
+# 大学生职业规划智能系统 - 报告生成模块
+# 功能：AI 职业规划报告生成、流式输出、PDF/MD 导出、报告历史管理
+# 技术栈：Flask + Vue3 + 阿里云百炼大模型 + SQLite
+# 版本：v1.0
+# ============================================================
 from flask import Blueprint, request, jsonify, send_file, Response, stream_with_context
 from db import get_db
 import json

@@ -2,7 +2,6 @@ import io
 from flask import send_file
 from db import get_db
 
-
 def get_report_row(report_id: int):
     conn = get_db()
     cur = conn.cursor()
