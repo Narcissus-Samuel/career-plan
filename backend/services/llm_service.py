@@ -217,9 +217,80 @@ _llm_call_count = 0
 
 
 def _local_llm_fallback(prompt: str) -> str:
-    """本地简易内容生成，供无API密钥或低额度场景使用"""
-    summary_lines = [l.strip() for l in prompt.split('\n') if l.strip()][:8]
-    return "# 本地生成内容（示例）\n\n" + "\n".join(summary_lines) + "\n\n（未命中外部API，属于演示内容）"
+    """本地模板生成，供无API密钥或API调用失败时使用"""
+    
+    import re
+    
+    # 1. 尝试从 prompt 中提取岗位名称
+    job_match = re.search(r'【(.*?)】', prompt)
+    job_name = job_match.group(1) if job_match else "目标岗位"
+    
+    # 2. 尝试提取学生技能
+    skills = []
+    tech_keywords = ['Python', 'Java', 'JavaScript', 'Vue', 'React', 'SQL', 'HTML', 'CSS', 
+                     'Spring', 'Django', 'Flask', 'TensorFlow', 'PyTorch', 'C++', 'C#', 
+                     'PHP', 'Go', 'Rust', 'Swift', 'Kotlin', 'Node.js', 'TypeScript',
+                     '数据分析', '机器学习', '深度学习', '前端开发', '后端开发', '全栈']
+    
+    for kw in tech_keywords:
+        if kw.lower() in prompt.lower():
+            skills.append(kw)
+    
+    skills_text = "、".join(skills[:5]) if skills else "相关技术"
+
+    # 3. 返回完整的模板报告
+    return f"""# 职业生涯发展报告（本地演示版）
+
+> ⚠️ 提示：当前未配置阿里云百炼 API Key，本报告使用本地模板生成。  
+> 配置 `ALIYUN_API_KEY` 后即可获得 AI 个性化报告。
+
+## 一、自我认知总结
+
+根据您的能力画像，您在专业技能、学习能力方面表现良好。建议进一步明确职业兴趣方向，结合【{job_name}】岗位要求制定发展计划。
+
+## 二、人岗匹配分析
+
+### 2.1 核心优势
+- 具备良好的学习能力和技术基础（{skills_text}）
+- 有相关项目实践经验
+- 软能力评分良好，适合团队协作
+
+### 2.2 待提升方向
+- 补充【{job_name}】岗位的核心技能
+- 增加相关实习经历
+- 考取行业认可证书
+
+## 三、职业发展路径
+
+### 3.1 晋升路径
+初级{job_name} → 中级{job_name} → 高级{job_name} → 技术专家/架构师
+
+### 3.2 转型方向
+可考虑向产品经理、技术架构师、技术管理等方向发展
+
+## 四、分阶段行动计划
+
+### 短期（1年内）
+- 掌握【{job_name}】核心技能框架
+- 完成 1-2 个相关项目
+- 准备求职作品集
+
+### 中期（1-3年）
+- 积累项目经验，提升技术深度
+- 考取行业相关证书
+- 建立技术影响力
+
+### 长期（3-5年）
+- 成为领域专家或技术负责人
+- 具备跨团队协作和项目管理能力
+
+## 五、评估与调整建议
+
+建议每 6 个月进行一次自我评估，根据行业发展和个人成长调整规划。
+
+---
+*本报告由系统本地模板生成。配置阿里云百炼 API Key 后即可获得 AI 个性化报告。*
+"""
 
 
 def call_llm(prompt: str, temperature=0.3, max_tokens=6000, thinking=False, max_retries=1) -> str:

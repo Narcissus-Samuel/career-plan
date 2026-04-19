@@ -1,8 +1,64 @@
-# 项目整体结构说明
+# 系统部署与运行指南
 
-本项目为前后端分离的大学生职业规划系统，使用 Vue 3 + Vite 构建前端，Flask + SQLite 构建后端。
+## 一、环境要求
+
+| 环境 | 版本要求 |
+|------|----------|
+| Python | 3.8 及以上 |
+| Node.js | 16.0 及以上 |
+| 操作系统 | Windows / macOS / Linux |
+
+---
+
+## 二、后端部署
+
+### 
+2.1 进入后端目录
+```bash
+cd backend
+
+ 2.2 创建虚拟环境（推荐）
+Windows：
+python -m venv venv
+venv\Scripts\activate
+
+Mac / Linux：
+python -m venv venv
+source venv/bin/activate
+
+2.3 安装依赖
+pip install -r requirements.txt
+
+2.4 配置环境变量（重要）
+在 backend 目录下创建 .env 文件：
+ALIYUN_API_KEY=你的阿里云百炼API Key
+注意：如果没有配置 API Key，以下功能可能将无法使用：
+1、AI 职业规划报告生成   2、岗位画像动态生成（只能查看以前生成好的）  3、AI 简历智能解析   4、兴趣测评 AI 推荐
+
+2.6 启动后端服务
+python app.py
+启动成功提示：
+* Running on http://127.0.0.1:5000
+✅ 后端服务默认运行在：http://localhost:5000
+
+三、前端部署
+3.1 进入前端目录
+cd frontend
+
+3.2 安装依赖
+npm install
+
+3.3 启动前端服务
+npm run dev
+
+启动成功提示：
+
+VITE v4.x.x  ready in xxx ms
+➜  Local:   http://localhost:5173/
+✅ 前端服务默认运行在：http://localhost:5173
 
 测试用户 u1 密码：12345678
+
 
 
 ```
@@ -70,6 +126,8 @@ backend/
 - 后端使用原生 sqlite3，采用 `db.init_db()` 动态创建表并支持 Excel 导入。
 - 前端页面均使用 Element Plus / 原生组件实现 UI，部分页面使用 Canvas 绘图。
 - 通过 `axios` 实现前端与后端的数据交互，授权使用简单 Bearer token `mock-token-<id>`。
+
+
 
 ```
 ```

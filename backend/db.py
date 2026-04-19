@@ -82,7 +82,13 @@ def init_db():
         
         # 重建 job 表（先删除旧表，确保结构生效；如果需要保留旧数据，可注释掉 DROP TABLE）
         # cursor.execute("DROP TABLE IF EXISTS job")
-        cursor.execute(f"CREATE TABLE job ({', '.join(col_defs)})")
+        # 检查 job 表是否存在，不存在才创建
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='job'")
+        if not cursor.fetchone():
+            cursor.execute(f"CREATE TABLE job ({', '.join(col_defs)})")
+            print("✅ job 表已创建")
+        else:
+            print("⚠️ job 表已存在，跳过创建")
 
         # 批量导入数据，统计导入数量
         import_count = 0
