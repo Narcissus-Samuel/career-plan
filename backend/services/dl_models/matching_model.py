@@ -35,9 +35,15 @@ class SiameseMatchingNet(nn.Module):
             dropout=dropout if num_layers > 1 else 0
         )
         
+        # 编码后的向量维度 = hidden_dim * 3（因为拼接了 last_hidden, pooled_max, pooled_mean）
+        encoding_dim = hidden_dim * 3   # 当 hidden_dim=256 时，encoding_dim=768
+        
+        # 融合层的输入维度 = concat(2个编码) + diff + product = 2*encoding_dim + encoding_dim + encoding_dim = 4*encoding_dim
+        fusion_input_dim = 4 * encoding_dim   # 4*768=3072
+        
         # 特征融合层
         self.fusion = nn.Sequential(
-            nn.Linear(hidden_dim * 3, 256),
+            nn.Linear(fusion_input_dim, 256),
             nn.BatchNorm1d(256),
             nn.ReLU(),
             nn.Dropout(dropout),
